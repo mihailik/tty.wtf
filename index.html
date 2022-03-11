@@ -6,17 +6,8 @@
 <title>TTY</title>
 </head>
 <body style="width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0;">
-<textarea id="textarea" style="
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  overflow: auto;
-  border: none;
-  padding: 1em;
-  outline: none;
-  font: inherit;
-  padding-bottom: 3em;">
-</textarea>
 <div id="toolbar" style="
-  position: absolute; bottom: 0; left: 0;
+  position: absolute; top: 0; left: 0;
   background: whitesmoke;
 ">
 <button id="bold">𝗕</button>
@@ -30,6 +21,20 @@
 <button id="typewrighter">𝚃</button>
 <button id="wide">𝕎</button>
 </div>
+<textarea id="textarea" style="
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  overflow: auto;
+  border: none;
+  padding: 1em;
+  outline: none;
+  font: inherit;
+  padding-top: 3em;" autofocus>
+</textarea>
+<style>
+#toolbar button {
+  width: 1.7em; height: 1.7em; margin: 0.15em;
+}  
+</style>
 <script>
 // @ts-check
 

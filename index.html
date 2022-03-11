@@ -54,16 +54,17 @@ function load() {
   var status = document.getElementById('status');
 
   textarea.onchange = textarea_onchange;
-  textarea.onselect = textarea_selectionchange;
-  textarea.onselectionchange = textarea_selectionchange;
-  textarea.onselectstart = textarea_selectionchange;
-  textarea.onkeydown = textarea_selectionchange;
-  textarea.onkeyup = textarea_selectionchange;
-  textarea.onmousedown = textarea_selectionchange;
+  textarea.onselect = textarea_onselectionchange;
+  textarea.onselectionchange = textarea_onselectionchange;
+  textarea.onselectstart = textarea_onselectionchange;
+  textarea.onkeydown = textarea_onselectionchange;
+  textarea.onkeyup = textarea_onselectionchange;
+  textarea.onmousedown = textarea_onselectionchange;
 
   window.onunload = window_onunload;
 
   addButtonHandlers();
+  textarea_onselectionchange();
 
   function addButtonHandlers() {
     var buttonsArray = document.getElementsByTagName('button');
@@ -117,15 +118,15 @@ function load() {
 
   function textarea_onchange_debounced() {
     setStorageText(textarea.value);
-    textarea_selectionchange_debounced();
+    textarea_onselectionchange_debounced();
   }
 
-  function textarea_selectionchange() {
+  function textarea_onselectionchange() {
     clearTimeout(selection_timeout);
-    selection_timeout = setTimeout(textarea_selectionchange_debounced, 100);
+    selection_timeout = setTimeout(textarea_onselectionchange_debounced, 100);
   }
 
-  function textarea_selectionchange_debounced() {
+  function textarea_onselectionchange_debounced() {
     // TODO: detect selection and update font toolbar
     status.textContent = status.innerText = textarea.selectionStart + ':' + (textarea.selectionEnd - textarea.selectionStart);
   }

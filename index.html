@@ -24,6 +24,8 @@ function load() {
   textarea.onselectionchange = textarea_selectionchange;
   textarea.onselectstart = textarea_selectionchange;
 
+  window.onunload = window_onunload;
+
 
   function getStorageText() {
     try {
@@ -60,6 +62,11 @@ function load() {
 
   function textarea_selectionchange_debounced() {
     // TODO: detect selection and update font toolbar
+  }
+
+  function window_onunload() {
+    // save to local storage NOW
+    textarea_onchange_debounced();
   }
 }
 window.onload = load;

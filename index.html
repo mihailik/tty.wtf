@@ -35,7 +35,10 @@
 <button id="typewrighter">𝚃</button>
 <button id="wide">𝕎</button>
 
-<div id="status"></div>
+<div id="status" style="
+  position: absolute;
+  right: 1em;
+  top: 0;"></div>
 </div>
 <script>
 // @ts-check
@@ -56,6 +59,8 @@ function load() {
   textarea.onselectstart = textarea_selectionchange;
 
   window.onunload = window_onunload;
+
+  addButtonHandlers();
 
   function addButtonHandlers() {
     var buttonsArray = document.getElementsByTagName('button');
@@ -109,6 +114,7 @@ function load() {
 
   function textarea_onchange_debounced() {
     setStorageText(textarea.value);
+    textarea_selectionchange_debounced();
   }
 
   function textarea_selectionchange() {

@@ -34,6 +34,8 @@
 <button id="round">Ⓡ</button>
 <button id="typewrighter">𝚃</button>
 <button id="wide">𝕎</button>
+
+<div id="status"></div>
 </div>
 <script>
 // @ts-check
@@ -46,6 +48,8 @@ function load() {
   var textarea = /** @type {HTMLTextAreaElement} */(document.getElementById('textarea'));
   textarea.value = getStorageText();
 
+  var status = document.getElementById('status');
+
   textarea.onchange = textarea_onchange;
   textarea.onselect = textarea_selectionchange;
   textarea.onselectionchange = textarea_selectionchange;
@@ -53,6 +57,31 @@ function load() {
 
   window.onunload = window_onunload;
 
+  function addButtonHandlers() {
+    var buttonsArray = document.getElementsByTagName('button');
+    for (var i = 0; i < buttonsArray.length; i++) {
+      addHandler(buttonsArray[i]);
+    }
+
+    function addHandler(btn) {
+      btn.onmousedown = btn_onmousedown;
+      btn.onmouseup = btn_mouseup;
+      btn.onclick = btn_click;
+
+      function btn_onmousedown(evt) {
+        if (evt.preventDefault) evt.preventDefault();
+        // TODO: apply 
+      }
+
+      function btn_mouseup(evt) {
+        if (evt.preventDefault) evt.preventDefault();
+      }
+
+      function btn_click(evt) {
+        if (evt.preventDefault) evt.preventDefault();
+      }
+    }
+  }
 
   function getStorageText() {
     try {
@@ -89,6 +118,7 @@ function load() {
 
   function textarea_selectionchange_debounced() {
     // TODO: detect selection and update font toolbar
+    status.textContent = status.innerText = textarea.selectionStart + ':' + (textarea.selectionEnd - textarea.selectionStart);
   }
 
   function window_onunload() {

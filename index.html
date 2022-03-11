@@ -14,10 +14,15 @@
 function load() {
 
   var save_timeout;
+  var selection_timeout;
   
   var textarea = /** @type {HTMLTextAreaElement} */(document.getElementById('textarea'));
   textarea.value = getStorageText();
+
   textarea.onchange = textarea_onchange;
+  textarea.onselect = textarea_selectionchange;
+  textarea.onselectionchange = textarea_selectionchange;
+  textarea.onselectstart = textarea_selectionchange;
 
 
   function getStorageText() {
@@ -46,6 +51,15 @@ function load() {
 
   function textarea_onchange_debounced() {
     setStorageText(textarea.value);
+  }
+
+  function textarea_selectionchange() {
+    clearTimeout(selection_timeout);
+    selection_timeout = setTimeout(textarea_selectionchange_debounced, 300);
+  }
+
+  function textarea_selectionchange_debounced() {
+    // TODO: detect selection and update font toolbar
   }
 }
 window.onload = load;

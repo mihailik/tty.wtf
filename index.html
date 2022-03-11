@@ -9,11 +9,14 @@
 <textarea id="textarea" style="width: 100%; height: 100%; overflow: auto; border: none; padding: 1em; outline: none; font: inherit;">
 </textarea>
 <script>
+// @ts-check
+
 function load() {
 
   var save_timeout;
-  var textarea = document.getElementById('textarea');
-  textarea = getStorageText();
+  
+  var textarea = /** @type {HTMLTextAreaElement} */(document.getElementById('textarea'));
+  textarea.value = getStorageText();
   textarea.onchange = textarea_onchange;
 
 

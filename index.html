@@ -57,6 +57,9 @@ function load() {
   textarea.onselect = textarea_selectionchange;
   textarea.onselectionchange = textarea_selectionchange;
   textarea.onselectstart = textarea_selectionchange;
+  textarea.onkeydown = textarea_selectionchange;
+  textarea.onkeyup = textarea_selectionchange;
+  textarea.onmousedown = textarea_selectionchange;
 
   window.onunload = window_onunload;
 
@@ -119,7 +122,7 @@ function load() {
 
   function textarea_selectionchange() {
     clearTimeout(selection_timeout);
-    selection_timeout = setTimeout(textarea_selectionchange_debounced, 300);
+    selection_timeout = setTimeout(textarea_selectionchange_debounced, 100);
   }
 
   function textarea_selectionchange_debounced() {

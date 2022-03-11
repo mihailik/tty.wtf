@@ -6,7 +6,46 @@
 <title>TTY</title>
 </head>
 <body style="width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0;">
-<textarea style="width: 100%; height: 100%; overflow: auto; border: none; padding: 1em; outline: none; font: inherit;">
+<textarea id="textarea" style="width: 100%; height: 100%; overflow: auto; border: none; padding: 1em; outline: none; font: inherit;">
 </textarea>
+<script>
+function load() {
+
+  var save_timeout;
+  var textarea = document.getElementById('textarea');
+  textarea = getStorageText();
+  textarea.onchange = textarea_onchange;
+
+
+  function getStorageText() {
+    try {
+      return localStorage.getItem('tty.wtf.content');
+    } catch (error) {
+      console.log('Browser failed to get data from localStorage. ', error);
+    }
+  }
+
+  function setStorageText(text) {
+    try {
+      localStorage.setItem('tty.wtf.content', text);
+      setStorageText.lastStorageSuccess = true;
+    } catch (error) {
+      if (setStorageText.lastStorageSuccess !== true)
+        console.log('Browser failed to store data into localStorage. ', error);
+      setStorageText.lastStorageSuccess = false;
+    }
+  }
+
+  function textarea_onchange() {
+    clearTimeout(save_timeout);
+    save_timeout = setTimeout(textarea_onchange_debounced, 600);
+  }
+
+  function textarea_onchange_debounced() {
+    setStorageText(textarea.value);
+  }
+}
+window.onload = load;
+</script>
 </body>
 </html>

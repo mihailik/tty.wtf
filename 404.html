@@ -178,6 +178,37 @@ function load() {
     // save to local storage NOW
     textarea_onchange_debounced();
   }
+
+  /** @param str {string} */
+  function getModifiers(str) {
+    var char = str.charAt(0);
+    var result = [];
+    for (var modKind in variants) {
+      var rangeMap = variants[modKind];
+      if (!rangeMap || typeof rangeMap !== 'object') continue;
+
+      for (var rangeDescr in rangeMap) {
+        var rangeList = rangeMap[rangeDescr];
+        if (typeof rangeList !== 'string') continue;
+        if (rangeList.indexOf(char)>=0) {
+          // TODO: add modKind, but pay attention to bold overlap
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /** @param str {string} */
+  function breakIntoChars(str) {
+    /** @type {string[]} */
+    var arr = [];
+    str.replace(/./ug, function (ch) {
+      arr.push(ch);
+      return '';
+    });
+    return arr;
+  }
 }
 window.onload = load;
 </script>

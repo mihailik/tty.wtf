@@ -108,7 +108,10 @@ function ttywtf() {
   var save_timeout;
   var selection_timeout_slide;
   var selection_timeout_max;
-  
+
+  var textareaKeyEventTimestamp = 0;
+  var textareaLastValue = '';
+
   var textarea = /** @type {HTMLTextAreaElement} */(document.getElementById('textarea'));
   textarea.value = getStorageText();
 
@@ -119,8 +122,9 @@ function ttywtf() {
   textarea.onselect = textarea_onselectionchange;
   textarea.onselectionchange = textarea_onselectionchange;
   textarea.onselectstart = textarea_onselectionchange;
-  textarea.onkeydown = textarea_onselectionchange;
-  textarea.onkeyup = textarea_onselectionchange;
+  textarea.onkeydown = textarea_onkeydown;
+  textarea.onkeyup = textarea_onkeyevent;
+  textarea.onkeypress = textarea_onkeyevent;
   textarea.onmousedown = textarea_onmousedown;
   textarea.onmouseup = textarea_onmouseup;
   textarea.onmousemove = textarea_onmousemove;
@@ -147,26 +151,8 @@ function ttywtf() {
         if ('cancelBubble' in evt) evt.cancelBubble = true;
 
         var modifier = btn.id;
-        var oldText = textarea.value;
-
-        if (!modifier || !oldText) return;
-
-        var leadText = oldText.slice(0, textarea.selectionStart);
-        var modifyText = oldText.slice(textarea.selectionStart, textarea.selectionEnd);
-        var trailText = oldText.slice(textarea.selectionEnd);
-
-        if (!modifyText) return;
-
-        var newText = leadText + applyModifier(
-          modifyText,
-          btn.id,
-          (btn.className || '').indexOf('pressed') >=0) + trailText;
-
-        if (oldText !== newText) {
-          textarea.value = newText;
-          textarea.selectionStart = leadText.length;
-          textarea.selectionEnd = newText.length - trailText.length;
-        }
+        var remove = (btn.className || '').indexOf('pressed') >=0;
+        applyModifierToSelection(modifier, remove);
       }
 
       /**
@@ -186,6 +172,36 @@ function ttywtf() {
         if (evt.stopPropagation) evt.stopPropagation();
         if ('cancelBubble' in evt) evt.cancelBubble = true;
       }
+    }
+  }
+
+  /**
+   * @param modifier {string}
+   * @param remove {boolean=}
+   **/
+  function applyModifierToSelection(modifier, remove) {
+    var oldText = textarea.value;
+
+    if (!modifier || !oldText) return;
+
+    var leadText = oldText.slice(0, textarea.selectionStart);
+    var modifyText = oldText.slice(textarea.selectionStart, textarea.selectionEnd);
+    var trailText = oldText.slice(textarea.selectionEnd);
+
+    if (!modifyText) return;
+
+    var newText = leadText + applyModifier(
+      modifyText,
+      modifier,
+      remove) + trailText;
+
+    if (oldText !== newText) {
+      // ensure this update is not considered a user edit
+      textareaCurrentValue = newText;
+
+      textarea.value = newText;
+      if (textarea.selectionStart !== leadText.length) textarea.selectionStart = leadText.length;
+      if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
     }
   }
 
@@ -209,8 +225,98 @@ function ttywtf() {
   }
 
   function textarea_onchange() {
-    clearTimeout(save_timeout);
-    save_timeout = setTimeout(textarea_onchange_debounced, 600);
+    var textareaCurrentValue = textarea.value;
+    if (textareaCurrentValue === textareaLastValue) {
+      textarea_onselectionchange();
+    } else {
+      var timestamp = Date.now();
+      var shortlyAfterKeydown = (Date.now() - textareaKeyEventTimestamp) < 50;
+      var formattingApplied = false;
+      if (textareaCurrentValue && shortlyAfterKeydown) {
+        if (textarea.selectionStart === textarea.selectionEnd) {
+          var leadLength = Math.max(0, textarea.selectionStart - 10);
+          var trailLength = Math.max(0, textareaCurrentValue.length - textarea.selectionStart - 2);
+
+          if (textareaCurrentValue.slice(0, leadLength) === textareaLastValue.slice(0, leadLength)
+             && textareaCurrentValue.slice(-trailLength) === textareaLastValue.slice(-trailLength)) {
+            // change is close to the cursor, good
+
+            // find where change starts exactly
+            while (leadLength + trailLength < textareaCurrentValue.length
+                  && leadLength + trailLength < textareaLastValue.length
+                  && textareaCurrentValue.charCodeAt(leadLength) === textareaLastValue.charCodeAt(leadLength)) {
+              leadLength++;
+            }
+
+            // find where change ends exactly
+            while (leadLength + trailLength < textareaCurrentValue.length
+                  && leadLength + trailLength < textareaLastValue.length
+                  && textareaCurrentValue.charCodeAt(textareaCurrentValue.length - trailLength) === textareaLastValue.charCodeAt(textareaLastValue.length - trailLength)) {
+              trailLength++;
+            }
+
+            // will be applying modifiers one by one, more important last
+            var modifiersChange = getModifiersTextSection(
+              textareaLastValue,
+              leadLength,
+              textareaLastValue.length - trailLength
+            ).parsed.modifiers;
+
+            var modifiersLead = textareaLastValue.length === leadLength + trailLength ?
+              [] :
+              getModifiersTextSection(
+                textareaLastValue,
+                leadLength,
+                leadLength + 2
+              ).parsed.modifiers;
+
+            if (modifiersChange.length) {
+              var applyModifiers = modifiersLead.slice().reverse();
+              for (var i = 0; i < modifiersChange.length; i++) {
+                var mod = modifiersChange[i];
+                if (applyModifiers.indexOf(mod)<0) applyModifiers.unshift(mod);
+              }
+
+              var innerText = textareaCurrentValue.slice(leadLength, -trailLength);
+              for (var i = 0; i < applyModifiers.length; i++) {
+                innerText = applyModifier(innerText, applyModifiers[i]);
+              }
+
+              var prevInnerText = textareaLastValue.slice(leadLength, -trailLength);
+              var editedInnerText = textareaCurrentValue.slice(leadLength, -trailLength);
+
+              var newText =
+                textareaCurrentValue.slice(0, leadLength) +
+                innerText +
+                textareaCurrentValue.slice(-trailLength);
+
+              var retainSelectionStart = textarea.selectionStart;
+              textareaLastValue = newText;
+              textarea.value = newText;
+              formattingApplied = true;
+              if (textarea.selectionStart !== retainSelectionStart) textarea.selectionStart = retainSelectionStart;
+              if (textarea.selectionEnd !== retainSelectionStart) textarea.selectionEnd = retainSelectionStart;
+
+              console.log(
+                {
+                  from: prevInnerText,
+                  edited: editedInnerText,
+                  formatted: innerText,
+                  mods: applyModifiers
+                }
+              );
+            }
+          }
+        }
+      }
+
+      if (!formattingApplied) {
+        textareaLastValue = textareaCurrentValue;
+      }
+
+      clearTimeout(save_timeout);
+      save_timeout = setTimeout(textarea_onchange_debounced, 600);
+    }
   }
 
   function textarea_onchange_debounced() {
@@ -231,6 +337,31 @@ function ttywtf() {
   function textarea_onmousemove() {
     if (!textareaMouseDown) return;
     textarea_onselectionchange();
+  }
+
+  function textarea_onkeydown(e) {
+    if (e.metaKey || e.ctrlKey) {
+      var letter = String.fromCharCode(e.keyCode);
+      var modifier =
+        letter === 'B' ? 'bold' :
+        letter === 'I' ? 'italic' :
+        '';
+
+      if (modifier) {
+        var btn = document.getElementById(modifier);
+        if (btn) {
+          var remove = (btn.className || '').indexOf('pressed') >=0;
+          applyModifierToSelection(modifier, remove);
+        }
+      }
+    }
+
+    textarea_onkeyevent();
+  }
+
+  function textarea_onkeyevent(e) {
+    textareaKeyEventTimestamp = Date.now();
+    textarea_onchange();
   }
 
   function textarea_onselectionchange() {

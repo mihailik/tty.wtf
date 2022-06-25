@@ -31,7 +31,18 @@ body {
 }
 
 #toolbar button {
-  width: 2.7em; height: 2.7em; margin: 0.15em;
+  width: 2.7em;
+  height: 2.7em;
+  margin: 0.15em;
+  border-radius: 0.5em;
+  background: white;
+  border: solid 1px #d6d6d6;
+  box-shadow: 2px 3px 6px rgb(0, 0, 0, 0.09);
+}
+
+#toolbar button.pressed {
+  background: gray;
+  color: white;
 }
 
 #textarea {
@@ -43,6 +54,7 @@ body {
   outline: none;
   font: inherit;
   padding-top: 4em;
+  resize: none;
 }
 
 </style>
@@ -102,15 +114,16 @@ function ttywtf() {
 
   var status = document.getElementById('status');
 
+  var textareaMouseDown = false;
   textarea.onchange = textarea_onchange;
   textarea.onselect = textarea_onselectionchange;
   textarea.onselectionchange = textarea_onselectionchange;
   textarea.onselectstart = textarea_onselectionchange;
   textarea.onkeydown = textarea_onselectionchange;
   textarea.onkeyup = textarea_onselectionchange;
-  textarea.onmousedown = textarea_onselectionchange;
-  textarea.onmouseup = textarea_onselectionchange;
-  textarea.onmousemove = textarea_onselectionchange;
+  textarea.onmousedown = textarea_onmousedown;
+  textarea.onmouseup = textarea_onmouseup;
+  textarea.onmousemove = textarea_onmousemove;
 
   window.onunload = window_onunload;
 
@@ -130,15 +143,48 @@ function ttywtf() {
 
       function btn_onmousedown(evt) {
         if (evt.preventDefault) evt.preventDefault();
-        // TODO: apply 
+        if (evt.stopPropagation) evt.stopPropagation();
+        if ('cancelBubble' in evt) evt.cancelBubble = true;
+
+        var modifier = btn.id;
+        var oldText = textarea.value;
+
+        if (!modifier || !oldText) return;
+
+        var leadText = oldText.slice(0, textarea.selectionStart);
+        var modifyText = oldText.slice(textarea.selectionStart, textarea.selectionEnd);
+        var trailText = oldText.slice(textarea.selectionEnd);
+
+        if (!modifyText) return;
+
+        var newText = leadText + applyModifier(
+          modifyText,
+          btn.id,
+          (btn.className || '').indexOf('pressed') >=0) + trailText;
+
+        if (oldText !== newText) {
+          textarea.value = newText;
+          textarea.selectionStart = leadText.length;
+          textarea.selectionEnd = newText.length - trailText.length;
+        }
       }
 
+      /**
+       * @param evt {MouseEvent}
+       **/
       function btn_mouseup(evt) {
         if (evt.preventDefault) evt.preventDefault();
+        if (evt.stopPropagation) evt.stopPropagation();
+        if ('cancelBubble' in evt) evt.cancelBubble = true;
       }
 
+      /**
+       * @param evt {MouseEvent}
+       **/
       function btn_click(evt) {
         if (evt.preventDefault) evt.preventDefault();
+        if (evt.stopPropagation) evt.stopPropagation();
+        if ('cancelBubble' in evt) evt.cancelBubble = true;
       }
     }
   }
@@ -172,6 +218,21 @@ function ttywtf() {
     textarea_onselectionchange_debounced();
   }
 
+  function textarea_onmousedown() {
+    textareaMouseDown = true;
+    textarea_onselectionchange();
+  }
+
+  function textarea_onmouseup() {
+    textareaMouseDown = false;
+    textarea_onselectionchange();
+  }
+
+  function textarea_onmousemove() {
+    if (!textareaMouseDown) return;
+    textarea_onselectionchange();
+  }
+
   function textarea_onselectionchange() {
     if (!selection_timeout_max) selection_timeout_max = setTimeout(textarea_onselectionchange_debounced, 200);
     clearTimeout(selection_timeout_slide);
@@ -191,7 +252,9 @@ function ttywtf() {
     for (var i = 0; i < toggleButtons.length; i++) {
       var btn = /** @type {HTMLButtonElement} */(toggleButtons[i]);
       if (btn.id) {
-        btn.style.background = modTextSection.parsed.modifiers.indexOf(btn.id) >=0 ? 'silver' : null;
+        var pressed = modTextSection.parsed.modifiers.indexOf(btn.id) >= 0;
+        if (pressed) btn.className = (btn.className || '').replace(/\s+$/, '') + ' pressed';
+        else btn.className = btn.className.replace(/\s*\bpressed\b\s*/, ' ') ;
       }
     }
   }
@@ -241,46 +304,141 @@ function ttywtf() {
     textarea_onchange_debounced();
   }
 
-  function createParser() {
-    /** @type {{ uni: string, ascii: string, modifiers: string[], fullModifiers: string }[]} */
-    var lookupList = [];
-    /** @type {{ [uni: string]: typeof lookupList[0] }} */
-    var lookup = {};
+  /**
+   * @param text {string}
+   * @param modifier {string}
+   * @param remove {boolean}
+   **/
+  function applyModifier(text, modifier, remove) {
+    var parsed = parseRanges(text, { disableCoalescing: true });
+    var text = '';
 
-    var modKindList = [];
-    for (var modKind in variants) {
-      var rangeMap = variants[modKind];
-      if (!rangeMap || typeof rangeMap !== 'object') continue;
+    for (var iRange = 0; iRange < parsed.length; iRange++) {
+      var range = parsed[iRange];
 
-      var modifiers = modKind.indexOf('bold') ? [modKind] : ['bold', modKind.slice(4)];
+      if (typeof range === 'string') {
+        if (remove) {
+          text += range;
+        } else {
+          var rangeMap = variants[modifier];
+          if (!rangeMap) {
+            // strange modifier???
+            text += range;
+          } else {
+            for (var iChar = 0; iChar < range.length; iChar++) {
+              // range is an ASCII string, iterate for each character
+              var ch = range.charAt(iChar);
+              var uniCh = applyModifierToAscii(ch, [modifier]);
+              text += uniCh;
+            }
+          }
+        }
+      } else {
+        /** @type {string} */
+        var applyFullModifiers;
+        if (remove) {
+          if (range.modifiers.indexOf(modifier)<0) {
+            // formatted, but not with this modifier — not removing anything
+            text += range.uni;
+            continue;
+          } else if (range.modifiers.length === 1) {
+            // last modifier to be removed, simply reduce back to ASCII unformatted
+            text += range.ascii;
+            continue;
+          } else {
+            applyFullModifiers = range.modifiers.filter(mod => mod === modifier).join('');
+          }
+        } else {
+          applyFullModifiers = range.modifiers.concat([modifier]).sort().join('');
+        }
 
-      for (var rangeDesc in rangeMap) {
-        var rangeChars = rangeMap[rangeDesc];
-        if (!rangeChars || typeof rangeChars !== 'string') continue;
+        var formattedCh = applyModifierToAscii(range.ascii, [applyFullModifiers, modifier]);
+        text += formattedCh;
+      }
+    }
 
-        var rangeCount = rangeDesc.length === 1 ? 1 : rangeDesc.charCodeAt(1) - rangeDesc.charCodeAt(0) + 1;
-        var uniWidth = rangeChars.length / rangeCount;
-        for (let i = 0; i < rangeCount; i++) {
-          var ascii = String.fromCharCode(rangeDesc.charCodeAt(0) + i);
-          var rangeCh = rangeChars.slice(i * uniWidth, (i + 1) * uniWidth);
-          var entry = { uni: rangeCh, ascii: ascii, modifiers: modifiers, fullModifiers: modKind };
-          lookupList.push(entry);
-          lookup[entry.uni] = entry;
+    return text;
+  }
+
+  /**
+   * @param asciiCh {string}
+   * @param modifierAndFallbacks {string[]}
+   **/
+  function applyModifierToAscii(asciiCh, modifierAndFallbacks) {
+    for (var iMod = 0; iMod < modifierAndFallbacks.length; iMod++) {
+      var mod = modifierAndFallbacks[iMod];
+      var rangeMap = variants[mod];
+      var uniRange = rangeMap[asciiCh];
+      if (uniRange) return uniRange;
+
+      for (var asciiRange in rangeMap) {
+        var uniRange = rangeMap[asciiRange];
+        if (typeof uniRange === 'string' && asciiCh.charCodeAt(0) >= asciiRange.charCodeAt(0) && asciiCh.charCodeAt(0) <= asciiRange.charCodeAt(1)) {
+          // found respective range in modifier entry, pick corresponding Unicode character
+          var uniIndex = asciiCh.charCodeAt(0) - asciiRange.charCodeAt(0);
+          var uniUnit = uniRange.length / (asciiRange.charCodeAt(1) - asciiRange.charCodeAt(0) + 1);
+          return uniRange.slice(uniIndex * uniUnit, (uniIndex + 1) * uniUnit);
         }
       }
     }
 
-    lookupList.sort(function (entry1, entry2) {
-      return -(entry1.uni.length - entry2.uni.length);
-    });
+    return asciiCh;
+  }
 
-    var matchRegex = new RegExp(lookupList.map(function(entry) { return entry.uni.replace(/[#-.]|[[-^]|[?|{}]/g, '\\$&'); }).join('|'), 'g');
+  function createParser() {
+      /** @typedef {{ uni: string, ascii: string, modifiers: string[], fullModifiers: string }} LookupEntry */
+
+      /** @type {{ [uni: string]: LookupEntry }} */
+    var lookup = {};
+    /** @type {RegExp} */
+    var matchRegex;
+
+    buildLookups();
 
     return parser;
 
-    function parser(text) {
-      var result = /** @type {((typeof lookupList[0] & { length: number }) | string)[] & { modifiers: string[], fullModifiers: string } } */([]);
+    function buildLookups() {
+      /** @type {LookupEntry[]} */
+      var lookupList = [];
+
+      for (var modKind in variants) {
+        var rangeMap = variants[modKind];
+        if (!rangeMap || typeof rangeMap !== 'object') continue;
+
+        var modifiers = modKind === 'bold' || modKind.indexOf('bold') ? [modKind] : ['bold', modKind.slice(4)];
+
+        for (var rangeDesc in rangeMap) {
+          var rangeChars = rangeMap[rangeDesc];
+          if (!rangeChars || typeof rangeChars !== 'string') continue;
+
+          var rangeCount = rangeDesc.length === 1 ? 1 : rangeDesc.charCodeAt(1) - rangeDesc.charCodeAt(0) + 1;
+          var uniWidth = rangeChars.length / rangeCount;
+          for (let i = 0; i < rangeCount; i++) {
+            var ascii = String.fromCharCode(rangeDesc.charCodeAt(0) + i);
+            var rangeCh = rangeChars.slice(i * uniWidth, (i + 1) * uniWidth);
+            var entry = { uni: rangeCh, ascii: ascii, modifiers: modifiers, fullModifiers: modKind };
+            lookupList.push(entry);
+            lookup[entry.uni] = entry;
+          }
+        }
+      }
+
+      lookupList.sort(function (entry1, entry2) {
+        return -(entry1.uni.length - entry2.uni.length);
+      });
+
+      matchRegex = new RegExp(lookupList.map(function(entry) { return entry.uni.replace(/[#-.]|[[-^]|[?|{}]/g, '\\$&'); }).join('|'), 'g');
+    }
+
+    /**
+     * @param text {string}
+     * @param options {{ disableCoalescing?: boolean }=}
+     **/
+    function parser(text, options) {
+      var result = /** @type {((LookupEntry & { length: number }) | string)[] & { modifiers: string[], fullModifiers: string } } */([]);
       result.modifiers = [];
+
+      var disableCoalescing = options && options.disableCoalescing;
 
       var modifierDict = {};
 
@@ -297,7 +455,7 @@ function ttywtf() {
         var entry = lookup[match[0]];
         var prev = result.length && result[result.length - 1];
 
-        if (prev && typeof prev !== 'string' && prev.fullModifiers === entry.fullModifiers) {
+        if (!disableCoalescing && prev && typeof prev !== 'string' && prev.fullModifiers === entry.fullModifiers) {
           prev.uni += entry.uni;
           prev.length += entry.uni.length;
           prev.ascii += entry.ascii;
@@ -327,7 +485,7 @@ function ttywtf() {
       }
 
       result.modifiers.sort();
-      result.fullModifiers = modifiers.join('');
+      result.fullModifiers = result.modifiers.join('');
 
       return result;
     }

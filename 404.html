@@ -174,6 +174,9 @@ function ttywtf() {
   }
 
   function setStorageText(text) {
+    updateLocationWithText(text);
+    return;
+
     try {
       localStorage.setItem('tty.wtf.content', text);
       /** @type {{lastStorageSuccess?: boolean}}*/(setStorageText).lastStorageSuccess = true;
@@ -226,16 +229,31 @@ function decodeText(source) {
     if ((text || '') === (existingText || '')) return false;
 
     var encoded = encodeText(text);
-    // TODO: decide whether to update hash or query or path
+    
+    var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
+    var isFileProtocol = /^file:$/i.test(location.protocol || '');
+
+    var allowReplaceState = 
+      !/\//.test(encoded) &&
+      !isFileProtocol &&
+      hasReplaceState;
+    
+      if (allowReplaceState) {
+        history.replaceState(null, null, encoded);
+      } else if (hasReplaceState && !isFileProtocol) {
+        history.replaceState(null, null, location.pathname + '?' + encoded);
+      } else {
+        location.search = '';
+        location.href = '#' + encoded;
+      }
   }
 
   /** @param text {string} */
   function encodeText(text) {
-    if (text.length <= 200) {
-      // no need to zip-encode
-    } else {
+    var encoded = convertToMarkdown(text);
+    if (encoded.length < 1900 && convertFromMarkdown(encoded) === text) return encoded;
 
-    }
+    return text;
   }
 
   var regex_isASCII = /^[ -~\r\n\t]*$/;

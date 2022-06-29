@@ -149,9 +149,6 @@ function ttywtf() {
       remove) + trailText;
 
     if (oldText !== newText) {
-      // ensure this update is not considered a user edit
-      textareaLastValue = newText;
-
       textarea.value = newText;
       if (textarea.selectionStart !== leadText.length) textarea.selectionStart = leadText.length;
       if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
@@ -196,6 +193,7 @@ function ttywtf() {
       trimStr((location.hash || '').replace(/^#/, '')) ||
       trimStr((location.search || '').replace(/^\?/, '')) ||
       trimStr((location.pathname || '').split('/').filter(function (ch) { return !!ch; }).slice(-1)[0]);
+      source = decodeURI(source);
 
     if (!source) return '';
 
@@ -230,7 +228,7 @@ function decodeText(source) {
     var existingText = deriveTextFromLocation(location);
     if ((text || '') === (existingText || '')) return false;
 
-    var encoded = encodeText(text);
+    var encoded = encodeText(text).replace(/ /g, '+');
     
     var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
     var isFileProtocol = /^file:$/i.test(location.protocol || '');
@@ -240,14 +238,14 @@ function decodeText(source) {
       !isFileProtocol &&
       hasReplaceState;
     
-      if (allowReplaceState) {
-        history.replaceState(null, null, encoded);
-      } else if (hasReplaceState && !isFileProtocol) {
-        history.replaceState(null, null, location.pathname + '?' + encoded);
-      } else {
-        location.search = '';
-        location.href = '#' + encoded;
-      }
+    if (allowReplaceState) {
+      history.replaceState(null, null, encoded);
+    } else if (hasReplaceState && !isFileProtocol) {
+      history.replaceState(null, null, location.pathname + '?' + encoded);
+    } else {
+      location.search = '';
+      location.href = '#' + encoded;
+    }
   }
 
   /** @param text {string} */
@@ -454,6 +452,7 @@ function decodeText(source) {
   }
 
   function textarea_onchange_debounced() {
+    clearTimeout(save_timeout);
     setStorageText(textarea.value);
     textarea_onselectionchange_debounced();
   }

@@ -193,7 +193,7 @@ function ttywtf() {
       trimStr((location.hash || '').replace(/^#/, '')) ||
       trimStr((location.search || '').replace(/^\?/, '')) ||
       trimStr((location.pathname || '').split('/').filter(function (ch) { return !!ch; }).slice(-1)[0]);
-      source = decodeURI(source);
+      source = decodeURI(source).replace(/\+/g, '%2b').replace(/\+/g, ' ');
 
     if (!source) return '';
 

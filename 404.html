@@ -193,7 +193,7 @@ function ttywtf() {
       trimStr((location.hash || '').replace(/^#/, '')) ||
       trimStr((location.search || '').replace(/^\?/, '')) ||
       trimStr((location.pathname || '').split('/').filter(function (ch) { return !!ch; }).slice(-1)[0]);
-      source = decodeURI(source).replace(/\+/g, '%2b').replace(/\+/g, ' ');
+      source = decodeURI(source).replace(/\+/g, ' ');
 
     if (!source) return '';
 
@@ -228,7 +228,7 @@ function decodeText(source) {
     var existingText = deriveTextFromLocation(location);
     if ((text || '') === (existingText || '')) return false;
 
-    var encoded = encodeText(text).replace(/ /g, '+');
+    var encoded = encodeText(text).replace(/\+/g, '%2b').replace(/ /g, '+');
     
     var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
     var isFileProtocol = /^file:$/i.test(location.protocol || '');

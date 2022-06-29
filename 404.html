@@ -189,7 +189,7 @@ function ttywtf() {
     if (!location) location = window.location;
     var source =
       trimStr((location.hash || '').replace(/^#/, '')) ||
-      trimStr((location.search || '').replace(/^#/, '')) ||
+      trimStr((location.search || '').replace(/^\?/, '')) ||
       trimStr((location.pathname || '').split('/').filter(function (ch) { return !!ch; }).slice(-1)[0]);
 
     if (!source) return '';
@@ -209,8 +209,9 @@ function decodeText(source) {
   } else if (/^b:/.test(source)) {
     return convertFromCompressed(source.slice('b:'.length));
   } else {
-    // assume raw text
-    return source;
+    var fromMD = convertFromMarkdown(source);
+    if (convertToMarkdown(fromMD) === source) return fromMD;
+    else return source;
   }
 }
 
@@ -244,7 +245,7 @@ function decodeText(source) {
     return typeof str === 'string' && regex_isASCII.test(str);
   }
 
-  var regex_markdownDecorChunks = /(\*+)([a-zA-Z\{\}\(\) \t\.\,\;])(\*+)/g;
+  var regex_markdownDecorChunks = /([\*_]+)([a-zA-Z\{\}\(\) \t\.\,\;]+)([\*_]+)/g;
 
   /**
    * @param markdown {string}
@@ -256,6 +257,51 @@ function decodeText(source) {
   }
 
   /**
+   * @param formattedText {string}
+   * @returns {string}
+   **/
+  function convertToMarkdown(formattedText) {
+    var parsed = parseRanges(formattedText);
+    var result = '';
+    for (var i = 0; i < parsed.length; i++) {
+      var range = parsed[i];
+      if (typeof range === 'string') {
+        result += range;
+      } else {
+        var prefix = '';
+        var suffix = '';
+        var text = range.plain;
+
+        for (var j = 0; j < range.modifiers.length; j++) {
+          var mod = range.modifiers[j];
+          switch (mod) {
+            case 'bold':
+              prefix = '**' + prefix;
+              suffix = suffix + '**';
+              break;
+
+            case 'italic':
+              prefix = '*' + prefix;
+              suffix = suffix + '*';
+              break;
+
+            case 'underlined':
+              prefix = '_' + prefix;
+              suffix = suffix + '_';
+              break;
+
+            default:
+              text = applyModifier(text, mod);
+          }
+        }
+
+        result += prefix + text + suffix;
+      }
+    }
+    return result;
+  }
+
+  /**
    * @param whole {string}
    * @param openDecor {string}
    * @param content {string}
@@ -263,16 +309,20 @@ function decodeText(source) {
    **/
   function convertFromMarkdownHelper(whole, openDecor, content, closeDecor) {
     if (openDecor==='*' && closeDecor ==='*') {
-      var bolditalic = applyModifier(content, 'italic');
-      if (bolditalic !== openDecor) return bolditalic;
+      var italic = applyModifier(content, 'italic');
+      if (italic !== whole) return italic;
       else return whole;
     } else if (openDecor === '**' && closeDecor === '**') {
-      var bolditalic = applyModifier(content, 'bold');
-      if (bolditalic !== openDecor) return bolditalic;
+      var bold = applyModifier(content, 'bold');
+      if (bold !== whole) return bold;
       else return whole;
     } else if (openDecor === '***' && closeDecor === '***') {
       var bolditalic = applyModifier(applyModifier(content, 'bold'), 'italic');
-      if (bolditalic !== openDecor) return bolditalic;
+      if (bolditalic !== whole) return bolditalic;
+      else return whole;
+    } else if (openDecor === '_' && closeDecor === '_') {
+      var underline = applyModifier(content, 'underlined');
+      if (underline !== whole) return underline;
       else return whole;
     }
     return whole;
@@ -751,13 +801,28 @@ function decodeText(source) {
           if (matchUnderlined.index > start) result.push(text.slice(start, matchUnderlined.index));
 
           var underlinedText = matchUnderlined[0];
-          result.push({
-            formatted: underlinedText,
-            plain: underlinedText.slice(0,underlinedText.length - 1),
-            modifiers: ['underlined'],
-            fullModifiers: 'underlined',
-            length: underlinedText.length
-          });
+          var plain = underlinedText.slice(0,underlinedText.length - 1);
+
+          var added = false;
+          if (!disableCoalescing) {
+            var prevEntry = result.length && result[result.length - 1];
+            if (prevEntry && typeof prevEntry !== 'string' && prevEntry.fullModifiers === 'underlined') {
+              added = true;
+              prevEntry.formatted += underlinedText;
+              prevEntry.plain += plain;
+              prevEntry.length += underlinedText.length;
+            }
+          }
+
+          if (!added) {
+            result.push({
+              formatted: underlinedText,
+              plain: plain,
+              modifiers: ['underlined'],
+              fullModifiers: 'underlined',
+              length: underlinedText.length
+            });
+          }
 
           if (result.modifiers.indexOf('underlined') <0) result.modifiers.push('underlined');
 

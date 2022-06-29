@@ -155,6 +155,8 @@ function ttywtf() {
       textarea.value = newText;
       if (textarea.selectionStart !== leadText.length) textarea.selectionStart = leadText.length;
       if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
+
+      textarea_onselectionchange_debounced();
     }
   }
 

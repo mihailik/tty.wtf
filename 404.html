@@ -186,14 +186,30 @@ function ttywtf() {
     }
   }
 
+  /** @param text {string} */
+  function mangleForURL(text) {
+    return encodeURIComponent(text)
+      .replace(/%3A/ig, ':')
+      .replace(/%20/ig, '+')
+      .replace(/%0A/gi, '/');
+  }
+
+  /** @param mangled {string} */
+  function unmangleFromURL(mangled) {
+    return decodeURIComponent(mangled
+      .replace(/\//g, '\n')
+      .replace(/\+/g, ' ')
+    );
+  }
+
   /** @param location {typeof window.location=} */
   function deriveTextFromLocation(location) {
     if (!location) location = window.location;
-    var source =
-      trimStr((location.hash || '').replace(/^#/, '')) ||
-      trimStr((location.search || '').replace(/^\?/, '')) ||
-      trimStr((location.pathname || '').split('/').filter(function (ch) { return !!ch; }).slice(-1)[0]);
-      source = decodeURI(source).replace(/\+/g, ' ');
+    var source = unmangleFromURL(
+      (location.hash || '').replace(/^#/, '') ||
+      (location.search || '').replace(/^\?/, '') ||
+      (location.pathname || '').replace(/^\//, '')
+    );
 
     if (!source) return '';
 
@@ -228,7 +244,7 @@ function decodeText(source) {
     var existingText = deriveTextFromLocation(location);
     if ((text || '') === (existingText || '')) return false;
 
-    var encoded = encodeText(text).replace(/\+/g, '%2b').replace(/ /g, '+');
+    var encoded = mangleForURL(encodeText(text));
     
     var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
     var isFileProtocol = /^file:$/i.test(location.protocol || '');
@@ -274,13 +290,15 @@ function decodeText(source) {
     return formatted;
   }
 
+  var regex_newline = /\r\n|\r|\n/g;
+
   /**
    * @param formattedText {string}
    * @returns {string}
    **/
   function convertToMarkdown(formattedText) {
-    var parsed = parseRanges(formattedText);
     var result = '';
+    var parsed = parseRanges(formattedText);
     for (var i = 0; i < parsed.length; i++) {
       var range = parsed[i];
       if (typeof range === 'string') {
@@ -366,77 +384,86 @@ function decodeText(source) {
       var formattingApplied = false;
       if (textareaCurrentValue && shortlyAfterKeydown) {
         if (textarea.selectionStart === textarea.selectionEnd) {
-          var leadLength = Math.max(0, textarea.selectionStart - 10);
-          var trailLength = Math.max(0, textareaCurrentValue.length - textarea.selectionStart - 2);
+          var unchangedPrefixLength = Math.max(0, textarea.selectionStart - 10);
+          var unchangedSuffixLength = Math.max(0, textareaCurrentValue.length - textarea.selectionStart - 2);
 
-          if (textareaCurrentValue.slice(0, leadLength) === textareaLastValue.slice(0, leadLength)
-             && textareaCurrentValue.slice(-trailLength) === textareaLastValue.slice(-trailLength)) {
+          if (textareaCurrentValue.slice(0, unchangedPrefixLength) === textareaLastValue.slice(0, unchangedPrefixLength)
+             && (!unchangedSuffixLength || textareaCurrentValue.slice(-unchangedSuffixLength) === textareaLastValue.slice(-unchangedSuffixLength))) {
             // change is close to the cursor, good
 
             // find where change starts exactly
-            while (leadLength + trailLength < textareaCurrentValue.length
-                  && leadLength + trailLength < textareaLastValue.length
-                  && textareaCurrentValue.charCodeAt(leadLength) === textareaLastValue.charCodeAt(leadLength)) {
-              leadLength++;
+            while (unchangedPrefixLength + unchangedSuffixLength < textareaCurrentValue.length
+                  && unchangedPrefixLength + unchangedSuffixLength < textareaLastValue.length
+                  && textareaCurrentValue.charCodeAt(unchangedPrefixLength) === textareaLastValue.charCodeAt(unchangedPrefixLength)) {
+              unchangedPrefixLength++;
             }
 
             // find where change ends exactly
-            while (leadLength + trailLength < textareaCurrentValue.length
-                  && leadLength + trailLength < textareaLastValue.length
-                  && textareaCurrentValue.charCodeAt(textareaCurrentValue.length - trailLength) === textareaLastValue.charCodeAt(textareaLastValue.length - trailLength)) {
-              trailLength++;
+            while (unchangedPrefixLength + unchangedSuffixLength < textareaCurrentValue.length
+                  && unchangedPrefixLength + unchangedSuffixLength < textareaLastValue.length
+                  && textareaCurrentValue.charCodeAt(textareaCurrentValue.length - unchangedSuffixLength) === textareaLastValue.charCodeAt(textareaLastValue.length - unchangedSuffixLength)) {
+              unchangedSuffixLength++;
             }
 
             // will be applying modifiers one by one, more important last
             var modifiersChange = getModifiersTextSection(
               textareaLastValue,
-              leadLength,
-              textareaLastValue.length - trailLength
+              unchangedPrefixLength,
+              textareaLastValue.length - unchangedSuffixLength
             ).parsed.modifiers;
 
-            var modifiersLead = textareaLastValue.length === leadLength + trailLength ?
+            var modifiersLead = textareaLastValue.length === unchangedPrefixLength + unchangedSuffixLength ?
               [] :
               getModifiersTextSection(
                 textareaLastValue,
-                leadLength,
-                leadLength + 2
+                unchangedPrefixLength,
+                unchangedPrefixLength + 2
               ).parsed.modifiers;
 
             if (modifiersChange.length) {
-              var applyModifiers = modifiersLead.slice().reverse();
-              for (var i = 0; i < modifiersChange.length; i++) {
-                var mod = modifiersChange[i];
-                if (applyModifiers.indexOf(mod)<0) applyModifiers.unshift(mod);
-              }
+              var prevInnerText = textareaLastValue.slice(
+                unchangedPrefixLength,
+                unchangedSuffixLength ? -unchangedSuffixLength : textareaLastValue.length);
+              var editedInnerText = textareaCurrentValue.slice(
+                unchangedPrefixLength,
+                unchangedSuffixLength ? -unchangedSuffixLength : textareaCurrentValue.length);
 
-              var innerText = textareaCurrentValue.slice(leadLength, -trailLength);
-              for (var i = 0; i < applyModifiers.length; i++) {
-                innerText = applyModifier(innerText, applyModifiers[i],/* remove: */ false);
-              }
-
-              var prevInnerText = textareaLastValue.slice(leadLength, -trailLength);
-              var editedInnerText = textareaCurrentValue.slice(leadLength, -trailLength);
-
-              var newText =
-                textareaCurrentValue.slice(0, leadLength) +
-                innerText +
-                textareaCurrentValue.slice(-trailLength);
-
-              var retainSelectionStart = textarea.selectionStart;
-              textareaLastValue = newText;
-              textarea.value = newText;
-              formattingApplied = true;
-              if (textarea.selectionStart !== retainSelectionStart) textarea.selectionStart = retainSelectionStart;
-              if (textarea.selectionEnd !== retainSelectionStart) textarea.selectionEnd = retainSelectionStart;
-
-              console.log(
-                {
-                  from: prevInnerText,
-                  edited: editedInnerText,
-                  formatted: innerText,
-                  mods: applyModifiers
+              var innerText = editedInnerText;
+              if (innerText) {
+                var applyModifiers = modifiersLead.slice().reverse();
+                for (var i = 0; i < modifiersChange.length; i++) {
+                  var mod = modifiersChange[i];
+                  if (applyModifiers.indexOf(mod)<0) applyModifiers.unshift(mod);
                 }
-              );
+
+                for (var i = 0; i < applyModifiers.length; i++) {
+                  innerText = applyModifier(innerText, applyModifiers[i],/* remove: */ false);
+                }
+              }
+
+              if (innerText !== editedInnerText) {
+                var newText =
+                  textareaCurrentValue.slice(0, unchangedPrefixLength) +
+                  innerText +
+                  (unchangedSuffixLength ? textareaCurrentValue.slice(-unchangedSuffixLength) : '');
+
+                var retainSelectionStart = textarea.selectionStart;
+                textareaLastValue = newText;
+                textarea.value = newText;
+                formattingApplied = true;
+                if (textarea.selectionStart !== retainSelectionStart) textarea.selectionStart = retainSelectionStart;
+                if (textarea.selectionEnd !== retainSelectionStart) textarea.selectionEnd = retainSelectionStart;
+
+                console.log(
+                  'on-the-fly formatting: ',
+                  {
+                    from: prevInnerText,
+                    edited: editedInnerText,
+                    formatted: innerText,
+                    mods: applyModifiers
+                  }
+                );
+              }
             }
           }
         }
@@ -613,7 +640,9 @@ function decodeText(source) {
             applyFullModifiers = range.modifiers.filter(mod => mod === modifier).join('');
           }
         } else {
-          applyFullModifiers = range.modifiers.concat([modifier]).sort().join('');
+          applyFullModifiers = range.modifiers.indexOf(modifier) < 0 ?
+            range.modifiers.concat([modifier]).sort().join('') :
+            range.fullModifiers;
         }
 
         var formattedCh = applyModifierToPlainCh(

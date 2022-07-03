@@ -266,7 +266,7 @@ function decodeText(source) {
     return typeof str === 'string' && regex_isASCII.test(str);
   }
 
-  var regex_markdownDecorChunks = /([\*_]+)([a-zA-Z\{\}\(\) \t\.\,\;]+)([\*_]+)/g;
+  var regex_markdownDecorChunks = /([\*_]+)([^\*_\n]+)([\*_]+)/g;
 
   /**
    * @param markdown {string}
@@ -799,6 +799,8 @@ function decodeText(source) {
     function parser(text, options) {
       var result = /** @type {((LookupEntry & { length: number }) | string)[] & { modifiers: string[], fullModifiers: string } } */([]);
       result.modifiers = [];
+      result.fullModifiers = '';
+      if (!text) return result;
 
       var disableCoalescing = options && options.disableCoalescing;
 
@@ -945,7 +947,7 @@ function decodeText(source) {
     round: { AZ: 'ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ', az: 'ⓐⓑⓒⓓⓔⓕⓖⓗⓘⓙⓚⓛⓜⓝⓞⓟⓠⓡⓢⓣⓤⓥⓦⓧⓨⓩ', '09': '⓪①②③④⑤⑥⑦⑧⑨' },
     typewriter: { AZ: '𝙰𝙱𝙲𝙳𝙴𝙵𝙶𝙷𝙸𝙹𝙺𝙻𝙼𝙽𝙾𝙿𝚀𝚁𝚂𝚃𝚄𝚅𝚆𝚇𝚈𝚉', az: '𝚊𝚋𝚌𝚍𝚎𝚏𝚐𝚑𝚒𝚓𝚔𝚕𝚖𝚗𝚘𝚙𝚚𝚛𝚜𝚝𝚞𝚟𝚠𝚡𝚢𝚣', '09': '𝟶𝟷𝟸𝟹𝟺𝟻𝟼𝟽𝟾𝟿' },
     wide: {
-      AB: '𝔸𝔹', C:'ℂ', DG: '𝔻𝔼𝔽𝔾', H:'ℍ', IM: '𝕀𝕁𝕂𝕃𝕄', N:'ℕ', O:'𝕆', PR:' ℙℚℝ', SY:'𝕊𝕋𝕌𝕍𝕎𝕏𝕐', Z:'ℤ',
+      AB: '𝔸𝔹', C:'ℂ', DG: '𝔻𝔼𝔽𝔾', H:'ℍ', IM: '𝕀𝕁𝕂𝕃𝕄', N:'ℕ', O:'𝕆', PR:'ℙℚℝ', SY:'𝕊𝕋𝕌𝕍𝕎𝕏𝕐', Z:'ℤ',
       az: '𝕒𝕓𝕔𝕕𝕖𝕗𝕘𝕙𝕚𝕛𝕜𝕝𝕞𝕟𝕠𝕡𝕢𝕣𝕤𝕥𝕦𝕧𝕨𝕩𝕪𝕫', '09': '𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡' }
   };
 

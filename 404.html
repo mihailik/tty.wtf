@@ -447,12 +447,14 @@ function decodeText(source) {
                   innerText +
                   (unchangedSuffixLength ? textareaCurrentValue.slice(-unchangedSuffixLength) : '');
 
-                var retainSelectionStart = textarea.selectionStart;
                 textareaLastValue = newText;
                 textarea.value = newText;
                 formattingApplied = true;
-                if (textarea.selectionStart !== retainSelectionStart) textarea.selectionStart = retainSelectionStart;
-                if (textarea.selectionEnd !== retainSelectionStart) textarea.selectionEnd = retainSelectionStart;
+                var restoreSelectionPos = unchangedPrefixLength + newText.length;
+                if (textarea.selectionStart !== restoreSelectionPos || textarea.selectionEnd !== restoreSelectionPos) {
+                  textarea.selectionStart = restoreSelectionPos;
+                  textarea.selectionEnd = restoreSelectionPos;
+                }
 
                 console.log(
                   'on-the-fly formatting: ',
@@ -505,6 +507,7 @@ function decodeText(source) {
       var modifier =
         letter === 'B' ? 'bold' :
         letter === 'I' ? 'italic' :
+        letter === 'U' ? 'underlined' :
         '';
 
       if (modifier) {
@@ -557,12 +560,22 @@ function decodeText(source) {
       return { text: modText, start: start, end: end, parsed: parseRanges(modText) };
     }
 
-    var consequentMatch = /\S*$/.exec(text.slice(0, start));
+    var consequentMatch = /\S+\s*$/.exec(text.slice(0, start));
     var consequentEntryStart = start - (consequentMatch ? consequentMatch[0].length : 0);
     var parsed = consequentMatch && consequentMatch[0] && parseRanges(consequentMatch[0]);
     var consequentEntry = parsed && parsed.length && parsed[parsed.length -1];
+    // pick previous if this is punctuation or whitespace after formatted word
+    if (typeof consequentEntry === 'string' && parsed.length > 1) {
+      var prevConsequentEntry = parsed[parsed.length - 2];
+      if (consequentEntry.indexOf('\n') < 0 &&
+        typeof prevConsequentEntry !== 'string' &&
+        consequentEntry == applyModifier(consequentEntry, prevConsequentEntry.fullModifiers)) {
+          consequentEntry = prevConsequentEntry;
+        }
+    }
+
     if (!consequentMatch || !consequentMatch[0]) {
-      consequentMatch = /^\S*/.exec(text.slice(start));
+      consequentMatch = /^\s*\S+/.exec(text.slice(start));
       parsed = consequentMatch && parseRanges(consequentMatch[0]);
       consequentEntry = parsed && parsed.length && parsed[0];
     }

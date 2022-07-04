@@ -70,36 +70,16 @@ function ttywtf() {
     }
   }
 
-  /** @param str {string} */
-  function trimStr(str) {
-    return !str ? '' : typeof str.trim === 'function' ? str.trim() : str.replace(/^\s+/, '').replace(/\s+$/, '');
-  }
-
   function getStorageText() {
     return deriveTextFromLocation();
-
-    try {
-      return localStorage.getItem('tty.wtf.content');
-    } catch (error) {
-      console.log('Browser failed to get data from localStorage. ', error);
-    }
   }
 
+  /** @param {string} text */
   function setStorageText(text) {
     updateLocationWithText(text);
-    return;
-
-    try {
-      localStorage.setItem('tty.wtf.content', text);
-      /** @type {{lastStorageSuccess?: boolean}}*/(setStorageText).lastStorageSuccess = true;
-    } catch (error) {
-      if (/** @type {{lastStorageSuccess?: boolean}}*/(setStorageText).lastStorageSuccess !== true)
-        console.log('Browser failed to store data into localStorage. ', error);
-      /** @type {{lastStorageSuccess?: boolean}}*/(setStorageText).lastStorageSuccess = false;
-    }
   }
 
-  /** @param text {string} */
+  /** @param {string} text */
   function mangleForURL(text) {
     return encodeURIComponent(text)
       .replace(/%3A/ig, ':')
@@ -115,8 +95,7 @@ function ttywtf() {
     );
   }
 
-  /** @param location {typeof window.location=} */
-  function deriveTextFromLocation(location) {
+  function getLocationSource() {
     if (!location) location = window.location;
     var source = unmangleFromURL(
       (location.hash || '').replace(/^#/, '') ||
@@ -124,28 +103,33 @@ function ttywtf() {
       (location.pathname || '').replace(/^\//, '')
     );
 
-    if (!source) return '';
+    return source || '';
+  }
 
-    var decoded = decodeText(source);
+  /**
+   * @param {typeof window.location=} location
+   **/
+  function deriveTextFromLocation(location) {
+    var decoded = decodeText(getLocationSource());
     return decoded;
   }
 
-/** @param source {string} */
-function decodeText(source) {
-  if (!source) return '';
+  /** @param source {string} */
+  function decodeText(source) {
+    if (!source) return '';
 
-  if (/^txt~/.test(source)) {
-    return source.slice('txt~'.length);
-  } else if (/^md~/.test(source)) {
-    return convertFromMarkdown(source.slice('md~'.length));
-  } else if (/^b~/.test(source)) {
-    return convertFromCompressed(source.slice('b~'.length));
-  } else {
-    var fromMD = convertFromMarkdown(source);
-    if (convertToMarkdown(fromMD) === source) return fromMD;
-    else return source;
+    if (/^txt~/.test(source)) {
+      return source.slice('txt~'.length);
+    } else if (/^md~/.test(source)) {
+      return convertFromMarkdown(source.slice('md~'.length));
+    } else if (/^b~/.test(source)) {
+      return convertFromCompressed(source.slice('b~'.length));
+    } else {
+      var fromMD = convertFromMarkdown(source);
+      if (convertToMarkdown(fromMD) === source) return fromMD;
+      else return source;
+    }
   }
-}
 
   /**
    * @param text {string}
@@ -161,18 +145,21 @@ function decodeText(source) {
     
     var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
     var isFileProtocol = /^file:$/i.test(location.protocol || '');
+    var isAboutProtocol = /^about:$/i.test(location.protocol || '');
+    var hasSearch = !!(location.search || '').replace(/^\?/, '');
 
     var allowReplaceState = 
       !/\//.test(encoded) &&
       !isFileProtocol &&
+      !isAboutProtocol &&
       hasReplaceState;
     
-    if (allowReplaceState) {
+    if (allowReplaceState && !hasSearch) {
       history.replaceState(null, 'unused-string', encoded);
-    } else if (hasReplaceState && !isFileProtocol) {
+    } else if (hasReplaceState && !isFileProtocol && !isAboutProtocol) {
       history.replaceState(null, 'unused-string', location.pathname + '?' + encoded);
     } else {
-      location.search = '';
+      if (hasSearch) location.search = '';
       location.href = '#' + encoded;
     }
   }
@@ -202,8 +189,6 @@ function decodeText(source) {
     var formatted = markdown.replace(regex_markdownDecorChunks, convertFromMarkdownHelper);
     return formatted;
   }
-
-  var regex_newline = /\r\n|\r|\n/g;
 
   /**
    * @param formattedText {string}
@@ -996,22 +981,113 @@ function decodeText(source) {
     return parser;
   }
 
+  function createLayout() {
+    var tableLayoutHTML =
+      '<table style="width: 100%; height: 100%;" cellspacing=0 cellpadding=0><tr><td width="100%">' +
+      '<textarea id="textarea" autofocus>' +
+      '</textarea>' +
+      '</td><td width="1%" style="width: 1em;" id="toolbar" valign=top>' +
+      createButtonLayout() +
+      '</td></tr></table>';
 
-  /** @param str {string} */
-  function breakIntoChars(str) {
-    /** @type {string[]} */
-    var arr = [];
-    str.replace(REGEX_anychar_unicode, function (ch) {
-      arr.push(ch);
-      return '';
-    });
-    return arr;
+    var tmpDIV = document.createElement('div');
+    tmpDIV.innerHTML = tableLayoutHTML;
+    var table = tmpDIV.getElementsByTagName('table')[0];
+
+    document.body.insertBefore(table, document.body.childNodes.item(0));
+
+    var styleCSS =
+      'html { box-sizing: border-box; width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0; } ' +
+      'body { background: white; color: black; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0; } ' +
+      '*, *:before, *:after { box-sizing: inherit; } ' +
+      '#toolbar button { width: 2.7em; height: 2.7em; margin: 0.35em; margin-top: 0.25em; margin-bottom: 0; border-radius: 0.5em; background: white; border: solid 1px #d6d6d6; box-shadow: 2px 3px 6px rgb(0, 0, 0, 0.09); } ' +
+      '#toolbar button.pressed { background: gray; color: white; } ' +
+      '#textarea { width: 100%; height: 100%; overflow: auto; border: none; padding: 1em; outline: none; font: inherit; resize: none; }';
+    
+    var styleEl = document.createElement('style');
+    styleEl.innerHTML = styleCSS;
+    (document.head || document.getElementsByTagName('head')[0]).appendChild(styleEl);
+    
+    function createButtonLayout() {
+      var buttonsHTML = '';
+      var addedSymbols = '';
+      for (var mod in variants) {
+        if (mod !== 'bold' && /^bold/.test(mod)) continue;
+        var symbol = mod.charAt(0);
+        if (addedSymbols.indexOf(symbol) >= 0) symbol = mod.charAt(mod.length - 1);
+        addedSymbols += symbol;
+        symbol = applyModifierToPlainCh(symbol.toUpperCase(), mod === 'fractur' || mod === 'cursive' ? ['bold' + mod] : [mod]);
+        buttonsHTML += '<button id=' + mod + ' title=' + mod.charAt(0).toUpperCase() + mod.slice(1) + '>' + symbol + '</b>';
+      }
+      return buttonsHTML;
+    }
   }
 
+  function initWithStorageText() {
+    textarea.value = getStorageText() || '';
 
+    //var status = document.getElementById('status');
 
-  var REGEX_anychar_unicode = /./ug;
-  var REGEX_startsWithBold = /^bold/;
+    textarea.onchange = textarea_onchange;
+    textarea.onselect = textarea_onselectionchange;
+    textarea.onselectionchange = textarea_onselectionchange;
+    textarea.onselectstart = textarea_onselectionchange;
+    textarea.onkeydown = textarea_onkeydown;
+    textarea.onkeyup = textarea_onkeyevent;
+    textarea.onkeypress = textarea_onkeyevent;
+    textarea.onmousedown = textarea_onmousedown;
+    textarea.onmouseup = textarea_onmouseup;
+    textarea.onmousemove = textarea_onmousemove;
+    textarea.onpaste = textarea_onpaste;
+
+    window.onunload = window_onunload;
+
+    addButtonHandlers();
+    textarea_onselectionchange();
+  }
+
+  var checkIfLoadedTimeout;
+
+  function checkIfLoaded() {
+    clearTimeout(checkIfLoadedTimeout);
+
+    if (typeof pako === 'undefined') {
+      checkIfLoadedTimeout = setTimeout(checkIfLoaded, 300);
+    } else {
+      initWithStorageText();
+    }
+  }
+
+  function getStorageTextFirstTime() {
+    var source = getLocationSource();
+    if (!/^b~/.test(source)) {
+      initWithStorageText();
+      return;
+    }
+
+    textarea.onchange = ignoreEvent;
+    textarea.onselect = ignoreEvent;
+    textarea.onselectionchange = ignoreEvent;
+    textarea.onselectstart = ignoreEvent;
+    textarea.onkeydown = ignoreEvent;
+    textarea.onkeyup = ignoreEvent;
+    textarea.onkeypress = ignoreEvent;
+    textarea.onmousedown = ignoreEvent;
+    textarea.onmouseup = ignoreEvent;
+    textarea.onmousemove = ignoreEvent;
+    textarea.onpaste = ignoreEvent;
+
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('load', checkIfLoaded);
+      checkIfLoadedTimeout = setTimeout(checkIfLoaded, 300);
+    }
+
+    /** @param {Event} evt */
+    function ignoreEvent(evt) {
+      if (typeof evt.preventDefault === 'function') evt.preventDefault();
+    }
+
+  }
 
   var variants = {
     bold: { AZ: '𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭', az: '𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇', '09': '𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵' },
@@ -1023,7 +1099,7 @@ function decodeText(source) {
     boldcursive: { AZ: '𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩', az: '𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃' },
     upper: { AP: 'ᴬᴮᶜᴰᴱᶠᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾ', Q: 'ᴼ̴', RW: 'ᴿˢᵀᵁⱽᵂ', ap: 'ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖ', q: '٩', rz: 'ʳˢᵗᵘᵛʷˣʸᶻ', '09': '⁰¹²³⁴⁵⁶⁷⁸⁹' },
     box: { AZ: '🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉' },
-    fill: { AZ: '🅰🅱🅲🅳🅴🅵🅶🅷🅸🅹🅺🅻🅼🅽🅾🅿🆀🆁🆂🆃🆄🆅🆆🆇🆈🆉' },
+    plate: { AZ: '🅰🅱🅲🅳🅴🅵🅶🅷🅸🅹🅺🅻🅼🅽🅾🅿🆀🆁🆂🆃🆄🆅🆆🆇🆈🆉' },
     round: { AZ: 'ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ', az: 'ⓐⓑⓒⓓⓔⓕⓖⓗⓘⓙⓚⓛⓜⓝⓞⓟⓠⓡⓢⓣⓤⓥⓦⓧⓨⓩ', '09': '⓪①②③④⑤⑥⑦⑧⑨' },
     typewriter: { AZ: '𝙰𝙱𝙲𝙳𝙴𝙵𝙶𝙷𝙸𝙹𝙺𝙻𝙼𝙽𝙾𝙿𝚀𝚁𝚂𝚃𝚄𝚅𝚆𝚇𝚈𝚉', az: '𝚊𝚋𝚌𝚍𝚎𝚏𝚐𝚑𝚒𝚓𝚔𝚕𝚖𝚗𝚘𝚙𝚚𝚛𝚜𝚝𝚞𝚟𝚠𝚡𝚢𝚣', '09': '𝟶𝟷𝟸𝟹𝟺𝟻𝟼𝟽𝟾𝟿' },
     wide: {
@@ -1040,26 +1116,12 @@ function decodeText(source) {
   var textareaKeyEventTimestamp = 0;
   var textareaLastValue = '';
 
+  createLayout();
+
   var textarea = /** @type {HTMLTextAreaElement} */(document.getElementById('textarea'));
-  textarea.value = getStorageText() || '';
-
-  //var status = document.getElementById('status');
-
   var textareaMouseDown = false;
-  textarea.onchange = textarea_onchange;
-  textarea.onselect = textarea_onselectionchange;
-  textarea.onselectionchange = textarea_onselectionchange;
-  textarea.onselectstart = textarea_onselectionchange;
-  textarea.onkeydown = textarea_onkeydown;
-  textarea.onkeyup = textarea_onkeyevent;
-  textarea.onkeypress = textarea_onkeyevent;
-  textarea.onmousedown = textarea_onmousedown;
-  textarea.onmouseup = textarea_onmouseup;
-  textarea.onmousemove = textarea_onmousemove;
-  textarea.onpaste = textarea_onpaste;
 
-  window.onunload = window_onunload;
-
-  addButtonHandlers();
-  textarea_onselectionchange();
+  getStorageTextFirstTime();
 }
+
+ttywtf();

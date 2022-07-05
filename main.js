@@ -100,7 +100,7 @@ function ttywtf() {
     var source = unmangleFromURL(
       (location.hash || '').replace(/^#/, '') ||
       (location.search || '').replace(/^\?/, '') ||
-      (location.pathname || '').replace(/^\//, '')
+      (location.pathname || '').replace(/^\//, '').replace(/^api\//, '').replace(/^404.html/, '')
     );
 
     return source || '';
@@ -146,7 +146,10 @@ function ttywtf() {
     var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
     var isFileProtocol = /^file:$/i.test(location.protocol || '');
     var isAboutProtocol = /^about:$/i.test(location.protocol || '');
-    var hasSearch = !!(location.search || '').replace(/^\?/, '');
+    var preferSearchToPath =
+      !!(location.search || '').replace(/^\?/, '') // already has search query, keep it
+      || /^\/api\//.test(location.pathname || '') // path starts with /api, this is azure function call
+      || /^\/404.html/.test(location.pathname || ''); // path starts with /404.html, this is GitHub or CodeSpaces preview
 
     var allowReplaceState = 
       !/\//.test(encoded) &&
@@ -154,12 +157,12 @@ function ttywtf() {
       !isAboutProtocol &&
       hasReplaceState;
     
-    if (allowReplaceState && !hasSearch) {
+    if (allowReplaceState && !preferSearchToPath) {
       history.replaceState(null, 'unused-string', encoded);
     } else if (hasReplaceState && !isFileProtocol && !isAboutProtocol) {
       history.replaceState(null, 'unused-string', location.pathname + '?' + encoded);
     } else {
-      if (hasSearch) location.search = '';
+      if (preferSearchToPath) location.search = '';
       location.href = '#' + encoded;
     }
   }

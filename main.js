@@ -798,7 +798,7 @@ function ttywtf() {
             text += range.plain;
             continue;
           } else {
-            applyFullModifiers = range.modifiers.filter(mod => mod === modifier).join('');
+            applyFullModifiers = range.modifiers.filter(mod => mod !== modifier).join('');
           }
         } else {
           applyFullModifiers = range.modifiers.indexOf(modifier) < 0 ?

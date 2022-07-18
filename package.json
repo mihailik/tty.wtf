@@ -1,6 +1,7 @@
 {
   "name": "tty.wtf",
   "version": "1.0.0",
+  "private": true,
   "description": "",
   "scripts": {
     "start": "func start",

@@ -66,7 +66,7 @@ function ttywtf() {
       if (textarea.selectionStart !== leadText.length) textarea.selectionStart = leadText.length;
       if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
 
-      textarea_onselectionchange_debounced();
+      textarea_onchange_debounced();
     }
   }
 
@@ -79,7 +79,8 @@ function ttywtf() {
     return encodeURIComponent(text)
       .replace(/%3A/ig, ':')
       .replace(/%20/ig, '+')
-      .replace(/%0A/gi, '/');
+      .replace(/%0A/gi, '/')
+      .replace(/%5E/gi, '^');
   }
 
   /** @param mangled {string} */
@@ -185,6 +186,9 @@ function ttywtf() {
    **/
   function convertFromMarkdown(markdown) {
     var formatted = markdown.replace(regex_markdownDecorChunks, convertFromMarkdownHelper);
+    formatted = formatted.replace(
+      /\^([a-z0-9])/i,
+      function (whole, char) { return applyModifierToPlainCh(char, ['super']); });
     return formatted;
   }
 
@@ -250,7 +254,10 @@ function ttywtf() {
               break;
 
             default:
-              text = applyModifier(text, mod);
+              if (range.fullModifiers === 'super' && range.plain.length === 1)
+                prefix = '^';
+              else
+                text = range.formatted;
           }
         }
 
@@ -265,7 +272,8 @@ function ttywtf() {
    * @returns {string}
    **/
   function convertFromCompressed(compressed) {
-    // TODO: atob, then inflate
+    var pako = /** @type {*} */(window).pako;
+
     var deflatedStr = atob(compressed);
     var deflatedArr = typeof Uint8Array === 'function' ?
       new Uint8Array(deflatedStr.length) :
@@ -288,7 +296,8 @@ function ttywtf() {
    * @returns {string}
    **/
   function convertToCompressed(text) {
-    // TODO: deflate, then btoa
+    var pako = /** @type {*} */(window).pako;
+
     var deflatedArr = pako.deflate(text);
     var deflatedStr = '';
     for (var i = 0; i < deflatedArr.length; i++) {
@@ -1170,7 +1179,7 @@ function ttywtf() {
   function checkIfLoaded() {
     clearTimeout(checkIfLoadedTimeout);
 
-    if (typeof pako === 'undefined') {
+    if (!/** @type {*} */(window).pako) {
       checkIfLoadedTimeout = setTimeout(checkIfLoaded, 600);
     } else {
       initWithStorageText();

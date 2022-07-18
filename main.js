@@ -96,7 +96,7 @@ function ttywtf() {
     var source = unmangleFromURL(
       (location.hash || '').replace(/^#/, '') ||
       (location.search || '').replace(/^\?/, '') ||
-      (location.pathname || '').replace(/^\//, '').replace(/^api\//, '').replace(/^404.html/, '')
+      (location.pathname || '').replace(/^\//, '').replace(/^404.html/, '').replace(/^api\/[a-z]+/gi, '')
     );
 
     return source || '';
@@ -144,8 +144,8 @@ function ttywtf() {
     var isAboutProtocol = /^about:$/i.test(location.protocol || '');
     var preferSearchToPath =
       !!(location.search || '').replace(/^\?/, '') // already has search query, keep it
-      || /^\/api\//.test(location.pathname || '') // path starts with /api, this is azure function call
-      || /^\/404.html/.test(location.pathname || ''); // path starts with /404.html, this is GitHub or CodeSpaces preview
+      || /^\/api\//i.test(location.pathname || '') // path starts with /api, this is azure function call
+      || /^\/404.html/i.test(location.pathname || ''); // path starts with /404.html, this is GitHub or CodeSpaces preview
 
     var allowReplaceState = 
       !/\//.test(encoded) &&
@@ -1217,6 +1217,109 @@ function ttywtf() {
 
   }
 
+  function runInBrowser() {
+    parseRanges = createParser();
+    createLayout();
+    textarea = /** @type {HTMLTextAreaElement} */(document.getElementById('textarea'));
+    getStorageTextFirstTime();
+  }
+
+  function runInLocalNodeScript() {
+
+  }
+
+  function runAsModule() {
+
+  }
+
+  function runInAzure() {
+    module.exports = handleRequest;
+  }
+
+  /** @typedef {{
+ *  log(...args: any[]): void;
+ * }} Context
+ */
+
+  /** @typedef {{
+   *  url: string;
+   *  query: {
+   *    name: string;
+   *  };
+   *  body: any;
+   * }} Request
+   */
+
+  /** @typedef {{
+   *  body: string | Buffer;
+   *  headers: { [header: string]: string | string[] }
+   * }} Response
+   */
+
+  /**
+   * @param {Context} context
+   * @param {Request} req
+   * @returns {Promise<Response>}
+   */
+  function handleRequest(context, req) {
+    return new Promise(function (resolve, reject) {
+
+      var scriptBaseURL = '//tty.wtf/';
+
+      var resultHTML =
+        '<!DOCTYPE html><html lang="en"><head>\n' +
+        '<meta charset="UTF-8">\n' +
+        '<meta http-equiv="X-UA-Compatible" content="IE=edge">\n' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+        '<title>TTY</title>\n' +
+        '</head><body>\n' +
+        '<' + 'script src="' + scriptBaseURL + 'main.js"' + '></' + 'script' + '>\n' +
+        '<' + 'script src="' + scriptBaseURL + 'pako.js"' + '></' + 'script' + '>\n' +
+        '</body></html>';
+
+      resolve({
+        // status: 200, /* Defaults to 200 */
+        body: resultHTML,
+        headers: {
+          'Content-Type': 'text/html'
+        }
+      });
+    });
+  }
+
+
+  function detectEnvironmentAndRun() {
+    var isBrowserEnvironment =
+      typeof window !== 'undefined' && window && typeof window.alert === 'function' &&
+      typeof document !== 'undefined' && document && typeof document.createElement === 'function';
+    
+    var isNodeEnvironment =
+      typeof process !== 'undefined' && process && process.env &&
+      typeof require === 'function' &&
+      typeof module !== 'undefined' && module;
+    
+    var isLocalNodeScript =
+      isNodeEnvironment &&
+      require.main === module;
+
+    var isAzure =
+      isNodeEnvironment &&
+      !isLocalNodeScript &&
+      process.env.WEBSITE_HOSTNAME;
+
+    var isLoadedAsModule =
+      isNodeEnvironment &&
+      !isLocalNodeScript &&
+      !isAzure;
+
+    if (isBrowserEnvironment) return runInBrowser();
+    if (isLocalNodeScript) return runInLocalNodeScript();
+    if (isAzure) return runInAzure();
+    if (isLoadedAsModule) return runAsModule();
+
+    throw new Error('Unknown environment, exiting main script.');
+  }
+
   var variants = {
     bold: { AZ: '𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭', az: '𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇', '09': '𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵' },
     italic: { AZ: '𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡', az: '𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻' },
@@ -1235,7 +1338,8 @@ function ttywtf() {
       az: '𝕒𝕓𝕔𝕕𝕖𝕗𝕘𝕙𝕚𝕛𝕜𝕝𝕞𝕟𝕠𝕡𝕢𝕣𝕤𝕥𝕦𝕧𝕨𝕩𝕪𝕫', '09': '𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡' }
   };
 
-  var parseRanges = createParser();
+  /** @type {ReturnType<typeof createParser>} */
+  var parseRanges;
 
   var save_timeout;
   var selection_timeout_slide;
@@ -1244,12 +1348,11 @@ function ttywtf() {
   var textareaKeyEventTimestamp = 0;
   var textareaLastValue = '';
 
-  createLayout();
-
-  var textarea = /** @type {HTMLTextAreaElement} */(document.getElementById('textarea'));
+  /** @type {HTMLTextAreaElement} */
+  var textarea;
   var textareaMouseDown = false;
 
-  getStorageTextFirstTime();
+  detectEnvironmentAndRun();
 }
 
 ttywtf();

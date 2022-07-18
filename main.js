@@ -1225,7 +1225,98 @@ function ttywtf() {
   }
 
   function runInLocalNodeScript() {
+    console.log('Running local DEV server...');
 
+    var fs = require('fs');
+    var path = require('path');
+    var http = require('http');
+
+    var restartTimeout;
+    fs.watch(
+      __filename,
+      function () {
+        clearTimeout(restartTimeout);
+        restartTimeout = setTimeout(function () {
+          console.log('file changed...');
+          var child_process = require('child_process');
+          child_process.spawnSync('node ' + __filename);
+        }, 2000);
+      }
+    );
+
+    var port = 3458;
+
+    var server = http.createServer(nodeHandleRequest);
+
+    http.get('http://localhost:' + port + '/shutdown', function () {
+      startServerListening();
+    }).on('error', function () {
+      startServerListening();
+    });
+
+    function startServerListening() {
+      console.log('  ...listening on http://localhost:' + port + '/');
+      server.listen(port);
+    }
+
+    /** @typedef {import ('http').IncomingMessage} NodeRequest */
+    /** @typedef {import('http').ServerResponse} NodeResponse */
+
+    /**
+     * @param {NodeRequest} req
+     * @param {NodeResponse} res
+     */
+    function nodeHandleRequest(req, res) {
+      if (req.url === '/shutdown') {
+        console.log('exiting now.');
+        server.close();
+        process.exit(0);
+        return;
+      } else if (req.url === '/main.js' || req.url === '/pako.js') {
+        var file = fs.readFileSync(__dirname + req.url);
+        res.setHeader('Content-Type', 'application/javascript');
+        res.end(file);
+        return;
+      }
+
+      var context = {
+        log: console.log.bind(console)
+      };
+
+      /** @type {Request} */
+      var abstractRequest = {
+        url: 'http://localhost:' + port + req.url
+      };
+
+      var resultPromise = handleRequest(
+        context,
+        abstractRequest
+      );
+
+      resultPromise.then(
+        function (result) {
+          if (result.headers) {
+            for (var hdr in result.headers) {
+              var val = result.headers[hdr];
+              if (typeof val === 'string' || (val && Array.isArray(val))) {
+                try {
+                  res.setHeader(hdr, val);
+                }
+                catch (error) {
+                  //
+                }
+              }
+            }
+          }
+          res.end(result.body);
+        },
+        function (error) {
+          res.statusCode = 500;
+          res.end(
+            error.message + '\n\n' +
+            error.stack);
+        });
+    }
   }
 
   function runAsModule() {
@@ -1243,10 +1334,6 @@ function ttywtf() {
 
   /** @typedef {{
    *  url: string;
-   *  query: {
-   *    name: string;
-   *  };
-   *  body: any;
    * }} Request
    */
 
@@ -1265,6 +1352,9 @@ function ttywtf() {
     return new Promise(function (resolve, reject) {
 
       var scriptBaseURL = '//tty.wtf/';
+      if (/^http:\/\/localhost/i.test(req.url)) {
+        scriptBaseURL = '/';
+      }
 
       var resultHTML =
         '<!DOCTYPE html><html lang="en"><head>\n' +

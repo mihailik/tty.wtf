@@ -1316,11 +1316,13 @@ function ttywtf() {
 
       resultPromise.then(
         function (result) {
+          var html = false;
           if (result.headers) {
             for (var hdr in result.headers) {
               var val = result.headers[hdr];
               if (typeof val === 'string' || (val && Array.isArray(val))) {
                 try {
+                  if (hdr === 'Content-Type' && val === 'text/html') html = true;
                   res.setHeader(hdr, val);
                 }
                 catch (error) {
@@ -1329,7 +1331,9 @@ function ttywtf() {
               }
             }
           }
-          res.end(result.body + '<!-- server started: ' + serverStarted + '-->');
+
+          if (html) res.end(result.body + '<!-- server started: ' + serverStarted + '-->');
+          else res.end(result.body);
         },
         function (error) {
           res.statusCode = 500;

@@ -68,16 +68,6 @@
       }
     },
     {
-      "type": "func",
-      "dependsOn": "build (functions)",
-      "options": {
-        "cwd": "${workspaceFolder}/azure-fn-net6/bin/Debug/net6.0"
-      },
-      "command": "host start",
-      "isBackground": true,
-      "problemMatcher": "$func-dotnet-watch"
-    },
-    {
       "label": "build",
       "command": "dotnet",
       "type": "process",
@@ -112,6 +102,24 @@
         "${workspaceFolder}/azure-fn-net6/azure-fn-net6.csproj"
       ],
       "problemMatcher": "$msCompile"
+    },
+    {
+      "type": "func",
+      "command": "host start",
+      "problemMatcher": "$func-node-watch",
+      "isBackground": true,
+      "dependsOn": "npm install (functions)"
+    },
+    {
+      "type": "shell",
+      "label": "npm install (functions)",
+      "command": "npm install"
+    },
+    {
+      "type": "shell",
+      "label": "npm prune (functions)",
+      "command": "npm prune --production",
+      "problemMatcher": []
     }
   ]
 }

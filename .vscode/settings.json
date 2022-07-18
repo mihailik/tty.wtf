@@ -1,7 +1,8 @@
 {
-  "azureFunctions.deploySubpath": "azure-fn-net6/bin/Release/net6.0/publish",
-  "azureFunctions.projectLanguage": "C#",
+  "azureFunctions.deploySubpath": ".",
+  "azureFunctions.projectLanguage": "JavaScript",
   "azureFunctions.projectRuntime": "~4",
   "debug.internalConsoleOptions": "neverOpen",
-  "azureFunctions.preDeployTask": "publish (functions)"
+  "azureFunctions.preDeployTask": "npm prune (functions)",
+  "azureFunctions.postDeployTask": "npm install (functions)"
 }

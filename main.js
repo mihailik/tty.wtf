@@ -483,7 +483,7 @@ function ttywtf() {
           // find where change ends exactly
           while (unchangedPrefixLength + unchangedSuffixLength < textareaCurrentValue.length
             && unchangedPrefixLength + unchangedSuffixLength < textareaLastValue.length
-            && textareaCurrentValue.charCodeAt(textareaCurrentValue.length - unchangedSuffixLength) === textareaLastValue.charCodeAt(textareaLastValue.length - unchangedSuffixLength)) {
+            && textareaCurrentValue.charCodeAt(textareaCurrentValue.length - unchangedSuffixLength - 1) === textareaLastValue.charCodeAt(textareaLastValue.length - unchangedSuffixLength - 1)) {
             unchangedSuffixLength++;
           }
 

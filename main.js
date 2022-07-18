@@ -1387,6 +1387,7 @@ function ttywtf() {
         '<meta http-equiv="X-UA-Compatible" content="IE=edge">\n' +
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
         '<title>TTY</title>\n' +
+        '<!-- ' + req.url + ' -->\n'  +
         '</head><body>\n' +
         '<' + 'script src="' + scriptBaseURL + 'main.js"' + '></' + 'script' + '>\n' +
         '<' + 'script src="' + scriptBaseURL + 'pako.js"' + '></' + 'script' + '>\n' +

@@ -189,6 +189,33 @@ function ttywtf() {
   }
 
   /**
+   * @param whole {string}
+   * @param openDecor {string}
+   * @param content {string}
+   * @param closeDecor {string}
+   **/
+  function convertFromMarkdownHelper(whole, openDecor, content, closeDecor) {
+    if (openDecor==='*' && closeDecor ==='*') {
+      var italic = applyModifier(content, 'italic');
+      if (italic !== whole) return italic;
+      else return whole;
+    } else if (openDecor === '**' && closeDecor === '**') {
+      var bold = applyModifier(content, 'bold');
+      if (bold !== whole) return bold;
+      else return whole;
+    } else if (openDecor === '***' && closeDecor === '***') {
+      var bolditalic = applyModifier(applyModifier(content, 'bold'), 'italic');
+      if (bolditalic !== whole) return bolditalic;
+      else return whole;
+    } else if (openDecor === '_' && closeDecor === '_') {
+      var underline = applyModifier(content, 'underlined');
+      if (underline !== whole) return underline;
+      else return whole;
+    }
+    return whole;
+  }
+
+  /**
    * @param formattedText {string}
    * @returns {string}
    **/
@@ -231,33 +258,6 @@ function ttywtf() {
       }
     }
     return result;
-  }
-
-  /**
-   * @param whole {string}
-   * @param openDecor {string}
-   * @param content {string}
-   * @param closeDecor {string}
-   **/
-  function convertFromMarkdownHelper(whole, openDecor, content, closeDecor) {
-    if (openDecor==='*' && closeDecor ==='*') {
-      var italic = applyModifier(content, 'italic');
-      if (italic !== whole) return italic;
-      else return whole;
-    } else if (openDecor === '**' && closeDecor === '**') {
-      var bold = applyModifier(content, 'bold');
-      if (bold !== whole) return bold;
-      else return whole;
-    } else if (openDecor === '***' && closeDecor === '***') {
-      var bolditalic = applyModifier(applyModifier(content, 'bold'), 'italic');
-      if (bolditalic !== whole) return bolditalic;
-      else return whole;
-    } else if (openDecor === '_' && closeDecor === '_') {
-      var underline = applyModifier(content, 'underlined');
-      if (underline !== whole) return underline;
-      else return whole;
-    }
-    return whole;
   }
 
   /**
@@ -966,28 +966,14 @@ function ttywtf() {
 
         var modifiers = !underlined ? entry.modifiers : entry.underlinedModifiers;
         var fullModifiers = !underlined ? entry.fullModifiers : entry.underlinedFullModifiers;
-
-        if (!disableCoalescing && prev && typeof prev !== 'string' && prev.fullModifiers === entry.fullModifiers) {
-          prev.formatted += entry.formatted;
-          prev.length += entry.formatted.length;
-          prev.plain += entry.plain;
-        } else {
-          result.push({
-            formatted: match[0],
-            plain: entry.plain,
-            modifiers: modifiers,
-            fullModifiers: fullModifiers,
-            length: match[0].length
-          });
-
-          for (var i = 0; i < modifiers.length; i++) {
-            var mod = modifiers[i];
-            if (!modifierDict[mod]) {
-              modifierDict[mod] = true;
-              result.modifiers.push(mod);
-            }
-          }
-        }
+        
+        addFormatted({
+          formatted: match[0],
+          plain: entry.plain,
+          modifiers: modifiers,
+          fullModifiers: fullModifiers,
+          length: match[0].length
+        });
 
         index = match.index + match[0].length;
       }
@@ -1010,11 +996,11 @@ function ttywtf() {
           regex_underlinedChar.lastIndex = start;
           var matchUnderlined = regex_underlinedChar.exec(text);
           if (!matchUnderlined || matchUnderlined.index >= end) {
-            result.push(text.slice(start, end));
+            addFormatted(text.slice(start, end));
             break;
           }
 
-          if (matchUnderlined.index > start) result.push(text.slice(start, matchUnderlined.index));
+          if (matchUnderlined.index > start) addFormatted(text.slice(start, matchUnderlined.index));
 
           var underlinedText = matchUnderlined[0];
           var plain = underlinedText.slice(0,underlinedText.length - 1);
@@ -1031,7 +1017,7 @@ function ttywtf() {
           }
 
           if (!added) {
-            result.push({
+            addFormatted({
               formatted: underlinedText,
               plain: plain,
               modifiers: ['underlined'],
@@ -1045,6 +1031,50 @@ function ttywtf() {
           start = matchUnderlined.index + underlinedText.length;
         }
       }
+
+      /** @param {typeof result[0]} entry */
+      function addFormatted(entry) {
+        var prev = result.length && result[result.length - 1];
+
+        if (!disableCoalescing) {
+          if (typeof entry === 'string') {
+            if (typeof prev === 'string') {
+              result[result.length - 1] = prev + entry;
+              return;
+            }
+          } else if (prev) {
+            if (typeof prev === 'string') {
+              var nextPrev = result.length > 1 && result[result.length - 2];
+              if (nextPrev && typeof nextPrev !== 'string' &&
+                nextPrev.fullModifiers === entry.fullModifiers &&
+                applyModifier(prev, entry.fullModifiers) === prev) {
+                nextPrev.formatted += prev + entry.formatted;
+                nextPrev.plain += prev + entry.plain;
+                nextPrev.length += prev.length + entry.length;
+                return;
+              }
+            }
+            else if (prev.fullModifiers === entry.fullModifiers) {
+              prev.formatted += entry.formatted;
+              prev.plain += entry.plain;
+              prev.length += entry.length;
+              return;
+            }
+          }
+        }
+
+        if (typeof entry !== 'string' && (!prev ||  typeof prev === 'string' || prev.fullModifiers !== entry.fullModifiers))
+        for (var i = 0; i < entry.modifiers.length; i++) {
+          var mod = entry.modifiers[i];
+          if (!modifierDict[mod]) {
+            modifierDict[mod] = true;
+            result.modifiers.push(mod);
+          }
+        }
+
+        result.push(entry);
+      }
+
     }
 
     buildLookups();

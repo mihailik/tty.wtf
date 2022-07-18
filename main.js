@@ -945,6 +945,7 @@ function ttywtf() {
       formattedRegex.lastIndex = 0;
       let index = 0;
       while (true) {
+        formattedRegex.lastIndex = index;
         var match = formattedRegex.exec(text);
         if (!match) break;
 
@@ -1047,7 +1048,7 @@ function ttywtf() {
               var nextPrev = result.length > 1 && result[result.length - 2];
               if (nextPrev && typeof nextPrev !== 'string' &&
                 nextPrev.fullModifiers === entry.fullModifiers &&
-                applyModifier(prev, entry.fullModifiers) === prev) {
+                !formattedRegex.test(prev)) {
                 nextPrev.formatted += prev + entry.formatted;
                 nextPrev.plain += prev + entry.plain;
                 nextPrev.length += prev.length + entry.length;

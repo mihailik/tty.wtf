@@ -540,7 +540,7 @@ function ttywtf() {
     }
 
     clearTimeout(save_timeout);
-    save_timeout = setTimeout(textarea_onchange_debounced, 400);
+    save_timeout = setTimeout(textarea_onchange_debounced, 200);
   }
 
   function textarea_onchange_debounced() {
@@ -932,61 +932,6 @@ function ttywtf() {
      * @param options {{ disableCoalescing?: boolean }=}
      **/
     function parser(text, options) {
-      /** @type {ParsedList} */
-      var result = /** @type{*} */([]);
-      result.modifiers = [];
-      result.fullModifiers = '';
-      if (!text) return result;
-
-      var disableCoalescing = options && options.disableCoalescing;
-
-      var modifierDict = {};
-
-      formattedRegex.lastIndex = 0;
-      let index = 0;
-      while (true) {
-        formattedRegex.lastIndex = index;
-        var match = formattedRegex.exec(text);
-        if (!match) break;
-
-        if (match.index > index) {
-          addUnderlinedsAndPlainTextBetween(index, match.index);
-          // result.push(text.slice(index, match.index));
-        }
-
-        var underlined = false;
-        
-        var entryKey = match[0];
-        if (entryKey.charCodeAt(entryKey.length - 1) === ('\u0332').charCodeAt(0)) {
-          entryKey = entryKey.slice(0, entryKey.length - 1);
-          underlined = true;
-        }
-
-        var entry = lookup[entryKey];
-        var prev = result.length && result[result.length - 1];
-
-        var modifiers = !underlined ? entry.modifiers : entry.underlinedModifiers;
-        var fullModifiers = !underlined ? entry.fullModifiers : entry.underlinedFullModifiers;
-        
-        addFormatted({
-          formatted: match[0],
-          plain: entry.plain,
-          modifiers: modifiers,
-          fullModifiers: fullModifiers,
-          length: match[0].length
-        });
-
-        index = match.index + match[0].length;
-      }
-
-      if (index < text.length) {
-        addUnderlinedsAndPlainTextBetween(index, text.length);
-      }
-
-      result.modifiers.sort();
-      result.fullModifiers = result.modifiers.join('');
-
-      return result;
 
       /**
        * @param start {number}
@@ -997,11 +942,11 @@ function ttywtf() {
           regex_underlinedChar.lastIndex = start;
           var matchUnderlined = regex_underlinedChar.exec(text);
           if (!matchUnderlined || matchUnderlined.index >= end) {
-            addFormatted(text.slice(start, end));
+            addFormattedToResult(text.slice(start, end));
             break;
           }
 
-          if (matchUnderlined.index > start) addFormatted(text.slice(start, matchUnderlined.index));
+          if (matchUnderlined.index > start) addFormattedToResult(text.slice(start, matchUnderlined.index));
 
           var underlinedText = matchUnderlined[0];
           var plain = underlinedText.slice(0,underlinedText.length - 1);
@@ -1018,7 +963,7 @@ function ttywtf() {
           }
 
           if (!added) {
-            addFormatted({
+            addFormattedToResult({
               formatted: underlinedText,
               plain: plain,
               modifiers: ['underlined'],
@@ -1033,8 +978,10 @@ function ttywtf() {
         }
       }
 
+      var regex_formattableCharacters = /[a-z0-9]/;
+
       /** @param {typeof result[0]} entry */
-      function addFormatted(entry) {
+      function addFormattedToResult(entry) {
         var prev = result.length && result[result.length - 1];
 
         if (!disableCoalescing) {
@@ -1048,10 +995,11 @@ function ttywtf() {
               var nextPrev = result.length > 1 && result[result.length - 2];
               if (nextPrev && typeof nextPrev !== 'string' &&
                 nextPrev.fullModifiers === entry.fullModifiers &&
-                !formattedRegex.test(prev)) {
+                !regex_formattableCharacters.test(prev) && prev.indexOf('\n') < 0) {
                 nextPrev.formatted += prev + entry.formatted;
                 nextPrev.plain += prev + entry.plain;
                 nextPrev.length += prev.length + entry.length;
+                result.pop(); // plain text in the middle eliminated
                 return;
               }
             }
@@ -1076,6 +1024,61 @@ function ttywtf() {
         result.push(entry);
       }
 
+      /** @type {ParsedList} */
+      var result = /** @type{*} */([]);
+      result.modifiers = [];
+      result.fullModifiers = '';
+      if (!text) return result;
+
+      var disableCoalescing = options && options.disableCoalescing;
+
+      var modifierDict = {};
+
+      formattedRegex.lastIndex = 0;
+      let index = 0;
+      while (true) {
+        formattedRegex.lastIndex = index;
+        var match = formattedRegex.exec(text);
+        if (!match) break;
+
+        if (match.index > index) {
+          addUnderlinedsAndPlainTextBetween(index, match.index);
+          // result.push(text.slice(index, match.index));
+        }
+
+        var underlined = false;
+
+        var entryKey = match[0];
+        if (entryKey.charCodeAt(entryKey.length - 1) === ('\u0332').charCodeAt(0)) {
+          entryKey = entryKey.slice(0, entryKey.length - 1);
+          underlined = true;
+        }
+
+        var entry = lookup[entryKey];
+        var prev = result.length && result[result.length - 1];
+
+        var modifiers = !underlined ? entry.modifiers : entry.underlinedModifiers;
+        var fullModifiers = !underlined ? entry.fullModifiers : entry.underlinedFullModifiers;
+
+        addFormattedToResult({
+          formatted: match[0],
+          plain: entry.plain,
+          modifiers: modifiers,
+          fullModifiers: fullModifiers,
+          length: match[0].length
+        });
+
+        index = match.index + match[0].length;
+      }
+
+      if (index < text.length) {
+        addUnderlinedsAndPlainTextBetween(index, text.length);
+      }
+
+      result.modifiers.sort();
+      result.fullModifiers = result.modifiers.join('');
+
+      return result;
     }
 
     buildLookups();

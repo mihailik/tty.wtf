@@ -1231,22 +1231,42 @@ function ttywtf() {
     var path = require('path');
     var http = require('http');
 
-    var restartTimeout;
-    fs.watch(
-      __filename,
-      function () {
-        clearTimeout(restartTimeout);
-        restartTimeout = setTimeout(function () {
-          console.log('file changed...');
-          var child_process = require('child_process');
-          child_process.spawnSync('node ' + __filename);
-        }, 2000);
-      }
-    );
+    var useWatch = false;
+
+    if (useWatch) {
+      var restartTimeout;
+      fs.watch(
+        __filename,
+        function () {
+          clearTimeout(restartTimeout);
+          restartTimeout = setTimeout(function () {
+            // spurious change, ignore
+            if (fs.readFileSync(__filename).indexOf(ttywtf + '') >= 0) return;
+
+            console.log('file changed?...');
+            var child_process = require('child_process');
+            try {
+              var spawnRes = child_process.spawn('node', [__filename], {
+                cwd: __dirname,
+                argv0: __filename,
+                stdio: 'inherit'
+              }); ///
+              spawnRes.on('error', function (spawnErr) {
+                console.log('could not spawn new instance: ', spawnErr);
+              });
+            }
+            catch (error) {
+              console.log('could not start new instance: ', error);
+            }
+          }, 2000);
+        }
+      );
+    }
 
     var port = 3458;
 
     var server = http.createServer(nodeHandleRequest);
+    var serverStarted = new Date();
 
     http.get('http://localhost:' + port + '/shutdown', function () {
       startServerListening();
@@ -1255,6 +1275,7 @@ function ttywtf() {
     });
 
     function startServerListening() {
+      serverStarted = new Date();
       console.log('  ...listening on http://localhost:' + port + '/');
       server.listen(port);
     }
@@ -1303,12 +1324,12 @@ function ttywtf() {
                   res.setHeader(hdr, val);
                 }
                 catch (error) {
-                  //
+                  // ignore header errors
                 }
               }
             }
           }
-          res.end(result.body);
+          res.end(result.body + '<!-- server started: ' + serverStarted + '-->');
         },
         function (error) {
           res.statusCode = 500;

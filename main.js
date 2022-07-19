@@ -1470,10 +1470,13 @@ function ttywtf() {
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
 
         // TODO: decode text from URL and inject it into this title
-        '<meta property="og:title" content="TTY.WTF" />\n' +
-        // '<meta property="og:type" content="video.movie" />\n' + 
-        // '<meta property="og:url" content="https://www.imdb.com/title/tt0117500/" />\n' +
-        '<meta property="og:image" content="' + baseURL + '~image' + localURL + '" />\n' +
+        '<meta property="og:title" content="TTY.WTF">\n' +
+        '<meta property="og:type" content="article" />\n' +
+        '<meta property="og:description" content="TTY.WTF TBD">\n' +
+        '<meta name="twitter:image:alt" content="TTY.WTF A">\n' +
+        '<meta property="og:image" content="' + baseURL + '~image' + localURL + '">\n' +
+        // <meta property="og:url" content="http://euro-travel-example.com/index.htm">
+        '<meta name="twitter:card" content="summary_large_image">\n' +
 
         '<title>TTY</title>\n' +
         '</head><body>\n' +

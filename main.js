@@ -1376,7 +1376,7 @@ function ttywtf() {
   function handleRequest(context, req) {
     return new Promise(function (resolveResponse, rejectResponse) {
 
-      var baseURL = 'https://tty.wtf/';
+      var baseURL = 'https://tty-wtf-node.azurewebsites.net/api/azurefn?';
       var scriptBaseURL = '//tty.wtf/';
 
       var host = getHost(req.url);
@@ -1387,9 +1387,10 @@ function ttywtf() {
         scriptBaseURL = '/';        
       }
 
-      if (/^\/~image\//.test(localURL)) {
-        // TODO: generate image
-        generateImage(baseURL, localURL.slice('/~image'.length)).then(
+      var regex_imageURL = /^\/(api\/[a-z]+\/?\??)?(~image\/)/;
+      if (regex_imageURL.test(localURL)) {
+        var imgLocalURL = localURL.replace(regex_imageURL, '/$1');
+        generateImage(baseURL, imgLocalURL).then(
           function (imageBuffer) {
             resolveResponse({
               // status: 200, /* Defaults to 200 */

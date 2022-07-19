@@ -1377,7 +1377,7 @@ function ttywtf() {
     return new Promise(function (resolveResponse, rejectResponse) {
 
       var baseURL = 'https://tty.wtf/';
-      var scriptBaseURL = '//tty.wtf';
+      var scriptBaseURL = '//tty.wtf/';
 
       var host = getHost(req.url);
       var localURL = '/' + req.url.slice(host.length);

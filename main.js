@@ -1374,33 +1374,115 @@ function ttywtf() {
    * @returns {Promise<Response>}
    */
   function handleRequest(context, req) {
-    return new Promise(function (resolve, reject) {
+    return new Promise(function (resolveResponse, rejectResponse) {
 
-      var scriptBaseURL = '//tty.wtf/';
-      if (/^http:\/\/localhost/i.test(req.url)) {
-        scriptBaseURL = '/';
+      var baseURL = '//tty.wtf/';
+      var scriptBaseURL = baseURL;
+
+      var host = getHost(req.url);
+      var localURL = '/' + req.url.slice(host.length);
+      
+      if (host.toLowerCase().indexOf('http://localhost') === 0 || host.indexOf('http://127.') === 0) {
+        baseURL = host;
+        scriptBaseURL = '/';        
       }
 
+      if (/^\/~image\//.test(localURL)) {
+        // TODO: generate image
+        generateImage(baseURL, localURL.slice('/~image'.length)).then(
+          function (imageBuffer) {
+            resolveResponse({
+              // status: 200, /* Defaults to 200 */
+              body: imageBuffer,
+              headers: {
+                'Content-Type': 'image/png'
+              }
+            });
+          },
+          function (imageError) {
+            // pipe to the caller
+            rejectResponse(imageError);
+          }
+        );
+      } else {
+        resolveResponse({
+          // status: 200, /* Defaults to 200 */
+          body: generateHTML(scriptBaseURL, baseURL, localURL),
+          headers: {
+            'Content-Type': 'text/html'
+          }
+        });
+      }
+
+    });
+
+    /** @param {string} url */
+    function getHost(url) {
+      var match = /^(http|https):\/*[^\/]+\/?/i.exec(url);
+      return !match ? url : match[0];
+    }
+
+    /**
+     * @param {string} baseURL
+     * @param {string} localUrl
+     * @returns {Promise<Buffer>}
+     */
+    function generateImage(baseURL, localUrl) {
+      var imgSize = { width: 800, height: 418 };
+
+      return new Promise(function (resolve, reject) {
+        var puppeteer = require('puppeteer');
+        puppeteer.launch().then(
+          function withBrowser(browser) {
+            browser.newPage().then(
+              function withPage(page) {
+                page.setViewport(imgSize).then(
+                  function withViewportSet() {
+                    context.log('goto ' + baseURL + localUrl);
+                    page.goto(baseURL + localUrl).then(
+                      function pageLoaded() {
+                        page.screenshot({ fullPage: true }).then(
+                          function withScreenshotBuffer(buffer) {
+                            context.log('page screenshot obtained: ' + buffer.length);
+                            resolve(/** @type {Buffer}*/(buffer));
+                          }, reject
+                        );
+                      }, reject
+                    );
+                  });
+              }, reject
+            );
+          }, reject
+        );
+      });
+    }
+
+    /**
+     * @param {string} scriptBaseURL
+     * @param {string} baseURL
+     * @param {string} localURL
+     */
+    function generateHTML(scriptBaseURL, baseURL, localURL) {
       var resultHTML =
         '<!DOCTYPE html><html lang="en"><head>\n' +
         '<meta charset="UTF-8">\n' +
         '<meta http-equiv="X-UA-Compatible" content="IE=edge">\n' +
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+
+        // TODO: decode text from URL and inject it into this title
+        '<meta property="og:title" content="TTY.WTF" />\n' +
+        // '<meta property="og:type" content="video.movie" />\n' + 
+        // '<meta property="og:url" content="https://www.imdb.com/title/tt0117500/" />\n' +
+        '<meta property="og:image" content="' + baseURL + '~image' + localURL + '" />\n' +
+
         '<title>TTY</title>\n' +
-        '<!-- ' + req.url + ' -->\n'  +
         '</head><body>\n' +
         '<' + 'script src="' + scriptBaseURL + 'main.js"' + '></' + 'script' + '>\n' +
         '<' + 'script src="' + scriptBaseURL + 'pako.js"' + '></' + 'script' + '>\n' +
         '</body></html>';
-
-      resolve({
-        // status: 200, /* Defaults to 200 */
-        body: resultHTML,
-        headers: {
-          'Content-Type': 'text/html'
-        }
-      });
-    });
+      
+      return resultHTML;
+    }
   }
 
 

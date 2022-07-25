@@ -1123,7 +1123,7 @@ function ttywtf() {
       'body { background: white; color: black; font-family:\n' +
       '   "Arial Unicode", "' + noteFonts.join('", "') + '",\n' +
       '   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0; } ' +
-      '*, *:before, *:after { box-sizing: inherit; } ' +
+      '*, *:before, *:after { box-sizing: inherit; font-family: inherit; } ' +
       '#toolbar button { width: 100%; height: 2.7em; margin: 0.35em; margin-top: 0.25em; margin-bottom: 0; border-radius: 0.5em; background: white; border: solid 1px #d6d6d6; box-shadow: 2px 3px 6px rgb(0, 0, 0, 0.09); } ' +
       '#toolbar button.pressed { background: gray; color: white; } ' +
       '#toolbar button .symbol-formatted { font-size: 150%; position: relative; top: 0.05em; } ' +
@@ -1499,6 +1499,7 @@ function ttywtf() {
         '}\n' +
         '*, *:before, *:after {\n' +
         ' box-sizing: inherit;\n' +
+        ' font-family: inherit;\n' +
         '}\n' +
         '</style>\n' +
 

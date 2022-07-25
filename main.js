@@ -1095,6 +1095,14 @@ function ttywtf() {
     return parser;
   }
 
+  var noteFonts = [
+    'Note Sans Math',
+    'Note Emoji',
+    'Noto Sans Symbols',
+    'Noto Sans Symbols 2',
+    'Note Sans'
+  ];
+
   function createLayout() {
     var tableLayoutHTML =
       '<table style="width: 100%; height: 100%;" cellspacing=0 cellpadding=0><tr><td width="100%">' +
@@ -1112,7 +1120,9 @@ function ttywtf() {
 
     var styleCSS =
       'html { box-sizing: border-box; width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0; } ' +
-      'body { background: white; color: black; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0; } ' +
+      'body { background: white; color: black; font-family:\n' +
+      '   "Arial Unicode", "' + noteFonts.join('", "') + '",\n' +
+      '   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0; } ' +
       '*, *:before, *:after { box-sizing: inherit; } ' +
       '#toolbar button { width: 100%; height: 2.7em; margin: 0.35em; margin-top: 0.25em; margin-bottom: 0; border-radius: 0.5em; background: white; border: solid 1px #d6d6d6; box-shadow: 2px 3px 6px rgb(0, 0, 0, 0.09); } ' +
       '#toolbar button.pressed { background: gray; color: white; } ' +
@@ -1469,12 +1479,8 @@ function ttywtf() {
         '<meta charset="UTF-8">\n' +
         '<meta http-equiv="X-UA-Compatible" content="IE=edge">\n' +
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
-        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">\n' +
-        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">\n' +
-        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Numerals">\n' +
-        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Emoji">\n' +
-        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols">\n' +
-        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols 2">\n' +
+
+        noteFonts.map(function (font) { return '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=' + font + '">\n'; }).join('') + '\n' +
 
         // TODO: decode text from URL and inject it into this title
         '<meta property="og:title" content="TTY.WTF">\n' +
@@ -1488,7 +1494,7 @@ function ttywtf() {
         '<style>\n' +
         'html {\n' +
         ' box-sizing: border-box;\n' +
-        ' font-family: Arial Unicode, Note Sans Math, Note Emoji, Note Sans Numerals, Noto Sans Symbols, Noto Sans Symbols 2, Note Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";\n' +
+        ' font-family: "Arial Unicode", "' + noteFonts.join('", "') + '", \n' +
         ' background: white; color: black\n' +
         '}\n' +
         '*, *:before, *:after {\n' +

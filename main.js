@@ -1469,6 +1469,12 @@ function ttywtf() {
         '<meta charset="UTF-8">\n' +
         '<meta http-equiv="X-UA-Compatible" content="IE=edge">\n' +
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">\n' +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">\n' +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Numerals">\n' +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Emoji">\n' +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols">\n' +
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols 2">\n' +
 
         // TODO: decode text from URL and inject it into this title
         '<meta property="og:title" content="TTY.WTF">\n' +
@@ -1478,6 +1484,17 @@ function ttywtf() {
         '<meta property="og:image" content="' + baseURL + '~image' + localURL + '">\n' +
         // <meta property="og:url" content="http://euro-travel-example.com/index.htm">
         '<meta name="twitter:card" content="summary_large_image">\n' +
+
+        '<style>\n' +
+        'html {\n' +
+        ' box-sizing: border-box;\n' +
+        ' font-family: Arial Unicode, Note Sans Math, Note Emoji, Note Sans Numerals, Noto Sans Symbols, Noto Sans Symbols 2, Note Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";\n' +
+        ' background: white; color: black\n' +
+        '}\n' +
+        '*, *:before, *:after {\n' +
+        ' box-sizing: inherit;\n' +
+        '}\n' +
+        '</style>\n' +
 
         '<title>TTY</title>\n' +
         '</head><body>\n' +

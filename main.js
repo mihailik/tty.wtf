@@ -1359,7 +1359,20 @@ function ttywtf() {
   }
 
   function runInAzure() {
-    module.exports = handleRequest;
+    module.exports = handleAzureRequest;
+
+    var scriptBaseURL = '//tty.wtf/';
+    var azureWebsite = 'tty-wtf-node';
+
+    var baseURL = 'https://' + azureWebsite + '.azurewebsites.net/api/azurefn?';
+
+    /**
+     * @param {Context} context
+     * @param {Request} req
+     */
+    function handleAzureRequest(context, req) {
+      return handleRequest(baseURL, scriptBaseURL, context, req);
+    }
   }
 
   /** @typedef {{
@@ -1379,15 +1392,14 @@ function ttywtf() {
    */
 
   /**
+   * @param {string} baseURL
+   * @param {string} scriptBaseURL
    * @param {Context} context
    * @param {Request} req
    * @returns {Promise<Response>}
    */
-  function handleRequest(context, req) {
+  function handleRequest(baseURL, scriptBaseURL, context, req) {
     return new Promise(function (resolveResponse, rejectResponse) {
-
-      var baseURL = 'https://tty-wtf-node.azurewebsites.net/api/azurefn?';
-      var scriptBaseURL = '//tty.wtf/';
 
       var host = getHost(req.url);
       var localURL = '/' + req.url.slice(host.length);

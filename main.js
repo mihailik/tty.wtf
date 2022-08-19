@@ -2,6 +2,9 @@
 
 function ttywtf() {
 
+  /** @type {string[] | undefined} */
+  var residualModifiers;
+
   function addButtonHandlers() {
     var buttonsArray = document.getElementsByTagName('button');
     for (var i = 0; i < buttonsArray.length; i++) {
@@ -20,9 +23,7 @@ function ttywtf() {
         if (evt.stopPropagation) evt.stopPropagation();
         if ('cancelBubble' in evt) evt.cancelBubble = true;
 
-        var modifier = btn.id;
-        var remove = (btn.className || '').indexOf('pressed') >=0;
-        applyModifierToSelection(modifier, remove);
+        handleClick();
       }
 
       /** @param {MouseEvent} evt */
@@ -37,6 +38,12 @@ function ttywtf() {
         if (evt.preventDefault) evt.preventDefault();
         if (evt.stopPropagation) evt.stopPropagation();
         if ('cancelBubble' in evt) evt.cancelBubble = true;
+      }
+
+      function handleClick() {
+        var modifier = btn.id;
+        var remove = (btn.className || '').indexOf('pressed') >= 0;
+        applyModifierToSelection(modifier, remove);
       }
     }
   }
@@ -645,6 +652,7 @@ function ttywtf() {
     textarea_onselectionchange();
   }
 
+  /** @param {KeyboardEvent} e */
   function textarea_onkeydown(e) {
     if (e.metaKey || e.ctrlKey) {
       var letter = String.fromCharCode(e.keyCode);
@@ -666,6 +674,7 @@ function ttywtf() {
     textarea_onkeyevent();
   }
 
+  /** @param {KeyboardEvent=} e */
   function textarea_onkeyevent(e) {
     textareaKeyEventTimestamp = Date.now();
     textarea_onchange();
@@ -1124,9 +1133,13 @@ function ttywtf() {
       '   "Arial Unicode", "' + noteFonts.join('", "') + '",\n' +
       '   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; width: 100%; height: 100%; overflow: hidden; padding: 0; margin: 0; } ' +
       '*, *:before, *:after { box-sizing: inherit; font-family: inherit; } ' +
-      '#toolbar button { width: 100%; height: 2.7em; margin: 0.35em; margin-top: 0.25em; margin-bottom: 0; border-radius: 0.5em; background: white; border: solid 1px #d6d6d6; box-shadow: 2px 3px 6px rgb(0, 0, 0, 0.09); } ' +
+      '#toolbar button { width: 100%; height: 2.7em; padding-top:0; line-height:0; margin: 0.35em; margin-top: 0.25em; margin-bottom: 0; border-radius: 0.5em; background: white; border: solid 1px #d6d6d6; box-shadow: 2px 3px 6px rgb(0, 0, 0, 0.09); } ' +
       '#toolbar button.pressed { background: gray; color: white; } ' +
-      '#toolbar button .symbol-formatted { font-size: 150%; position: relative; top: 0.05em; } ' +
+      '#toolbar button .symbol-formatted { font-size: 150%; position: relative; top: 0.05em; font-size: 150%; position: relative; top: 0.08em; left: -0.02em; } ' +
+      '#toolbar button#italic .symbol-formatted { left: -0.07em; } \n' +
+      '#toolbar button#cursive .symbol-formatted { left: 0.1em; } \n' +
+      '#toolbar button#box .symbol-formatted { left: 0.05em; top: 0.08em; } \n' +
+      '#toolbar button#plate .symbol-formatted { top: 0.14em; } \n' +
       '#textarea { width: 100%; height: 100%; overflow: auto; border: none; padding: 1em; outline: none; font: inherit; resize: none; }';
     
     var styleEl = document.createElement('style');
@@ -1277,8 +1290,9 @@ function ttywtf() {
 
     var server = http.createServer(nodeHandleRequest);
     var serverStarted = new Date();
+    var serverUrl = 'http://localhost:' + port + '/';
 
-    http.get('http://localhost:' + port + '/shutdown', function () {
+    http.get(serverUrl + 'shutdown', function () {
       startServerListening();
     }).on('error', function () {
       startServerListening();
@@ -1286,7 +1300,7 @@ function ttywtf() {
 
     function startServerListening() {
       serverStarted = new Date();
-      console.log('  ...listening on http://localhost:' + port + '/');
+      console.log('  ...listening on ' + serverUrl + '/');
       server.listen(port);
     }
 
@@ -1320,6 +1334,8 @@ function ttywtf() {
       };
 
       var resultPromise = handleRequest(
+        serverUrl,
+        serverUrl,
         context,
         abstractRequest
       );

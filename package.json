@@ -21,7 +21,7 @@
   "homepage": "http://catch.rest/",
   "devDependencies": {
     "codemirror": "5",
-    "typescript": "*",
+    "typescript": "^4.9.3",
     "xlsx": "*"
   }
 }

@@ -643,6 +643,7 @@ issuing requests, processing data and representing the data in sensible way with
     var path = require('path');
     var child_process = require('child_process');
     var http = require('http');
+    var https = require('https');
     var URL = require('url');
 
     /** @type {(() => void | (Promise<void>))[]} */
@@ -706,8 +707,7 @@ issuing requests, processing data and representing the data in sensible way with
         'codemirror/mode/markdown/markdown.js',
         'codemirror/mode/addon/fold/foldgutter.js',
         'codemirror/mode/addon/fold/foldgutter.css',
-        'codemirror/mode/addon/fold/foldcode.js',
-        'codemirror/mode/addon/fold/markdown-fold.js',
+        'codemirror/addon/fold/markdown-fold.js',
 
         'xlsx/dist/xlsx.full.min.js',
         //'xlsx/jszip.js'
@@ -761,24 +761,39 @@ issuing requests, processing data and representing the data in sensible way with
       function readUnpkgImports() {
         var importDownloads = imports.map(function (importLocalPath) {
           return new Promise(function (resolve, reject) {
-            var req = http.get('http://unpkg.com/' + importLocalPath);
-            var buffers = [];
-            req.on('data', function (data) {
-              buffers.push(data);
-            });
-            req.on('error', function (err) {
-              reject(err);
-            });
-            req.on('response', function (res) {
-              if (res.statusCode !== 200) reject(new Error('HTTP/' + res.statusCode + ' ' + res.statusMessage));
-            });
-            req.on('end', function (res) {
-              var wholeData = buffers.length === 1 ? buffers[0] : Buffer.concat(buffers);
-              resolve({
-                importLocalPath: importLocalPath,
-                content: wholeData.toString('utf8')
+            var maxRemainingRedirects = 10;
+            getFromUrl(http.get('http://unpkg.com/' + importLocalPath));
+
+            function getFromUrl(url) {
+              var req = /^https/i.test(url) ? https.get(url) : http.get(url);
+              var buffers = [];
+              req.on('data', function (data) {
+                buffers.push(data);
               });
-            });
+              req.on('error', function (err) {
+                reject(err);
+              });
+              req.on('response',
+                function (res) {
+                  if (res.statusCode === 301 || res.statusCode === 302
+                    && res.headers.location
+                    && maxRemainingRedirects) {
+                    maxRemainingRedirects++;
+                    process.stdout.write(url + ' --> ' + res.headers.location + '...');
+                    getFromUrl(res.headers.location);
+                    return;
+                  }
+
+                  if (res.statusCode !== 200) reject(new Error('HTTP/' + res.statusCode + ' ' + res.statusMessage));
+                });
+              req.on('end', function (res) {
+                var wholeData = buffers.length === 1 ? buffers[0] : Buffer.concat(buffers);
+                resolve({
+                  importLocalPath: importLocalPath,
+                  content: wholeData.toString('utf8')
+                });
+              });
+            }
           });
         });
 
@@ -944,10 +959,14 @@ issuing requests, processing data and representing the data in sensible way with
           function (imports) {
             return withImports(imports);
           },
-          function (_errorLocalImports) {
-            return readUnpkgImports().then(function (imports) {
-              return withImports(imports);
-            });
+          function (errorLocalImports) {
+            return readUnpkgImports().then(
+              function (imports) {
+                return withImports(imports);
+              },
+              function (errUnpkgImports) {
+                throw errorLocalImports;
+              });
           });
 
         /**
@@ -4147,6 +4166,9 @@ issuing requests, processing data and representing the data in sensible way with
               'Ctrl-Enter': accept,
               'Cmd-Enter': accept
             },
+            // @ts-ignore
+            foldGutter: true,
+            gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
             lineWrapping: true,
             autofocus: true
           },
@@ -4319,6 +4341,10 @@ issuing requests, processing data and representing the data in sensible way with
                   value: initalValue,
 
                   mode: 'javascript',
+
+                  // @ts-ignore
+                  foldGutter: true,
+                  gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
 
                   lineNumbers: true,
                   readOnly: true,

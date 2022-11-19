@@ -941,6 +941,7 @@ function startHARREST() {
     var splitterLabel = /** @type {HTMLSpanElement} */(document.getElementById('splitterLabel'));
 
     var sendBUTTON = /** @type {HTMLButtonElement} */(document.getElementById('sendBUTTON'));
+    var sendLabel =  /** @type {HTMLSpanElement} */(document.getElementById('sendLabel'));
 
     /** @type {CodeMirror.Editor} */
     var requestCodeMirror;
@@ -990,6 +991,7 @@ function startHARREST() {
       set(statusTD, 'Loaded');
       continueWithDependencies();
       set(statusTD, 'Loaded.');
+      
     }
 
     function getLocationSource() {
@@ -1318,10 +1320,12 @@ function startHARREST() {
       responseTD.innerHTML = '';
       // @ts-ignore CodeMirror is defined
       var CodeMirrorCtor = CodeMirror;
+      var locationText = deriveTextFromLocation();
+      updateSendLabel(locationText);
       requestCodeMirror = CodeMirrorCtor(requestTD,
         {
           lineNumbers: true,
-          value: deriveTextFromLocation(),
+          value: locationText,
           extraKeys: {
             'Ctrl-Enter': sendRequestInteractively,
             'Cmd-Enter': sendRequestInteractively,
@@ -1344,6 +1348,7 @@ function startHARREST() {
       function debouncedRequestTextChanged() {
         requestTextChanged.timeout = 0;
         var text = requestCodeMirror.getValue();
+        updateSendLabel(text);
         updateLocationWithText(text);
       }
 
@@ -1357,7 +1362,7 @@ function startHARREST() {
           debouncedRequestTextChanged();
         }
 
-        splitterLabel.textContent = 'sending...';
+        set(splitterLabel, 'sending...');
         if (!/\bsending\b/i.test(splitterTD.className)) {
           splitterTD.className += ' sending';
         }
@@ -1395,7 +1400,7 @@ function startHARREST() {
           }
 
           var requestElapsedTime = getTimeNow() - requestStart;
-          splitterLabel.textContent = 'sending: ' + Math.round(requestElapsedTime / 1000) + 's...';
+          set(splitterLabel, 'sending: ' + Math.round(requestElapsedTime / 1000) + 's...');
         }
 
         /**
@@ -1411,12 +1416,12 @@ function startHARREST() {
 
           var requestTime = getTimeNow() - requestStart;
           if (!res) {
-            splitterLabel.textContent = 'REQUEST FAILED AS UNKNOWN ' + (requestTime / 1000) + 's';
+            set(splitterLabel, 'REQUEST FAILED AS UNKNOWN ' + (requestTime / 1000) + 's');
             responseCodeMirror.setValue('');
             return;
           }
 
-          splitterLabel.textContent = res.status + ' ' + res.statusText + ' ' + (requestTime / 1000) + 's';
+          set(splitterLabel, res.status + ' ' + res.statusText + ' ' + (requestTime / 1000) + 's');
 
           responseCodeMirror.setValue(
             res.body || ''
@@ -1432,7 +1437,7 @@ function startHARREST() {
           splitterTD.className = splitterTD.className.replace(/(^|\s+)sending(\s+|$)/g, ' ');
 
           var requestTime = getTimeNow() - requestStart;
-          splitterLabel.textContent = 'REQUEST FAILED ' + (requestTime / 1000) + 's';
+          set(splitterLabel, 'REQUEST FAILED ' + (requestTime / 1000) + 's');
           if (err && err.stack) {
             responseCodeMirror.setValue(err.message + '\n\n' + err.stack);
           } else {
@@ -1475,6 +1480,11 @@ function startHARREST() {
           location.href = '#' + encoded;
         }
       }
+    }
+
+    function updateSendLabel(text) {
+      var parsed = parseAsRequest(text);
+      set(sendLabel, parsed && parsed.verb && parsed.verb.toUpperCase() || 'GET');
     }
 
     function docHead() {
@@ -1741,7 +1751,7 @@ function startHARREST() {
     <tr>
       <td id=leftTD width=20% rowspan=3 valign=top>
 
-      <button id=sendBUTTON><span id=sendLabel>GET</span></button>
+      <button id=sendBUTTON><span id=sendLabel><span style="filter: blur(2.5px)">GET</span></span></button>
     
       </td>
       <td width=80% height=50% id=requestTD>

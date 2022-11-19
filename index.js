@@ -760,8 +760,11 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
             if (res && typeof res.then === 'function') {
               res.then(
                 function () {
-                  if (!entry.res.closed) {
-                    console.log('Request promise completed, but request not yet handled.');
+                  if (!entry.req.complete) {
+                    return new Promise(function (resolve) { setTimeout(resolve, 100); }).then(function () {
+                      if (!entry.req.complete) 
+                        console.log('Request promise completed, but request not yet handled: ' + entry.req.method + ' ' + entry.req.url);
+                    });
                   }
                 },
                 function (error) {

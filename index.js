@@ -311,7 +311,7 @@ function catchREST() {
     var encodedStr = url.slice(verbMatch.index);
     var posEndVerbSlash = encodedStr.indexOf('/');
     var verb;
-    var verbImplied;
+    var verbPos = verbMatch.index;
     if (posEndVerbSlash >= 0) {
       verb = encodedStr.slice(0, posEndVerbSlash);
       encodedStr = encodedStr.slice(posEndVerbSlash + 1);
@@ -323,26 +323,32 @@ function catchREST() {
     if (verb === 'http:' || verb === 'https:') {
       encodedStr = verb + encodedStr;
       verb = 'GET';
-      verbImplied = true;
+      verbPos = -1;
     }
 
-    var addr;
-    var addrEndPos = encodedStr.indexOf('//');
-    if (addrEndPos > 0 && encodedStr.charAt(addrEndPos - 1) === ':')
-      addrEndPos = encodedStr.indexOf('//', addrEndPos + 2);
-    if (addrEndPos >= 0) {
-      addr = encodedStr.slice(0, addrEndPos); // TODO: unescape strange characters here?
-      encodedStr = encodedStr.slice(addrEndPos + 2);
+    if (verb === 'edit' || verb === 'view') {
+      addr = '';
+      var body = decodeURIComponent(encodedStr);
     } else {
-      addr = encodedStr;
-      encodedStr = '';
-    }
 
-    var body = encodedStr;
+      var addr;
+      var addrEndPos = encodedStr.indexOf('//');
+      if (addrEndPos > 0 && encodedStr.charAt(addrEndPos - 1) === ':')
+        addrEndPos = encodedStr.indexOf('//', addrEndPos + 2);
+      if (addrEndPos >= 0) {
+        addr = encodedStr.slice(0, addrEndPos); // TODO: unescape strange characters here?
+        encodedStr = encodedStr.slice(addrEndPos + 2);
+      } else {
+        addr = encodedStr;
+        encodedStr = '';
+      }
+
+      var body = encodedStr;
+    }
 
     var result = {
       verb: verb,
-      verbImplied: verbImplied,
+      verbPos: verbPos,
       addr: addr,
       body: body
     };
@@ -4187,10 +4193,11 @@ issuing requests, processing data and representing the data in sensible way with
       }
 
       /**
+       * @param {(text: string) => void | undefined | Promise<void | unknown>} persist
        * @param {string=} textOverride
        * @param {string=} modeOverride
        */
-      function loadingComplete(textOverride, modeOverride) {
+      function loadingComplete(persist, textOverride, modeOverride) {
         if (typeof textOverride !== 'undefined') text = textOverride;
         if (typeof modeOverride !== 'undefined') mode = modeOverride;
         layout.requestEditorHost.innerHTML = '';
@@ -4240,7 +4247,9 @@ issuing requests, processing data and representing the data in sensible way with
               }
             );
 
-          editor.on('changes', debounce(updateVerbButton, 200, 900));
+          editor.on('changes', debounce(function () {
+            updateVerbButton(true);
+          }, 200, 900));
           updateVerbButton();
         }
 
@@ -4249,8 +4258,9 @@ issuing requests, processing data and representing the data in sensible way with
         /** @type {import('codemirror').Editor} */
         var replyEditor;
 
-        function updateVerbButton() {
-          var pars = parseTextRequest(editor.getValue());
+        function updateVerbButton(shouldPersist) {
+          var value = editor.getValue();
+          var pars = parseTextRequest(value);
           if (pars && pars.firstLine) {
             var parsFirst = parseFirstLine(pars.firstLine);
           }
@@ -4272,6 +4282,9 @@ issuing requests, processing data and representing the data in sensible way with
           if (parsFirst && parsFirst.verbPos > 0) {
             // highlight inside CodeMirror
           }
+
+          if (shouldPersist)
+            persist(value);
         }
 
         /**
@@ -4512,23 +4525,9 @@ issuing requests, processing data and representing the data in sensible way with
     }
 
     function bootUrlEncoded() {
-      if (/http/.test(location.protocol)) {
-        var encodedUrl = getVerb(location.pathname) ? parseEncodedURL(location.pathname + '') : parseEncodedURL(location.search);
-      } else {
-        var encodedUrl = parseEncodedURL(location.search + '');
-      }
-
-      if (!encodedUrl) {
-        var text = 'GET https://api.github.com/repos/microsoft/typescript/languages';
-        var mode = 'splash';
-      } else {
-        var skipVerb = encodedUrl.verbImplied && /^http/i.test(encodedUrl.addr || '');
-
-        var text =
-          (skipVerb ? '' : encodedUrl.verb) + (encodedUrl.addr ? (skipVerb ? '' : ' ') + encodedUrl.addr : '') +
-          (encodedUrl.body ? '\n' + encodedUrl.body : '');
-        var mode = 'javascript';
-      }
+      var initialTmod = getTextModeFromUrlEncoded();
+      var text = initialTmod.text;
+      var mode = initialTmod.mode;
 
       sanitizeDOM();
 
@@ -4541,8 +4540,100 @@ issuing requests, processing data and representing the data in sensible way with
         };
       }
 
+      function getTextModeFromUrlEncoded() {
+        var enc = detectCurrentUrlEncoded(location);
+        if (!enc) {
+          var text = 'GET https://api.github.com/repos/microsoft/typescript/languages';
+          var mode = 'splash';
+        } else {
+          var skipVerb = enc.encodedUrl.verbPos < 0 && /^http/i.test(enc.encodedUrl.addr || '');
+          if (enc.encodedUrl.verb === 'edit' || enc.encodedUrl.verb === 'view')
+            skipVerb = true;
+
+          var text =
+            skipVerb && !enc.encodedUrl.addr ? enc.encodedUrl.body :
+              (skipVerb ? '' : enc.encodedUrl.verb) + (enc.encodedUrl.addr ? (skipVerb ? '' : ' ') + enc.encodedUrl.addr : '') +
+              (enc.encodedUrl.body ? '\n' + enc.encodedUrl.body : '');
+          var mode = 'javascript';
+        }
+
+        return { text: text, mode: mode };
+      }
+
+      /** @param {typeof window.location} location */
+      function detectCurrentUrlEncoded(location) {
+        if (/http/.test(location.protocol)) {
+          var verb = getVerb(location.pathname);
+          if (verb) {
+            var encodedUrl = parseEncodedURL(location.pathname || '');
+            var source = 'pathname';
+          } else {
+            var encodedUrl = parseEncodedURL(location.search);
+            var source = 'search';
+          }
+        } else {
+          var encodedUrl = parseEncodedURL((location.hash || '').replace(/^\#/, ''));
+          var source = 'hash';
+        }
+
+        if (encodedUrl)
+          return {
+            encodedUrl: encodedUrl,
+            source: source
+          };
+      }
+
       function complete() {
-        shellLoader.loadingComplete();
+        shellLoader.loadingComplete(persistChange);
+      }
+
+      function persistChange(text) {
+        var parsed = parseTextRequest(text);
+
+        var enc = detectCurrentUrlEncoded(location);
+        var source = enc && enc.source;
+        if (typeof history.replaceState !== 'function')
+          source = 'hash';
+        var slashSeparated = [];
+        if (enc && enc.encodedUrl && enc.encodedUrl.verbPos > 0) {
+          var injectLeadPath =
+            location.pathname.slice(0, enc.encodedUrl.verbPos)
+              .replace(/^\//, '');
+          if (injectLeadPath)
+            slashSeparated.push(injectLeadPath);
+        }
+
+        var firstLine = parsed && parseFirstLine(parsed.firstLine);
+        if (!parsed || !firstLine) {
+          slashSeparated.push('edit');
+          slashSeparated.push(encodeURIComponent(text));
+        } else {
+          if (firstLine.verbPos >= 0) slashSeparated.push(firstLine.verb);
+          slashSeparated.push(firstLine.url);
+          if (parsed.body) slashSeparated.push('/' + parsed.body);
+        }
+
+        switch (enc && enc.source) {
+          case 'pathname':
+
+            history.replaceState(
+              null,
+              'unused-string',
+              location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + slashSeparated.join('/'));
+            break;
+
+          case 'search': // update search
+            history.replaceState(
+              null,
+              'unused-string',
+              location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + location.pathname + '?' + slashSeparated.join('/'));
+            break;
+
+          case 'hash':
+          default: // update hash
+            location.href = slashSeparated.join('/');
+            break;
+        }
       }
     }
 
@@ -4573,6 +4664,9 @@ issuing requests, processing data and representing the data in sensible way with
                     'text';
 
           shellLoader.loadingComplete(
+            function (updatedText) {
+              drive.write(bestFile, updatedText);
+            },
             drive.read(bestFile),
             detectMode
           );

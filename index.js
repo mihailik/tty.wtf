@@ -125,7 +125,7 @@ function catchREST() {
 
     var urlRest = firstLine.slice(leadWhitespace.length + verb.length);
     var url = urlRest.replace(/^\s+/, '');
-    var urlPos = leadWhitespace + urlRest.length - url.length;
+    var urlPos = leadWhitespace.length + urlRest.length - url.length;
     url = url.replace(/\s+$/, '');
 
     if (!url) return; // empty URL is not good
@@ -557,24 +557,51 @@ issuing requests, processing data and representing the data in sensible way with
         function withImports(imports) {
           var combinedLib = combineLib(imports);
 
-          var writeIndexHTML = writeFileAsync(
+          var builtHTML = getEmbeddedWholeHTML(true /* urlencoded */);
+
+          var writeIndexHTML = writeUnlessExactExceptMarker(
             indexHTML_path,
-            getEmbeddedWholeHTML(true /* urlencoded */)
+            builtHTML
           );
-          var writeIndex404HTML = writeFileAsync(
+          var writeIndex404HTML = writeUnlessExactExceptMarker(
             index404HTML_path,
             getEmbeddedWholeHTML(true /* urlencoded */)
           );
-          var writeLib = writeFileAsync(
+          var writeLib = writeUnlessExactExceptMarker(
             libJS_path,
             combinedLib
           );
 
-          return Promise.all([writeIndexHTML, writeIndex404HTML, writeLib]).then(function () {
-            return 'Updated HTML and library with hash: ' + catchREST_hash;
-          });
-        }
-      });
+          return Promise.all([writeIndexHTML, writeIndex404HTML, writeLib]).then(
+            function (skipped) {
+              var skippedIndexHTML = skipped[0], skippedIndex404HTML = skipped[1], skippedLib = skipped[2];
+              if (skippedIndexHTML && skippedIndex404HTML && skippedLib)
+                return 'Build already matches files.';
+              if (!skippedIndexHTML && !skippedIndex404HTML && !skippedLib) return
+              'Build updated index.html, 404.html and lib.js with hash ' + catchREST_hash;
+              return 'Build only updated ' +
+                (skippedIndexHTML ? '' : 'index.html ') +
+                (skippedIndex404HTML ? '' : '404.html ') +
+                (skippedLib ? '' : 'lib.js ') +
+                'with hash ' + catchREST_hash;
+            });
+
+          function writeUnlessExactExceptMarker(filePath, content) {
+            var alreadyMatchesPromise = readFileAsync(filePath).then(
+              function (oldContent) {
+                var markerRegexp = /\{build-by-hash:[^}]\}/g;
+                if (oldContent.replace(markerRegexp, '') === content.replace(markerRegexp, ''))
+                  return true;
+              },
+              function () {// failed to read old file -- fine, just write then
+              }
+            );
+
+            return alreadyMatchesPromise.then(function (alreadyMatches) {
+              return alreadyMatches || writeFileAsync(filePath, content);
+            });
+          }
+        }      });
     }
 
     /** @param {Promise<string>} buildPromise */
@@ -3791,6 +3818,11 @@ issuing requests, processing data and representing the data in sensible way with
 
     }
 
+    function minimalDependenciesPresent() {
+      // @ts-ignore
+      return typeof CodeMirror === 'function';
+    }
+
     function bootUrlEncoded() {
       var verbMatch = getVerb(location.pathname);
       if (verbMatch) {
@@ -3798,7 +3830,7 @@ issuing requests, processing data and representing the data in sensible way with
 
       sanitizeDOM();
       var shellLoader = createShell();
-      if (typeof CodeMirror === 'function') {
+      if (minimalDependenciesPresent()) {
         shellLoader.loadingComplete();
       } else {
         /** @type {*} */(catchREST)['continue'] = function () {
@@ -3813,7 +3845,7 @@ issuing requests, processing data and representing the data in sensible way with
       var shellLoader = createShell();
 
       loadAsync().then(function (drive) {
-        if (typeof CodeMirror === 'function') {
+        if (minimalDependenciesPresent()) {
           shellLoader.loadingComplete();
         } else {
         /** @type {*} */(catchREST)['continue'] = function () {

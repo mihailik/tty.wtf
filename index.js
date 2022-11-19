@@ -4097,7 +4097,7 @@ issuing requests, processing data and representing the data in sensible way with
 
     function createShell() {
 
-      injectStyle();
+      injectShellStyle();
       var layout = bindLayout();
       if (!layout.allFound) {
         if (layout.shell && layout.shell.parentElement) layout.shell.parentElement.removeChild(layout.shell);
@@ -4325,7 +4325,7 @@ issuing requests, processing data and representing the data in sensible way with
         return bindLayout();
       }
 
-      function injectStyle() {
+      function injectShellStyle() {
         if (verifyAuthenticStylesPresent()) return;
 
         var style = document.createElement('style');

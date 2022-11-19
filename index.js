@@ -267,7 +267,7 @@ function startCatchREST() {
     if (!asModule) {
       runAsScript();
     }
-    //TODO: run as module?
+    //TODO: run as module? for testing too
 
     function runAsScript() {
 
@@ -283,11 +283,11 @@ function startCatchREST() {
         return;
       }
 
-      process.stdout.write('Catch Rest node server@');
+      process.stdout.write('Catch REST');
       var startServerPromise = startServer(handleRequest, HTTP_PORT);
       startServerPromise.then(
         function (listeningServer) {
-          process.stdout.write(' listening on http://localhost:' + HTTP_PORT + '/\n');
+          process.stdout.write(' http://localhost:' + HTTP_PORT + '/\n');
           server = listeningServer;
 
           if (process.connected) {
@@ -312,11 +312,14 @@ function startCatchREST() {
 
     function watchSelfAndRestart() {
       var lastFileContent;
-      fs.watchFile(__filename, function () {
+      fs.watch(__filename, function () {
         fs.readFile(__filename, function (err, dt) {
-          if (!err && dt + '' !== lastFileContent) {
-            lastFileContent = dt + '';
-            initiateRestart(__filename + ' changed, restarting...');
+          if (err) return;
+          var contentStr = '' + dt;
+          if (!lastFileContent) lastFileContent = getCurrentJS();
+          if (contentStr !== lastFileContent) {
+            lastFileContent = contentStr;
+            initiateRestart(' changed:' + __filename + '\n\n');
           }
         });
       });
@@ -525,7 +528,7 @@ function startCatchREST() {
       }
 
       console.log(req.method + ' ' + req.url + ' --> initiating restart... ');
-      initiateRestart('Restart request from HTTP ' + req.method + ' ' +req.url);
+      initiateRestart(' ' + req.method + ':' +req.url + ' ');
       res.end('RESTART INITIATED');
     }
 
@@ -545,7 +548,6 @@ function startCatchREST() {
       req.on('data', function (dt) { dtMsg += dt; });
       req.on('end', function () {
         dtMsg = dtMsg.replace(/^\s+/, '').replace(/\s+$/, '');
-        console.log(req.method + ' ' + req.url + '[' + dtMsg + '] --> initiating shutdown...');
         initiateShutdown(dtMsg);
         res.end(
           process.pid + '\n' +
@@ -562,7 +564,9 @@ function startCatchREST() {
 
       res.setHeader('Content-Type', 'text/html');
       res.end(html);
-      console.log(req.method + ' ' + req.url + ' --> [text/html ' + html.length + '] 200/OK');
+
+      if (req.url !== '/keep-alive')
+        console.log(req.method + ' ' + req.url + ' --> [text/html ' + html.length + '] 200/OK');
     }
 
     /**
@@ -785,34 +789,27 @@ function startCatchREST() {
     /** @param {string=} ghostIfPidMatch */
     function shutdownOrBecomeGhost(ghostIfPidMatch) {
       if (scriptParent || !ghostProcess) {
-        console.log(process.pid + '(from ' + scriptParent + ') process.exit()');
+        process.stdout.write(' *' + process.pid + '(' + scriptParent + ') ');
         process.exit();
       } else {
-        console.log(process.pid + ' server.close()');
+        process.stdout.write(' *' + process.pid + ':close() ');
         server.close();
       }
     }
 
     /** @param {string=} ghostIfPidMatch */
     function initiateShutdown(ghostIfPidMatch) {
-      console.log('shutdown imminent...');
+      process.stdout.write(' * ');
       setTimeout(function () {
         shutdownOrBecomeGhost(ghostIfPidMatch);
-      }, 500);
+      }, 100);
     }
 
     /**
      * @param {string} msg
      */
     function initiateRestart(msg) {
-      console.log(msg || 'Restarting on change...');
-
-      if (scriptParent)
-        console.log('spawning new ' + process.pid + ' sibling per ' + scriptParent + ': ', process.argv);
-      else
-        console.log('starting new process: ', process.argv);
-
-      console.log('');
+      process.stdout.write(msg || ' restarting:' + process.pid + ' ');
 
       var child_process = require('child_process');
 
@@ -852,7 +849,7 @@ function startCatchREST() {
           tryGet();
 
           function tryGet() {
-            http.get('http://localhost:' + HTTP_PORT + '/',
+            http.get('http://localhost:' + HTTP_PORT + '/keep-alive',
               function (req) {
                 if (req.statusCode === 200) {
                   clearTimeout(closeOnServerDownTimeout);

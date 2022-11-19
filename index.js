@@ -165,13 +165,16 @@ body {
 
 #shell .CodeMirror-gutter.CodeMirror-linenumbers {
   background: #fbfbfb;
-  color: #999;
+}
+
+#shell .CodeMirror-gutter.CodeMirror-linenumber {
+  color: #ddd;
 }
 
 #shell #pseudoGutter {
   border-right: solid 1px #e4e4e4;
   background: #fbfbfb;
-  color: #999;
+  color: #ddd;
 
   position: absolute;
   left: 0; top: 0;

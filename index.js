@@ -1,7 +1,3 @@
-// <script> 
-
-const ts = require('typescript');
-
 // @ts-check
 function startHARREST() {
 
@@ -29,7 +25,8 @@ function startHARREST() {
 
     switch (detectEnvironment()) {
       case 'browser': return runBrowser();
-      case 'node': return runNode();
+      case 'node-script': return runNode(false /* asModule */);
+      case 'node-module': return runNode(true /* asModule */);
     }
 
     throw new Error('Running in an unsupported environment.');
@@ -39,8 +36,12 @@ function startHARREST() {
         && typeof document !== 'undefined' && document && typeof document.createElement === 'function')
         return 'browser';
       if (typeof process !== 'undefined' && process && process.argv && typeof process.argv.length === 'number'
-          && typeof require === 'function' && typeof require.resolve === 'function')
-        return 'node';
+        && typeof require === 'function' && typeof require.resolve === 'function'
+        && typeof module !== 'undefined' && module)
+        if ((process.mainModule || require.main) === module)
+          return 'node-script';
+        else
+          return 'node-module';
     }
   }
 
@@ -213,6 +214,7 @@ function startHARREST() {
 
   /** @param {string} text */
   function convertToCompressed(text) {
+    // @ts-ignore JSZipSync is defined
     var jsz = JSZipSync();
     jsz.text('t', text);
     return jsz.generate();
@@ -228,6 +230,7 @@ function startHARREST() {
         bytes.push(bytesStr.charCodeAt(i));
       }
 
+      // @ts-ignore JSZipSync is defined
       var jsz = JSZipSync(bytes);
       /** @type {string} */
       var content = jsz.file('t').asText();
@@ -243,59 +246,211 @@ function startHARREST() {
     return (fn + '').replace(/^([\s\S\n\r]*\/\*\s*)([\s\S\n\r]*)(\s*\*\/[\s\r\n]*}[\s\r\n]*)$/, function (whole, lead, content, tail) { return content; });
   }
 
-  function runNode() {
+  /**
+   * @param {boolean} asModule
+   */
+  function runNode(asModule) {
     var fs = require('fs');
-    var path = require('path');
     var http = require('http');
-    var child_process = require('child_process');
+    /** @type {http.Server} */
     var server;
+    var scriptParent;
+    var ghostProcess;
 
     var HTTP_PORT = 3100;
 
-    requestShutdownExisting(function(shutdownResult) {
-      console.log('Existing run: ', shutdownResult);
+    if (!asModule) {
+      runAsScript();
+    }
+    //TODO: run as module?
 
-      console.log('HAR Rest node server@' + process.pid);
-      server = http.createServer(handleRequest);
-      server.listen(HTTP_PORT, function () {
-        console.log('Server started at http://localhost:' + HTTP_PORT + '/');
+    function runAsScript() {
+
+      if (!scriptParent && process.send) {
+        // if child script, delay until parent is linked
+        process.on('message', /** @param {*} msg */ function (msg) {
+          if (msg && msg.scriptParent && !scriptParent) {
+            scriptParent = msg.scriptParent;
+            runAsScript();
+          }
+        });
+
+        return;
+      }
+
+      console.log('HAR Rest node server@' + process.pid + ' init...');
+      var startServerPromise = startServer(handleRequest, HTTP_PORT);
+      startServerPromise.then(
+        function (listeningServer) {
+          console.log('HAR Rest node server@' + process.pid + ' listening on http://localhost:' + HTTP_PORT + '/');
+          server = listeningServer;
+
+          if (process.connected) {
+            console.log('process is connected!');
+            watchDedicatedTtyParentAndExit();
+          } else {
+            console.log('process is rooted!');
+            watchSelfAndRestart();
+          }
+        },
+        function (startServerError) {
+          console.log('Could not start HTTP service at http://localhost:' + HTTP_PORT + '/ ', startServerError);
+          console.log('shutting down...');
+          initiateShutdown();
+        }
+      );
+    }
+
+    function watchDedicatedTtyParentAndExit() {
+      process.stdin.on('end', () => {
+        console.log('parent exited.');
+        initiateShutdown();
       });
+    }
 
+    function watchSelfAndRestart() {
+      var lastFileContent;
       fs.watchFile(__filename, function () {
-        initiateRestart(3000);
+        fs.readFile(__filename, function (err, dt) {
+          if (!err && dt + '' !== lastFileContent) {
+            lastFileContent = dt + '';
+            initiateRestart(__filename + ' changed, restarting...');
+          }
+        });
       });
-    });
+    }
 
     /**
-     * @param callback {(result: 'exited' | 'failed' | 'timeout') => void}
+     * @param {http.RequestListener} requestListener
+     * @param {number} port
+     * @returns {Promise<http.Server>}
      */
-    function requestShutdownExisting(callback) {
-      var postShutdownRequest = http.request(
-        'http://localhost:' + HTTP_PORT + '/shutdown', 
-        {
-          method: 'POST'
-        });
-      
-        var requestCompleted = false;
+    function startServer(requestListener, port) {
+      return new Promise(function (resolve, reject) {
+        var started = false;
+        var retryCount = 0;
+        var MAX_LISTEN_RETRY_COUNT = 30;
 
-      var requestTimeout = setTimeout(function() {
-        if (requestCompleted) return;
-        requestCompleted = true;
-        callback('timeout');
-      }, 10000);
+        tryStarting();
 
-      postShutdownRequest.on('error', function() {
-        if (requestCompleted) return;
-        clearTimeout(requestTimeout);
-        callback('failed');
+        function tryStarting() {
+
+          var server = http.createServer(requestListener);
+          server.on('error', handleServerError);
+          server.listen(port, handleServerListening);
+
+          function handleServerListening() {
+            started = true;
+            server.off('error', handleServerError);
+            if (process.send) {
+              process.send({ server: { requestTimeout: server.requestTimeout }, platform: process.platform, cwd: process.cwd });
+            }
+            resolve(server);
+          }
+
+          function handleServerError(error) {
+            if (started) return;
+
+            if (error.code === 'EADDRINUSE') {
+              if (retryCount >= MAX_LISTEN_RETRY_COUNT) {
+                error.message = '[' + retryCount + '] ' + error.message;
+                return reject(error);
+              }
+
+              if (!retryCount) {
+                retryCount = (retryCount || 0) +1;
+
+                // first try failed, request shutdown and keep retrying
+                console.log('Port is busy, requesting http://localhost:' + port + '/shutdown ...');
+                if (scriptParent) {
+                  process.send({ server: { requestTimeout: server.requestTimeout }, platform: process.platform, cwd: process.cwd });
+                }
+
+                requestShutdownExisting(port).then(
+                  function () {
+                    console.log('shutdown request OK');
+                    tryStarting();
+                  },
+                  function (err) {
+                    console.log('shutdown request failed ', err);
+                    tryStarting
+                  })
+              } else {
+                retryCount++;
+                setTimeout(tryStarting, 200);
+              }
+              return;
+            }
+
+            reject(error);
+          }
+        }
       });
+    }
 
-      postShutdownRequest.on('end', function() {
-        if (requestCompleted) return;
-        clearTimeout(requestTimeout);
-        setTimeout(function () {
-          callback('exited');
-        }, 400);
+    /**
+     * @param {number} port
+     * @returns {Promise<string>}
+     */
+    function requestShutdownExisting(port) {
+      return new Promise(function (resolve, reject) {
+
+        var postShutdownRequest = http.request(
+          'http://localhost:' + port + '/shutdown', { method: 'POST' },
+          handleResponse);
+
+        postShutdownRequest.on('error', function (error) {
+          if (requestCompleted) return;
+          clearTimeout(requestTimeout);
+          reject(error);
+        });
+
+        postShutdownRequest.end(String(scriptParent));
+
+        var requestCompleted = false;
+        var requestTimeout = setTimeout(function () {
+          if (requestCompleted) return;
+          requestCompleted = true;
+          /** @type {Error & { timeout?: boolean }} */
+          var error = new Error('Timeout');
+          error.timeout = true;
+          reject(error);
+        }, 10000);
+
+        /**
+         * @param {http.IncomingMessage} res
+         */
+        function handleResponse(res) {
+          if (requestCompleted) return;
+
+          if (res.statusCode === 200) {
+            if (!res.headers['content-length']) {
+              requestCompleted = true;
+              return resolve(res.statusCode + ' ' + res.statusMessage);
+            }
+
+            var dtMsg = '';
+
+            res.on('data', function (dt) {
+              if (requestCompleted) return;
+              dtMsg += dt;
+            });
+
+            res.on('end', function () {
+              if (requestCompleted) return;
+              requestCompleted = true;
+              resolve(dtMsg);
+            });
+
+            res.on('error', function (error) {
+              if (requestCompleted) return;
+              requestCompleted = true;
+              reject(error);
+            });
+          } else {
+            reject(res);
+          }
+        }        
       });
     }
 
@@ -313,33 +468,15 @@ function startHARREST() {
         return;
       }
       else if (/^\/index\.js\b/.test(url)) {
-        res.statusCode = 200;
-        res.end(
-          startHARREST + '\n' +
-          'startHARREST()'
-        );
+        handleIndexJSRequest(req, res);
         return;
       }
       else if (/^\/restart\b/.test(url)) {
-        if (req.method === 'GET') {
-          res.setHeader('Content-Type', 'text/html');
-          res.end('<form method=POST> RESTART: <input type=submit> </form>');
-          return;
-        }
-
-        initiateRestart();
-        res.end('RESTART INITIATED');
+        handleRestartRequest(req, res);
         return;
       }
       else if (/^\/shutdown\b/.test(url)) {
-        if (req.method === 'GET') {
-          res.setHeader('Content-Type', 'text/html');
-          res.end('<form method=POST> SHUTDOWN: <input type=submit> </form>');
-          return;
-        }
-
-        initiateShutdown();
-        res.end('SHUTDOWN INITIATED');
+        handleShutdownRequest(req, res);
         return;
       }
       else if (/^\/cors(\/?)/.test(url) && req.method === 'POST') {
@@ -347,11 +484,81 @@ function startHARREST() {
         return;
       }
 
+      handleWithHTML(res, req);
+    }
+
+    function getCurrentJS() {
+      var jsText =
+        '// @ts-check\n' +
+        startHARREST + '\n' +
+        'startHARREST()\n';
+      return jsText;
+    }
+
+    /**
+     * @param {http.IncomingMessage} req
+     * @param {http.ServerResponse} res
+     */
+    function handleIndexJSRequest(req, res) {
+      res.statusCode = 200;
+      var jsText = getCurrentJS();
+
+      console.log(req.method + ' ' + req.url + ' [application/javascript ' + jsText.length + '] 200/OK');
+      res.setHeader('Content-Type', 'application/javascript');
+      res.end(jsText);
+    }
+
+    /**
+     * @param {http.IncomingMessage} req
+     * @param {http.ServerResponse} res
+     */
+    function handleRestartRequest(req, res) {
+      if (req.method === 'GET') {
+        console.log('GET ' + req.url + ' --> redirecting to POST form');
+        res.setHeader('Content-Type', 'text/html');
+        res.end('<form method=POST> RESTART: <input type=submit> </form>');
+        return;
+      }
+
+      console.log(req.method + ' ' + req.url + ' --> initiating restart...');
+      initiateRestart('Restart request from HTTP ' + req.method + ' ' +req.url);
+      res.end('RESTART INITIATED');
+    }
+
+    /**
+     * @param {http.IncomingMessage} req
+     * @param {http.ServerResponse} res
+     */
+    function handleShutdownRequest(req, res) {
+      if (req.method === 'GET') {
+        console.log('GET ' + req.url + ' --> redirecting to POST form');
+        res.setHeader('Content-Type', 'text/html');
+        res.end('<form method=POST> SHUTDOWN: <input type=submit> </form>');
+        return;
+      }
+
+      var dtMsg = '';
+      req.on('data', function (dt) { dtMsg += dt; });
+      req.on('end', function () {
+        dtMsg = dtMsg.replace(/^\s+/, '').replace(/\s+$/, '');
+        console.log(req.method + ' ' + req.url + '[' + dtMsg + '] --> initiating shutdown...');
+        initiateShutdown(dtMsg);
+        res.end(
+          process.pid + '\n' +
+          'SHUTDOWN INITIATED');
+      });
+    }
+
+    /**
+     * @param {http.ServerResponse} res
+     * @param {http.IncomingMessage} req
+     */
+    function handleWithHTML(res, req) {
       var html = generateHTML();
-      
+
       res.setHeader('Content-Type', 'text/html');
       res.end(html);
-      console.log(req.url + ' HTTP/200');
+      console.log(req.method + ' ' + req.url + ' --> [text/html ' + html.length + '] 200/OK');
     }
 
     /**
@@ -412,7 +619,7 @@ function startHARREST() {
         
         requestObj.on('error', handleRequestError);
         requestObj.on('timeout', handleRequestTimeout);
-        requestObj.end();
+        requestObj.end(String(process.pid));
 
         /**
          * @param {http.IncomingMessage} res
@@ -571,33 +778,101 @@ function startHARREST() {
       );
     }
 
-    function initiateShutdown() {
-      setTimeout(function () {
+    /** @param {string=} ghostIfPidMatch */
+    function shutdownOrBecomeGhost(ghostIfPidMatch) {
+      if (scriptParent || !ghostProcess) {
+        console.log(process.pid + '(from ' + scriptParent + ') process.exit()');
         process.exit();
+      } else {
+        console.log(process.pid + ' server.close()');
+        server.close();
+      }
+    }
+
+    /** @param {string=} ghostIfPidMatch */
+    function initiateShutdown(ghostIfPidMatch) {
+      console.log('shutdown imminent...');
+      setTimeout(function () {
+        shutdownOrBecomeGhost(ghostIfPidMatch);
       }, 500);
     }
 
-    var restartTimeout;
-    var restarting;
+    /**
+     * @param {string} msg
+     */
+    function initiateRestart(msg) {
+      console.log(msg || 'Restarting on change...');
 
-    function initiateRestart(timeout) {
-      if (restarting) return;
-      clearTimeout(restartTimeout);
+      if (scriptParent)
+        console.log('spawning new ' + process.pid + ' sibling per ' + scriptParent + ': ', process.argv);
+      else
+        console.log('starting new process: ', process.argv);
 
-      restartTimeout = setTimeout(function () {
-        console.log('Restarting on change...');
-        restarting = true;
-        server.close(function () {
-          console.log('starting new process: ', process.argv);
-          console.log('');
-          child_process.spawn(
-            process.argv[0],
-            process.argv.slice(1),
-            { stdio: 'inherit' }
-          );
+      console.log('');
+
+      var child_process = require('child_process');
+
+      /** @type {child_process.ChildProcess} */
+      var proc;
+
+      if (scriptParent) {
+        // @ts-ignore send should be defined here
+        process.send({
+          restart: msg || 'restart by ' + process.pid
         });
-      }, timeout || 300);
+      } else {
+        proc = child_process.spawn(
+          process.argv[0],
+          process.argv.slice(1),
+          // allow piping the stdio, and allow sending messages
+          // (this is only for children of the first original process)
+          { stdio: ['pipe', 'pipe', 'pipe', 'ipc'] }
+        );
 
+        proc.on('message', handleChildProcessMessage);
+
+        proc.send({ scriptParent: process.pid, platform: process.platform, cwd: process.cwd });
+
+        // main process: keep pumping piped stdio
+        console.log('chained ' + proc.pid + '>' + process.pid);
+        proc.stdout.read();
+        proc.stdout.on('data', function (procOut) {
+          process.stdout.write(proc.pid + '>' + process.pid + ' ' + procOut);
+        });
+
+        proc.on('exit', () => {
+          if (!ghostProcess) return;
+          var closeOnServerDownTimeout = setTimeout(function () {
+            process.exit();
+          }, 2000);
+
+          tryGet();
+
+          function tryGet() {
+            http.get('http://localhost:' + HTTP_PORT + '/',
+              function (req) {
+                if (req.statusCode === 200) {
+                  clearTimeout(closeOnServerDownTimeout);
+                } else {
+                  setTimeout(tryGet, 200);
+                }
+              }).on('error', function () {
+                setTimeout(tryGet, 200);
+              });
+          }
+        });
+      }
+
+      function handleChildProcessMessage(message) {
+        if (message && message.restart) {
+          initiateRestart(message.restart);
+          return;
+        }
+        
+        if (message && message.server) ghostProcess = true;
+
+        proc.send({ scriptParent: process.pid, platform: process.platform, cwd: process.cwd });
+      }
     }
 
   }
@@ -634,8 +909,8 @@ function startHARREST() {
         var url = firstLine.replace(/^\s+/, '').replace(/\s+$/, '');
       }
 
-      var schemeSetMatch = regex_schemeSet.test(url);
-      if (!schemeSetMatch) {
+      var schemeSetMatch = regex_schemeSet.exec(url);
+      if (!schemeSetMatch || schemeSetMatch[0].toLowerCase()==='localhost:') {
         var deriveScheme = typeof location !== 'undefined' && /https/i.test(location.protocol || '') ? 'https' : 'http';
         url = deriveScheme + '://' + url.replace(/^\/+/, '');
       }
@@ -688,7 +963,13 @@ function startHARREST() {
 
     function checkDocLoaded() {
       if (document.readyState === 'complete') {
-        var allScriptsLoaded = typeof CodeMirror === 'function' && typeof ts !== 'undefined' && ts.createCompilerHost === 'function';
+        var allScriptsLoaded =
+          // @ts-ignore CodeMirror is defined
+          typeof CodeMirror === 'function' &&
+          typeof ts !== 'undefined' && typeof ts.createCompilerHost === 'function' &&
+          // @ts-ignore JSZipSync is defined
+          typeof JSZipSync === 'function';
+
         if (allScriptsLoaded) {
           console.log('All script loaded organically from HTML script tags');
           whenAllScriptsLoaded();
@@ -833,7 +1114,7 @@ function startHARREST() {
       }
     }
 
-        /** @param {MouseEvent | TouchEvent} evt */
+    /** @param {Partial<MouseEvent>} evt */
     function splitterTD_onmousedown(evt) {
       updateMice(evt, true);
     }
@@ -1008,8 +1289,12 @@ function startHARREST() {
 
     sendRequestAsync.sendUsingXMLHttpRequest = (function () {
       
+      /**
+       * @param {{ verb: string; url: string; body?: string; }} req
+       * @returns {Promise<CommonResponseData | undefined>}
+       */
       function sendUsingXMLHttpRequest(req) {
-
+        throw new Error('XMLHttpRequest feature is not implemented yet.');
       }
 
       return sendUsingXMLHttpRequest;
@@ -1017,8 +1302,12 @@ function startHARREST() {
 
     sendRequestAsync.sendUsingActiveXObject = (function () {
 
+      /**
+       * @param {{ verb: string; url: string; body?: string; }} req
+       * @returns {Promise<CommonResponseData | undefined>}
+       */
       function sendUsingActiveXObject(req) {
-
+        throw new Error('Internet Explorer ActiveX-based XMLHttpRequest feature is not implemented yet.');
       }
 
       return sendUsingActiveXObject;
@@ -1027,11 +1316,21 @@ function startHARREST() {
     function continueWithDependencies() {
       requestTD.innerHTML = '';
       responseTD.innerHTML = '';
-      requestCodeMirror = CodeMirror(requestTD, { lineNumbers: true, value: deriveTextFromLocation() });
-      responseCodeMirror = CodeMirror(responseTD, { lineNumbers: true, readOnly: true });
+      // @ts-ignore CodeMirror is defined
+      var CodeMirrorCtor = CodeMirror;
+      requestCodeMirror = CodeMirrorCtor(requestTD,
+        {
+          lineNumbers: true,
+          value: deriveTextFromLocation(),
+          extraKeys: {
+            'Ctrl-Enter': sendRequestInteractively,
+            'Cmd-Enter': sendRequestInteractively,
+          }
+        });
+      responseCodeMirror = CodeMirrorCtor(responseTD, { lineNumbers: true, readOnly: true });
 
       requestCodeMirror.on('changes', requestTextChanged);
-      requestTextChanged.timeout = 0;
+      requestTextChanged.timeout = null;
 
       var sending;
 
@@ -1476,5 +1775,4 @@ function startHARREST() {
   
 }
 
-startHARREST(); 
-// </script>
+startHARREST();

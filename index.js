@@ -221,7 +221,7 @@ function startCatchREST() {
   function convertToCompressed(text) {
     // @ts-ignore JSZipSync is defined
     var jsz = JSZipSync();
-    jsz.text('t', text);
+    jsz.file('t', text);
     return jsz.generate();
   }
 
@@ -1332,9 +1332,17 @@ function startCatchREST() {
             'Ctrl-Enter': sendRequestInteractively,
             'Cmd-Enter': sendRequestInteractively,
           },
+          lineWrapping: true,
           autofocus: true
         });
-      responseCodeMirror = CodeMirrorCtor(responseTD, { lineNumbers: true, readOnly: true });
+      var locationTextFirstLineLength = locationText.indexOf('\n') || locationText.length;
+      requestCodeMirror.setCursor(0, locationTextFirstLineLength);
+      responseCodeMirror = CodeMirrorCtor(responseTD,
+        {
+          lineNumbers: true,
+          lineWrapping: true,
+          readOnly: true
+        });
 
       requestCodeMirror.on('changes', requestTextChanged);
       requestTextChanged.timeout = null;

@@ -1,6 +1,11 @@
 // <script> 
+
+const ts = require('typescript');
+
 // @ts-check
 function startHARREST() {
+
+  var unicodeTitle = 'Catch Rest ' + String.fromCharCode(55356) + String.fromCharCode(57209);
 
   var importedJS = [
     'codemirror@5.64.0/lib/codemirror.js',
@@ -61,15 +66,11 @@ function startHARREST() {
       return decodeURIComponent(text.replace(/\+/g, '%20'));
     }
 
-    return unmangleFirstLine;
-
     /** @param {string} text */
     function unmangleSubsequentLines(text) {
       return decodeURIComponent(text.replace(/\+/g, '%20'))
         .replace(/\//g, '\n');
     }
-
-    return unmangleSubsequentLines;
 
     return unmangleFromURL;
   })();
@@ -299,17 +300,27 @@ function startHARREST() {
     }
 
     /**
-     * @param req {import('http').IncomingMessage}
-     * @param res {import('http').ServerResponse}
+     * @param req {http.IncomingMessage}
+     * @param res {http.ServerResponse}
      */
     function handleRequest(req, res) {
 
-      if (/^\/favicon\b/.test(req.url)) {
+      var url = req.url || '/';
+
+      if (/^\/favicon\b/.test(url)) {
         res.statusCode = 200;
         res.end();
         return;
       }
-      else if (/^\/restart\b/.test(req.url)) {
+      else if (/^\/index\.js\b/.test(url)) {
+        res.statusCode = 200;
+        res.end(
+          startHARREST + '\n' +
+          'startHARREST()'
+        );
+        return;
+      }
+      else if (/^\/restart\b/.test(url)) {
         if (req.method === 'GET') {
           res.setHeader('Content-Type', 'text/html');
           res.end('<form method=POST> RESTART: <input type=submit> </form>');
@@ -320,7 +331,7 @@ function startHARREST() {
         res.end('RESTART INITIATED');
         return;
       }
-      else if (/^\/shutdown\b/.test(req.url)) {
+      else if (/^\/shutdown\b/.test(url)) {
         if (req.method === 'GET') {
           res.setHeader('Content-Type', 'text/html');
           res.end('<form method=POST> SHUTDOWN: <input type=submit> </form>');
@@ -331,6 +342,10 @@ function startHARREST() {
         res.end('SHUTDOWN INITIATED');
         return;
       }
+      else if (/^\/cors(\/?)/.test(url) && req.method === 'POST') {
+        handleCorsRequest(req, res);
+        return;
+      }
 
       var html = generateHTML();
       
@@ -339,13 +354,220 @@ function startHARREST() {
       console.log(req.url + ' HTTP/200');
     }
 
+    /**
+     * @param {http.IncomingMessage} req
+     */
+    function getRequestBodyTextAsync(req) {
+      return new Promise(function (resolve, reject) {
+        var dataArray = [];
+
+        req.on('error', handleReadRequestError);
+        req.on('data', handleReadRequestData);
+        req.on('end', handleReadRequestEnd);
+        req.read();
+
+        function handleReadRequestError(error) {
+          reject(error);
+        }
+
+        function handleReadRequestData(data) {
+          dataArray.push(data);
+        }
+
+        function handleReadRequestEnd() {
+          var wholeBuffer = dataArray.length === 1 ? dataArray : Buffer.concat(dataArray);
+          var wholeText = wholeBuffer.toString();
+          resolve(wholeText);
+        }
+      });
+    }
+
+    /** @typedef {{
+     *  status: number;
+     *  statusText: string;
+     *  headers: Record<string, string | string[] | undefined>;
+     *  body?: string;
+     *  url: string;
+     * }} ProxiedRequestResponse */
+
+    /**
+     * @param {string} url
+     * @param {string} verb
+     * @returns {Promise<ProxiedRequestResponse>}
+     */
+    function requestAsync(url, verb) {
+      return new Promise(function (resolve, reject) {
+        var redirectUrl;
+        var isHttps = /^https/i.test(url);
+        var http = isHttps ? require('https') : require('http');
+        var URL = require('url');
+        var parsedURL = URL.parse(url);
+        var requestObj = http.request(
+          {
+            hostname: parsedURL.hostname,
+            port: parsedURL.port || undefined,
+            path: parsedURL.path,
+            method: verb || 'GET',
+          }, handleRequestResponse);
+        
+        requestObj.on('error', handleRequestError);
+        requestObj.on('timeout', handleRequestTimeout);
+        requestObj.end();
+
+        /**
+         * @param {http.IncomingMessage} res
+         */
+        function handleRequestResponse(res) {
+          var isRedirect =
+            res.headers.location &&
+            [301, 302, 303, 307].indexOf(/** @type {number}*/(res.statusCode)) >= 0;
+
+          if (isRedirect) {
+            redirectUrl = /** @type {string} */(res.headers.location);
+            console.log('/cors redirect ' + url + ' --> ' + redirectUrl + '...');
+            resolve(requestAsync(redirectUrl, verb));
+            return;
+          }
+
+          if (Number(res.headers['content-length']) > 0) {
+            var responseBodyPromise = getRequestBodyTextAsync(res);
+            responseBodyPromise.then(
+              handleResponseBodyReceived,
+              handleResponseBodyError
+            );
+          } else {
+            handleRequestResponseWithBody(res);
+          }
+
+          function handleResponseBodyReceived(bodyText) {
+            handleRequestResponseWithBody(res, bodyText);
+          }
+
+          function handleResponseBodyError(error) {
+            console.log('/cors body: ' + error.message);
+            reject(error);
+          }
+        }
+
+        function handleRequestError(err) {
+          console.log('/cors request onerror: ' + err.message);
+          reject(err);
+        }
+
+        function handleRequestTimeout() {
+          console.log('/cors request timeout');
+          reject(new Error('Request ' + url + ' timed out.'));
+        }
+
+        /**
+         * @param {http.IncomingMessage} res
+         * @param {string=} bodyText
+         */
+        function handleRequestResponseWithBody(res, bodyText) {
+          resolve({
+            status: res.statusCode,
+            statusText: res.statusMessage,
+            headers: res.headers,
+            body: bodyText,
+            url: url
+          });
+        }
+      });
+    }
+
+    /**
+     * @param {http.IncomingMessage} req
+     * @param {http.ServerResponse} res
+     */
+    function handleCorsRequest(req, res) {
+      var bodyTextPromise = getRequestBodyTextAsync(req);
+      bodyTextPromise.then(function (text) { handleCorsRequestWithBody(req, res, text); });
+    }
+
+    /**
+     * @param {http.IncomingMessage} req
+     * @param {http.ServerResponse} res
+     * @param {string} bodyText
+     */
+    function handleCorsRequestWithBody(req, res, bodyText) {
+      var parsed = parseAsRequest(bodyText);
+      if (!parsed) {
+        res.statusCode = 404;
+        res.statusMessage = 'NO REQUEST';
+        res.end('404 NO REQUEST?');
+        console.log('/cors NO REQUEST');
+        return;
+      }
+
+      console.log('/cors ' + parsed.url + '...');
+
+      const requestPromise = requestAsync(parsed.url, parsed.verb);
+      requestPromise.then(
+        handleCorsRequestProxied,
+        handleCorsRequestProxyFailed
+      );
+
+      /**
+       * @param {ProxiedRequestResponse} proxied
+       */
+      function handleCorsRequestProxied(proxied) {
+        res.end(JSON.stringify(proxied));
+        console.log(
+          '/cors ' +
+          proxied.status + ' ' + proxied.statusText + ' ' +
+          (!parsed || parsed.url === proxied.url ? '' : parsed.url + ' --> ') + proxied.url);
+      }
+
+      function handleCorsRequestProxyFailed(error) {
+        res.statusCode = 500;
+        res.statusMessage = error.message;
+        res.end(error.stack || error + '');
+        console.log('./cors ' + error.message);
+      }
+    }
+
     function generateHTML() {
+      var title = unicodeTitle;
+      var descr = title + '!';
+      var scriptBaseURL = '/';
       return (
-        '// <' + 'script' + '> \n' +
-        startHARREST + '\n' +
-        '\n' +
-        'startHARREST(); \n' +
-        '// </' + 'script' + '>\n'
+        '<!DOCTYPE html><html lang="en"><head>\n' +
+        '<meta charset="UTF-8">\n' +
+        '<meta http-equiv="X-UA-Compatible" content="IE=edge">\n' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
+        // TODO: decode text from URL and inject it into this title
+        '<meta property="og:title" content="' + title + '">\n' +
+        '<meta property="og:type" content="article" />\n' +
+        '<meta property="og:description" content="' + descr + '">\n' +
+        '<meta name="twitter:image:alt" content="' + descr + '">\n' +
+        // '<meta property="og:image" content="' + baseURL + '~image' + localURL + '">\n' +
+        // <meta property="og:url" content="http://euro-travel-example.com/index.htm">
+        '<meta name="twitter:card" content="summary_large_image">\n' +
+
+        '<' + 'script src="' + scriptBaseURL + 'index.js"' + '></' + 'script' + '>\n' +
+        importedJS.map(function (jsfile) {
+          return '<' + 'script' + ' src="' + '//unpkg.com/' + jsfile + '"></script>';
+        }).join('\n') + '\n\n' +
+
+        importedStyles.map(function (cssfile) {
+          return '<link rel=stylesheet href="' + '//unpkg.com/' + cssfile + '">';
+        }).join('\n') + '\n\n' +
+
+        '<style>\n' +
+        'html {\n' +
+        ' box-sizing: border-box;\n' +
+        ' background: white; color: black;\n' +
+        ' font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";\n' +
+        '}\n' +
+        '*, *:before, *:after {\n' +
+        ' box-sizing: inherit;\n' +
+        '}\n' +
+        '</style>\n' +
+
+        '<title>' + title + '</title>\n' +
+        '</head><body>\n' +
+
+        '</body></html>'
       );
     }
 
@@ -384,6 +606,7 @@ function startHARREST() {
    
     var regex_firstLineSeparated = /^([ \n]+)?([^\n]+)?\n?([\s\S]+)?$/;
     var regex_verbSeparated = /^\s*([A-Z]+)\s+(\S[\s\S]+)\s*$/i;
+    var regex_schemeSet = /^[a-z]+:/i;
 
     /**
      * @param {string} text
@@ -411,6 +634,12 @@ function startHARREST() {
         var url = firstLine.replace(/^\s+/, '').replace(/\s+$/, '');
       }
 
+      var schemeSetMatch = regex_schemeSet.test(url);
+      if (!schemeSetMatch) {
+        var deriveScheme = typeof location !== 'undefined' && /https/i.test(location.protocol || '') ? 'https' : 'http';
+        url = deriveScheme + '://' + url.replace(/^\/+/, '');
+      }
+
       return {
         whitespaceLead: whitespaceLead,
         firstLine: firstLine,
@@ -425,7 +654,7 @@ function startHARREST() {
 
   function runBrowser() {
 
-    document.title = 'Catch Rest ' + String.fromCharCode(55356) + String.fromCharCode(57209);
+    document.title = unicodeTitle;
     populateInnerHTML();
 
     var layoutTABLE = /** @type {HTMLTableElement} */(document.getElementById('layoutTABLE'));
@@ -434,12 +663,13 @@ function startHARREST() {
     var responseTD = /** @type {HTMLTableCellElement} */(document.getElementById('responseTD'));
     var statusTD = /** @type {HTMLTableCellElement} */(document.getElementById('statusTD'));
     var splitterTD = /** @type {HTMLTableCellElement} */(document.getElementById('splitterTD'));
+    var splitterLabel = /** @type {HTMLSpanElement} */(document.getElementById('splitterLabel'));
 
     var sendBUTTON = /** @type {HTMLButtonElement} */(document.getElementById('sendBUTTON'));
 
-    /** @type {import('codemirror').Editor} */
+    /** @type {CodeMirror.Editor} */
     var requestCodeMirror;
-    /** @type {import('codemirror').Editor} */
+    /** @type {CodeMirror.Editor} */
     var responseCodeMirror;
     
     splitterTD.onmousedown = splitterTD_onmousedown;
@@ -449,12 +679,37 @@ function startHARREST() {
     window.onmousemove = splitterTD_onmousemove;
     window.ontouchmove = splitterTD_onmousemove;
 
-    loadDependenciesAppropriately(function (source) {
-      console.log('Dependencies loaded from ' + source);
+    checkDocLoaded.repeatTimeout = null;
+    checkDocLoaded();
+
+    window.onload = function () {
+      checkDocLoaded();
+    }
+
+    function checkDocLoaded() {
+      if (document.readyState === 'complete') {
+        var allScriptsLoaded = typeof CodeMirror === 'function' && typeof ts !== 'undefined' && ts.createCompilerHost === 'function';
+        if (allScriptsLoaded) {
+          console.log('All script loaded organically from HTML script tags');
+          whenAllScriptsLoaded();
+          return;
+        }
+        else {
+          loadDependenciesAppropriately(function (source) {
+            console.log('Dependencies loaded from ' + source);
+            whenAllScriptsLoaded();
+          });
+        }
+      }
+
+      checkDocLoaded.repeatTimeout = setTimeout(checkDocLoaded, 500);
+    }
+
+    function whenAllScriptsLoaded() {
       set(statusTD, 'Loaded');
       continueWithDependencies();
       set(statusTD, 'Loaded.');
-    });
+    }
 
     function getLocationSource() {
       if (!location) location = window.location;
@@ -507,10 +762,10 @@ function startHARREST() {
        * @param {(success: boolean, results: boolean[]) => void} callback
        */
       function loadDependencyElements(elements, callback) {
-        process = {
-          env: {}
-        };
-        require = function () { }
+        // process = {
+        //   env: {}
+        // };
+        // require = function () { }
 
         var loadedCount = 0;
         /** @type {boolean[]} */
@@ -631,24 +886,69 @@ function startHARREST() {
      * @returns {Promise<CommonResponseData | undefined>}
      */
     function sendRequestAsync(req) {
-      if (typeof fetch === 'function' && typeof Headers === 'function') return sendRequestAsync.sendUsingFetch(req);
-      else if (typeof XMLHttpRequest === 'function') return sendRequestAsync.sendUsingXMLHttpRequest(req);
-      else if (typeof ActiveXObject === 'function') return sendRequestAsync.sendUsingActiveXObject(req);
-      else throw new Error('Cannot send any requests.');
+      if (typeof location !== 'undefined' && location.host && /localhost|127/.test(location.host)) {
+        return sendRequestAsync.detectAndSendDirectly(req);
+      }
+
+      return sendRequestAsync.sendViaCorsProxy(req);
     }
+
+    sendRequestAsync.sendViaCorsProxy = (function () {
+      /**
+       * @param {{ verb: string; url: string; body: string; }} req
+       * @returns {Promise<CommonResponseData | undefined>}
+       */
+      function sendViaCorsProxy(req) {
+        console.log('sendViaCorsProxy ', req);
+        return sendRequestAsync.detectAndSendDirectly(
+          {
+            url: '/cors',
+            verb: 'POST',
+            body: req.verb + ' ' + req.url + (req.body ? '\n' + req.body : '')
+          }).then(handleResponse);
+      }
+
+      /**
+       * @param {CommonResponseData | undefined} res
+       */
+      function handleResponse(res) {
+        if (!res) return res;
+        if (res.status === 200) {
+          var jsonBody = JSON.parse(res.body);
+          return jsonBody;
+        }
+      }
+
+      return sendViaCorsProxy;
+    })();
+
+    sendRequestAsync.detectAndSendDirectly = (function () {
+      /**
+       * @param {{ verb: string; url: string; body?: string; }} req
+       * @returns {Promise<CommonResponseData | undefined>}
+       */
+      function detectAndSendDirectly(req) {
+        if (typeof fetch === 'function' && typeof Headers === 'function') return sendRequestAsync.sendUsingFetch(req);
+        else if (typeof XMLHttpRequest === 'function') return sendRequestAsync.sendUsingXMLHttpRequest(req);
+        else if (typeof ActiveXObject === 'function') return sendRequestAsync.sendUsingActiveXObject(req);
+        else throw new Error('Cannot send any requests.');
+      }
+
+      return detectAndSendDirectly;
+    })();
 
     sendRequestAsync.sendUsingFetch = (function () {
 
       /**
-       * @param {{ url: string; verb: string; }} req
+       * @param {{ url: string; verb: string; body?: string }} req
        */
       function sendUsingFetch(req) {
         try {
-
           var fetchPromise = fetch(
             req.url,
             {
               method: req.verb,
+              body: req.body
             });
 
           return fetchPromise.then(fetchHandleResponse);
@@ -735,7 +1035,7 @@ function startHARREST() {
 
       var sending;
 
-      sendBUTTON.onclick = sendBUTTON_click;
+      sendBUTTON.onclick = sendBUTTON_onclick;
 
       function requestTextChanged() {
         clearTimeout(requestTextChanged.timeout);
@@ -748,7 +1048,7 @@ function startHARREST() {
         updateLocationWithText(text);
       }
 
-      function sendBUTTON_click() {
+      function sendBUTTON_onclick() {
         sendRequestInteractively();
       }
 
@@ -757,6 +1057,13 @@ function startHARREST() {
           clearTimeout(requestTextChanged.timeout);
           debouncedRequestTextChanged();
         }
+
+        splitterLabel.textContent = 'sending...';
+        if (!/\bsending\b/i.test(splitterTD.className)) {
+          splitterTD.className += ' sending';
+        }
+
+        var updateSendingTextInterval = setInterval(updateSendingText, 1000);
 
         var text = requestCodeMirror.getValue();
         var parsed = parseAsRequest(text);
@@ -782,28 +1089,55 @@ function startHARREST() {
           handleRequestFail
         );
 
+        function updateSendingText() {
+          if (sending !== promiseSendRequest) {
+            clearInterval(updateSendingTextInterval);
+            return;
+          }
+
+          var requestElapsedTime = getTimeNow() - requestStart;
+          splitterLabel.textContent = 'sending: ' + Math.round(requestElapsedTime / 1000) + 's...';
+        }
+
         /**
          * @param {CommonResponseData | undefined} res
          */
         function handleRequestResponse(res) {
-          var requestTime = getTimeNow() - requestStart;
-          if (!res) {
-            responseCodeMirror.setValue('REQUEST FAILED AS UNKNOWN ' + (requestTime / 1000) + 's');
+          clearInterval(updateSendingTextInterval);
+          if (sending !== promiseSendRequest) {
             return;
           }
 
+          splitterTD.className = splitterTD.className.replace(/(^|\s+)sending(\s+|$)/g, ' ');
+
+          var requestTime = getTimeNow() - requestStart;
+          if (!res) {
+            splitterLabel.textContent = 'REQUEST FAILED AS UNKNOWN ' + (requestTime / 1000) + 's';
+            responseCodeMirror.setValue('');
+            return;
+          }
+
+          splitterLabel.textContent = res.status + ' ' + res.statusText + ' ' + (requestTime / 1000) + 's';
+
           responseCodeMirror.setValue(
-            res.status + ' ' + res.statusText + ' ' + (requestTime / 1000) + 's\n\n' +
-            res.body
+            res.body || ''
           );
         }
 
         function handleRequestFail(err) {
+          clearInterval(updateSendingTextInterval);
+          if (sending !== promiseSendRequest) {
+            return;
+          }
+
+          splitterTD.className = splitterTD.className.replace(/(^|\s+)sending(\s+|$)/g, ' ');
+
           var requestTime = getTimeNow() - requestStart;
+          splitterLabel.textContent = 'REQUEST FAILED ' + (requestTime / 1000) + 's';
           if (err && err.stack) {
-            responseCodeMirror.setValue('REQUEST FAILED ' + (requestTime / 1000) + 's\n\n' + err.message + '\n\n' + err.stack);
+            responseCodeMirror.setValue(err.message + '\n\n' + err.stack);
           } else {
-            responseCodeMirror.setValue('REQUEST FAILED ' + (requestTime / 1000) + 's\n\n' + err + '');
+            responseCodeMirror.setValue(err + '');
           }
         }
       }
@@ -984,8 +1318,6 @@ function startHARREST() {
       // meta name="viewport" content="width=device-width, initial-scale=1.0"
 
       /*
-      
-      <title>HAR-REST</title>
     <style>
     html {
       margin:0;padding:0;
@@ -1018,6 +1350,18 @@ function startHARREST() {
       border-left: none;
       cursor: ns-resize;
       padding: 0.3em;
+      transition: background-color 200ms;
+    }
+
+    @keyframes fade {
+      from { opacity: 1 }
+      50% { opacity: 0.8 }
+      to { opacity: 1 }
+    }
+
+    #splitterTD.sending {
+      background: #fcdbe2;
+      animation: 2s infinite alternate fade;
     }
 
     #splitterTD.down {
@@ -1107,7 +1451,7 @@ function startHARREST() {
     </tr>
     <tr height=1>
       <td width=80% id=splitterTD>
-        -splitter-
+        <span id=splitterLabel>output</span>
       </td>
     </tr>
     <tr>

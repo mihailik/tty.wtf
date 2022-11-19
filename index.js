@@ -336,6 +336,22 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     var path = require('path');
     var child_process = require('child_process');
     var http = require('http');
+    var URL = require('url');
+
+    /** @type {(() => void | (Promise<void>))[]} */
+    var shutdownServices = [];
+    var runningChildProcesses = [];
+
+    var catchREST_secret_variable_name = 'catchREST_secret';
+    var shared_process_secret = /** @type {string} */(process.env[catchREST_secret_variable_name]);
+    if (!shared_process_secret) {
+      shared_process_secret = calcHash(__dirname.toLowerCase()) + '-' + Math.random().toString(36).replace(/[\.+-,]/g, '') + '-' + Math.random().toString(36).replace(/[\.+-,]/g, '');
+    }
+
+    /** @typedef {import("http").IncomingMessage} HTTPRequest */
+    /** @typedef {import("http").ServerResponse} HTTPResponse */
+
+    // #region COMMON NODE UTILS
 
     /**
      * @param {string} file
@@ -363,6 +379,15 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
         })
       });
     }
+
+    function derivePort(str) {
+      str = String(str).toLowerCase();
+      var hash = calcHash(str);
+      var port = 4000 + (hash % 4000);
+      return port;
+    }
+
+    //#endregion
 
     function build() {
       // verify the build result
@@ -499,13 +524,314 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     /** @param {Promise} buildPromise */
     function startServer(buildPromise) {
       return new Promise(function (resolve, reject) {
-        // server can start, and build result will only become necessary later
+        var port = derivePort(__dirname);
+
+        var listeningServerPromise = listenToPort('', port).catch(function (error) {
+          // TODO: if port is not available, send shutdown request and in the meantime start retrying...
+          throw new Error();
+        });
+
+        listeningServerPromise.then(function (listeningServer) {
+          console.log('server listening on http://localhost:' + listeningServer.port + '/');
+          listeningServer.handle(handleRequest);
+
+          /**
+           * @param {HTTPRequest} req
+           * @param {HTTPResponse} res
+           */
+          function handleRequest(req, res) {
+            return new Promise(function (resolve, reject) {
+              var url = URL.parse(/** @type {string} */(req.url), true /*parseQueryString*/);
+
+              switch ((url.pathname || '').toLowerCase()) {
+                case '/':
+                case '/index.html':
+                  return handleIndexHTMLRequest(req, res);
+
+                case 'favicon.ico':
+                  return handleFaviconRequest(req, res);
+
+                case '/control':
+                  return handleControlRequest(req, res, url);
+
+                default:
+                  return handleLocalFileRequest(req.url || '/', res);
+              }
+            });
+          }
+
+          /**
+           * @param {HTTPRequest} _req
+           * @param {HTTPResponse} res
+           * @returns {Promise<void>}
+           */
+          function handleIndexHTMLRequest(_req, res) {
+            return new Promise(function (resolve) {
+              res.setHeader('Content-type', 'text/html');
+              res.end(embeddedWholeHTML);
+              resolve();
+            });
+          }
+
+          /**
+           * @param {string} localPath
+           * @param {HTTPResponse} res
+           * @returns {Promise<void>}
+           */
+          function handleLocalFileRequest(localPath, res) {
+            return new Promise(function (resolve) {
+              var mimeByExt = {
+                html: 'text/html',
+                htm: 'text/html',
+                js: 'application/javascript',
+                css: 'style/css'
+              };
+
+              // TODO: inject ETag for caching
+
+              var verbOffset = getVerbOffset(localPath);
+              if (verbOffset >= 0) localPath = localPath.slice(0, verbOffset);
+              if (localPath === '/' || !localPath) localPath = '/index.html';
+
+              var fs = require('fs');
+              var path = require('path');
+
+              var fullPath = __dirname + localPath;
+              readFileAsync(fullPath, 'binary').then(function (data) {
+                var mime = mimeByExt[path.extname(localPath).toLowerCase().replace(/^\./, '')];
+                if (mime) res.setHeader('Content-type', mime);
+                res.end(data);
+                resolve();
+              });
+            });
+          }
+
+          /**
+           * @param {HTTPRequest} _req
+           * @param {HTTPResponse} res
+           * @returns {Promise<void>}
+           */
+          function handleFaviconRequest(_req, res) {
+            return new Promise(function (resolve) {
+              // for now just skip
+              res.end();
+              console.log(' []');
+              resolve();
+            });
+          }
+
+          /**
+           * @param {HTTPRequest} req
+           * @param {HTTPResponse} res
+           * @returns {Promise<void>}
+           */
+          function handle404Request(req, res) {
+            return new Promise(function (resolve) {
+              res.statusCode = 404;
+              res.end(req.url + ' NOT FOUND.');
+              resolve();
+            });
+          }
+
+          /**
+           * @param {import("http").IncomingMessage} req
+           * @param {import("http").ServerResponse} res
+           * @param {import("url").UrlWithParsedQuery} url
+           * @returns {Promise<void> | void}
+           */
+          function handleControlRequest(req, res, url) {
+            if (url.query[catchREST_secret_variable_name] !== shared_process_secret)
+              return handle404Request(req, res);
+
+            switch (url.query.command) {
+              case 'shutdown':
+                res.end('OK');
+                if (process.env[catchREST_secret_variable_name]) {
+                  process.exit(0);
+                } else {
+                  while (true) {
+                    var svc = shutdownServices.pop();
+                    if (!svc) break;
+                    svc();
+                  }
+                }
+                return new Promise(function (resolve) { resolve() });
+
+              case 'restart':
+                res.end('starting new instance');
+                startNewInstance();
+                return new Promise(function (resolve) { resolve() });
+            }
+          }
+        });
+      });
+
+      /**
+       * 
+       * @param {string | null | undefined} host
+       * @param {number} port
+       * @returns {Promise<{ port: number, host: string, server: import('http').Server, handle(handler: (req: HTTPRequest, res: HTTPResponse, server: import('http').Server) => Promise<any>): void }>}
+       */
+      function listenToPort(host, port) {
+        return new Promise(function (resolve, reject) {
+
+          /** @type {{ req: HTTPRequest, res: HTTPResponse, server: import('http').Server}[]} */
+          var requestQueue = [];
+
+          /** @type {(req: HTTPRequest, res: HTTPResponse, server: import('http').Server) => Promise<void>} */
+          var listener;
+          var listenToPort = port;
+          var listenToHost = host || '0.0.0.0';
+
+          var server = http.createServer(function (req, res) {
+            handleRequest(req, res);
+          });
+
+          server.on('listening', function () {
+            resolve({
+              port: listenToPort,
+              host: listenToHost,
+              server: server,
+              /** @param {(req: HTTPRequest, res: HTTPResponse, server: import('http').Server) => Promise<void>} handler */
+              handle: function (handler) {
+                listener = handler;
+                while (true) {
+                  var next = requestQueue.shift();
+                  if (!next) break;
+                  handleWithListener(next);
+                }
+              }
+            });
+          });
+          server.on('error', function (error) {
+            reject(error);
+          });
+          server.listen(listenToPort, listenToHost);
+
+          /** @param {HTTPRequest} req @param {HTTPResponse} res */
+          function handleRequest(req, res) {
+            var entry = { req: req, res: res, server: server };
+            if (/** @type {*}*/(listener)) handleWithListener(entry);
+            else requestQueue.push(entry);
+          }
+
+          /** @param {typeof requestQueue[0]} entry */
+          function handleWithListener(entry) {
+            var res = listener(entry.req, entry.res, entry.server);
+            if (res && typeof res.then === 'function') {
+              res.then(
+                function () {
+                  if (!entry.res.closed) {
+                    console.log('Request promise completed, but request not yet handled.');
+                  }
+                },
+                function (error) {
+                  if (!entry.res.closed) {
+                    if (!entry.res.headersSent) {
+                      entry.res.statusCode = 500;
+                      entry.res.statusMessage = error && error.message || String(error);
+                      entry.res.setHeader('Content-type', 'text/plain');
+                    }
+
+                    var errorResponse = error && error.stack ? error.stack :
+                      error && error.message ? error.message :
+                        String(error) || 'FAILED.'
+
+                    entry.res.end(errorResponse);
+                  }
+                });
+            }
+          }
+        });
+      }
+    }
+
+    function startNewInstance() {
+      if (startNewInstance.current) return startNewInstance.current;
+
+      return startNewInstance.current = new Promise(function (resolve, reject) {
 
         setTimeout(function () {
-          resolve('Server started (pretends) at http://localhost:1234/');
+          startNewInstance.current = null;
         }, 1000);
+
+        if (process.env[catchREST_secret_variable_name] && process.send) {
+          process.send({
+            command: 'start'
+          });
+
+          return;
+        }
+
+        var child_process = require('child_process');
+        /** @type{Record<string,string>} */
+        var env = {};
+        env[catchREST_secret_variable_name] = shared_process_secret;
+        var proc = child_process.fork(
+          __filename,
+          process.argv[1].toLowerCase().indexOf(
+            __filename.replace(/\\/g, '/').split('/').reverse()[0].toLowerCase()) >= 0 ?
+            process.argv.slice(2) :
+            process.argv.slice(1),
+          {
+            env: env,
+            stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+          });
+
+        if (proc.stdout) proc.stdout.on('data', handleChildStdout);
+        if (proc.stderr) proc.stderr.on('data', handleChildStderr);
+        proc.on('message', handleChildMessage);
+        proc.on('error', handleError);
+        proc.on('exit', handleExit);
+        var counted = false;
+
+        function handleChildStdout(data) {
+          resolve();
+          if (!counted) {
+            counted = true;
+            runningChildProcesses.push(proc);
+          }
+
+          var procId = proc.pid;
+          process.stdout.write(data);
+        }
+
+        function handleChildStderr(data) {
+          resolve();
+          if (!counted) {
+            counted = true;
+            runningChildProcesses.push(proc);
+          }
+
+          var procId = proc.pid;
+          process.stderr.write(data);
+        }
+
+        function handleError(error) {
+          resolve(error);
+          var procId = proc.pid;
+        }
+
+        function handleChildMessage(msg) {
+          if (msg && msg.command === 'start') {
+            startNewInstance();
+          }
+        }
+
+        function handleExit(exitCode) {
+          resolve(exitCode);
+
+          var posCurrent = runningChildProcesses.indexOf(proc);
+          if (posCurrent >= 0) runningChildProcesses.splice(posCurrent, 1);
+
+          // TODO: debounce with timeout, shutdown if no longer runningChildProcesses-
+        }
+
       });
     }
+    /** @type {null | Promise<void>} */
+    startNewInstance.current = null;
+
 
     function launchBrowser() {
       return new Promise(function (resolve, reject) {
@@ -543,11 +869,189 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
   }
 
   function runAsBrowser() {
-    // TODO: detect if HTML is initialised, if not -- initialise with CSS and body layout etc.
+    // #region COMMON BROWSER UTILS
+
+    function on(elem, eventName, callback) {
+      if (elem.addEventListener) return elem.addEventListener(eventName, callback);
+      else if (elem.attachEvent) return elem.attachEvent('on' + eventName, callback);
+      else elem['on' + eventName] = function (evt) {
+        if (!evt) evt = typeof event === 'undefined' ? void 0 : event;
+        return callback(evt);
+      };
+    }
+
+    function off(elem, eventName, callback) {
+      if (elem.removeEventListener) return elem.removeEventListener(eventName, callback);
+      else if (elem.detachEvent) return elem.detachEvent('on' + eventName, callback);
+      else elem['on' + eventName] = null;
+    }
+
+    function set(elem, value) {
+      if (typeof value === 'string') {
+        if (elem && 'textContent' in elem) {
+          elem.textContent = value;
+        } else if (elem && 'innerText' in elem) {
+          elem.innerText = value;
+        } else {
+          elem.text = value;
+        }
+      }
+    }
+    // #endregion COMMON BROWSER UTILS
+
+    function boot() {
+
+      function bindLayout() {
+        var anyMissing = false;
+        var elems = {
+          layoutTABLE: /**@type {HTMLTableElement}*/(id('layoutTABLE')),
+          leftTD: /**@type {HTMLTableElement}*/(id('leftTD')),
+          sendBUTTON: /**@type {HTMLButtonElement}*/(id('sendBUTTON')),
+          sendLabel: /**@type {HTMLSpanElement}*/(id('sendLabel')),
+          requestTD: /**@type {HTMLTableCellElement}*/(id('requestTD')),
+          splitterTD: /**@type {HTMLTableCellElement}*/(id('splitterTD')),
+          splitterLabel: /**@type {HTMLSpanElement}*/(id('splitterLabel')),
+          responseTD: /**@type {HTMLTableCellElement}*/(id('responseTD')),
+          statusTD: /**@type {HTMLTableCellElement}*/(id('statusTD')),
+          anyMissing: anyMissing
+        };
+        return elems;
+
+        function id(id) {
+          var elem = document.getElementById(id);
+          if (!elem) anyMissing = true;
+          return elem;
+        }
+      }
+
+      function populateBodyLayout() {
+        var placeholder = document.createElement('div');
+        placeholder.innerHTML = embeddedBodyLayoutHTML;
+        while (placeholder.childNodes.length) {
+          var node = placeholder.childNodes.item ? placeholder.childNodes.item(0) : placeholder.childNodes[0];
+          placeholder.removeChild(node);
+          document.body.appendChild(node);
+        }
+        return bindLayout();
+      }
+
+      function waitForLayout() {
+        return new Promise(function (resolve, reject) {
+          var layout = bindLayout();
+          if (layout) return resolve(layout);
+
+          if (document.body) return resolve(populateBodyLayout());
+
+          // TODO: queue on load complete
+        });
+      }
+
+      /** @param {ReturnType<typeof bindLayout>} layout */
+      function makeSplitterDraggable(layout) {
+        restoreSplitterPosition();
+
+        on(layout.splitterTD, 'mousedown', splitterTD_onmousedown);
+        on(layout.splitterTD, 'touchstart', splitterTD_onmousedown);
+        on(layout.splitterTD, 'touchend', splitterTD_onmouseup);
+        on(layout.splitterTD, 'mouseup', splitterTD_onmouseup);
+        on(layout.splitterTD, 'mousemove', splitterTD_onmousemove);
+        on(window, 'mousemove', splitterTD_onmousemove);
+        on(window, 'touchmove', splitterTD_onmousemove);
+        on(window, 'mouseup', splitterTD_onmouseup);
+
+        /** @type {boolean} */
+        var splitterTD_mice;
+
+        /**
+         * @param {{ button?: number }} evt
+         * @param {boolean} down
+         */
+        function updateMice(evt, down) {
+          // TODO: handle right-click specially!
+          // if (evt.button) down = false;
+          splitterTD_mice = down;
+
+          if (splitterTD_mice) {
+            if (!/(\s+|^)down(\s+|$)/.test(layout.splitterTD.className || '')) layout.splitterTD.className += ' down';
+          } else {
+            if (/(\s+|^)down(\s+|$)/.test(layout.splitterTD.className || '')) layout.splitterTD.className = (layout.splitterTD.className || '').replace(/(\s+|^)down(\s+|$)/g, '');
+          }
+        }
+
+
+        /** @param {Event & Partial<MouseEvent>} evt */
+        function splitterTD_onmousedown(evt) {
+          updateMice(evt, true);
+        }
+
+        /** @param {Event & Partial<MouseEvent>} evt */
+        function splitterTD_onmouseup(evt) {
+          updateMice(evt, false);
+        }
+
+        /** @param {MouseEvent | TouchEvent} evt */
+        function splitterTD_onmousemove(evt) {
+          if (splitterTD_mice) {
+            if (typeof evt.preventDefault === 'function') evt.preventDefault();
+
+            var y =
+          /** @type {MouseEvent} */(evt).pageY ||
+          /** @type {MouseEvent} */(evt).y;
+
+            if (!y) {
+              var touches = /** @type {TouchEvent} */(evt).touches;
+              if (touches && touches.length === 1)
+                y = touches[0].pageY;
+            }
+
+            var windowHeight = window.innerHeight || document.body.offsetHeight;
+            var ratio = y / (windowHeight - (layout.statusTD.offsetHeight || layout.statusTD.getBoundingClientRect().height));
+
+            var ratioPercent = (ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
+            var reverseRatioPercent = (100 - ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
+            if (typeof JSON !== 'undefined' && JSON && typeof JSON.stringify === 'function') {
+              window.name = '{"splitter": "' + ratioPercent + '"}';
+            }
+
+            if (layout.requestTD.height !== ratioPercent) layout.requestTD.height = ratioPercent;
+            if (layout.responseTD.height !== reverseRatioPercent) layout.responseTD.height = reverseRatioPercent;
+          }
+        }
+
+        function restoreSplitterPosition() {
+          if (!window.name || typeof JSON === 'undefined' || !JSON || typeof JSON.parse !== 'function') return;
+          try {
+            var windowObj = JSON.parse(window.name);
+            if (windowObj && windowObj.splitter && /%$/.test(windowObj.splitter)) {
+              var num = Number(windowObj.splitter.replace(/%$/, ''));
+              if (num > 0 && num < 100) {
+                layout.requestTD.height = windowObj.splitter;
+                layout.responseTD.height = (100 - num) + '%';
+              }
+            }
+          } catch (err) {
+            try { console.error('cannot restore splitter position: ', err); } catch (err) { }
+          }
+        }
+      }
+
+      function startBoot() {
+        var bindLayoutAndHandleSplitter = waitForLayout().then(
+          function (layout) {
+            makeSplitterDraggable(layout);
+            return layout;
+          }
+        )
+      }
+
+      return startBoot();
+    }
+
+    boot();
   }
 
   function runAsWScript() {
-
+    // TODO: fire mshta
   }
 
   function detectEnvironment() {

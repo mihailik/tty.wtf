@@ -151,134 +151,27 @@ body {
 }
   */});
 
-  var embeddedTableCSS = getFunctionCommentContent(function () {/*
-#layoutTABLE {
-  margin: 0;
-  width: 100%; height: 100%;
-}
-
-#splitterTD {
-  background: #fff0f3;
-  border: solid 1px #fed4dc;
-  border-left: none;
-  cursor: ns-resize;
-  padding: 0.3em;
-  transition: background-color 200ms;
-}
-
-@keyframes fade {
-  from { opacity: 1 }
-  50% { opacity: 0.8 }
-  to { opacity: 1 }
-}
-
-#splitterTD.sending {
-  background: #fcdbe2;
-  animation: 2s infinite alternate fade;
-}
-
-#splitterTD.down {
-  background: #ffe8ed;
-}
-
-#leftTD {
-  background: #fff0f3;
-  padding: 1em;
-}
-
-#sendBUTTON {
-  background: #75424c;
-  border: solid 1px #ebb2c1;
-  border-radius: 0.15em;
-  font-size: 200%;
-  padding: 0.25em;
-  padding-left: 0.45em;
-  padding-right: 0.45em;
-  box-shadow: 2px 2px 8px #a97d89;
-  color: #ffe8ee;
-  cursor: pointer;
-}
-
-#sendBUTTON:disabled {
-  background: #d9a9b2;
-  border: solid 1px #8b7d81;
-  border-radius: 0.15em;
-  font-size: 200%;
-  padding: 0.25em;
-  padding-left: 0.45em;
-  padding-right: 0.45em;
-  color: #ffffff;
-  cursor: default;
-  text-shadow: 0px 0px 5px #140004;
-  box-shadow: none;
-}
-
-#sendBUTTON #sendLabel {
-  transform: scaleX(0.95);
-}
-
-#statusTD {
-  background: #ffa4b4;
-  padding-left: 0.5em;
-  padding-bottom: 0.1em;
-  padding-top: 0.1em;
-}
-
-#requestTD {
-  position: relative;
-  border-left: solid 1px #ffcfd6;
-}
-
-#responseTD {
-  position: relative;
-  border-left: solid 1px #ffcfd6;
-}
-
-td .CodeMirror {
+  var embeddedCodeMirrorCSS = function(prefix) {
+    var css = getFunctionCommentContent(function() { /*
+{prefix} .CodeMirror {
   position: absolute;
   left: 0; top: 0;
   width: 100%; height: 100%;
   font: inherit;
 }
 
-td .CodeMirror-gutters {
+{prefix} .CodeMirror-gutters {
   border-right: solid 1px #e4e4e4;
 }
 
-td .CodeMirror-gutter.CodeMirror-linenumbers {
+{prefix} .CodeMirror-gutter.CodeMirror-linenumbers {
   background: #fbfbfb;
 }
+    */});
 
-  */});
-
-  var embeddedTableLayoutHTML = getFunctionCommentContent(function () {/*
-  <table id=layoutTABLE cellspacing=0 cellpadding=0><tr><td height=100%>
-
-    <table cellspacing=0 cellpadding=0 height=100% width=100%><tr>
-      <td id=leftTD width=20% valign=top>
-        <button id=sendBUTTON><span id=sendLabel><span style="filter: blur(2.5px)">GET</span></span></button>
-      </td>
-
-      <td width=80%>
-        <table cellspacing=0 cellpadding=0 height=100% width=100%>
-          <tr>
-            <td height=50% id=requestTD></td>
-          </tr>
-          <tr>
-            <td height=1 id=splitterTD> <span id=splitterLabel>output</span> </td>
-          </tr>
-          <tr>
-            <td height=50% id=responseTD></td>
-          </tr>
-        </table>
-      </td>
-    </tr></table>
-
-  </td></tr>
-  <tr><td height=1 id=statusTD>
-      Loading...
-  </td></tr></table>
-  */});
+    if (prefix) return css.replace(/\{prefix\}/g, prefix);
+    else return css.replace(/\{prefix\}\s*/g, '');
+  }
 
   var embeddedShellLayoutHTML = getFunctionCommentContent(function () { /*
 <div style="position: fixed; left: 0; top: 0; width: 100%; height: 100%">
@@ -3565,8 +3458,10 @@ shell layout
 
     function createShell() {
 
-      // TODO: update box model
+      injectStyle();
+
       var host = document.createElement('div');
+      host.id = 'editor-host';
       host.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding-top: 10%; text-align: center;';
       set(host, 'Loading..');
       document.body.appendChild(host);
@@ -3606,15 +3501,23 @@ shell layout
             autofocus: true
           });
 
-        var wrapper = editor.getWrapperElement();
-        Object.assign(wrapper.style, {
-          width: '100%', height: '100%',
-          font: 'inherit'
-        });
-
         function accept() {
 
         }
+      }
+
+      function injectShellHTML() {
+      }
+
+      function injectStyle() {
+        var style = document.createElement('style');
+        set(style, embeddedCodeMirrorCSS('#editor-host'));
+        var head = document.head || document.getElementsByTagName('head')[0];
+        if (!head) {
+          head = document.createElement('head');
+          document.children[0].appendChild(head);
+        }
+        head.appendChild(style);
       }
     }
 
@@ -3734,154 +3637,6 @@ shell layout
       } else {
         bootBacked(location.pathname);
       }
-    }
-
-    function bootOld() {
-
-      function bindLayout() {
-        var anyMissing = false;
-        var elems = {
-          layoutTABLE: /**@type {HTMLTableElement}*/(id('layoutTABLE')),
-          leftTD: /**@type {HTMLTableElement}*/(id('leftTD')),
-          sendBUTTON: /**@type {HTMLButtonElement}*/(id('sendBUTTON')),
-          sendLabel: /**@type {HTMLSpanElement}*/(id('sendLabel')),
-          requestTD: /**@type {HTMLTableCellElement}*/(id('requestTD')),
-          splitterTD: /**@type {HTMLTableCellElement}*/(id('splitterTD')),
-          splitterLabel: /**@type {HTMLSpanElement}*/(id('splitterLabel')),
-          responseTD: /**@type {HTMLTableCellElement}*/(id('responseTD')),
-          statusTD: /**@type {HTMLTableCellElement}*/(id('statusTD')),
-          anyMissing: anyMissing
-        };
-        return elems;
-
-        function id(id) {
-          var elem = document.getElementById(id);
-          if (!elem) anyMissing = true;
-          return elem;
-        }
-      }
-
-      function populateBodyLayout() {
-        var placeholder = document.createElement('div');
-        placeholder.innerHTML = embeddedTableLayoutHTML;
-        while (placeholder.childNodes.length) {
-          var node = placeholder.childNodes.item ? placeholder.childNodes.item(0) : placeholder.childNodes[0];
-          placeholder.removeChild(node);
-          document.body.appendChild(node);
-        }
-        return bindLayout();
-      }
-
-      function waitForLayout() {
-        return new Promise(function (resolve, reject) {
-          var layout = bindLayout();
-          if (layout) return resolve(layout);
-
-          if (document.body) return resolve(populateBodyLayout());
-
-          // TODO: queue on load complete
-        });
-      }
-
-      /** @param {ReturnType<typeof bindLayout>} layout */
-      function makeSplitterDraggable(layout) {
-        restoreSplitterPosition();
-
-        on(layout.splitterTD, 'mousedown', splitterTD_onmousedown);
-        on(layout.splitterTD, 'touchstart', splitterTD_onmousedown);
-        on(layout.splitterTD, 'touchend', splitterTD_onmouseup);
-        on(layout.splitterTD, 'mouseup', splitterTD_onmouseup);
-        on(layout.splitterTD, 'mousemove', splitterTD_onmousemove);
-        on(window, 'mousemove', splitterTD_onmousemove);
-        on(window, 'touchmove', splitterTD_onmousemove);
-        on(window, 'mouseup', splitterTD_onmouseup);
-
-        /** @type {boolean} */
-        var splitterTD_mice;
-
-        /**
-         * @param {{ button?: number }} evt
-         * @param {boolean} down
-         */
-        function updateMice(evt, down) {
-          // TODO: handle right-click specially!
-          // if (evt.button) down = false;
-          splitterTD_mice = down;
-
-          if (splitterTD_mice) {
-            if (!/(\s+|^)down(\s+|$)/.test(layout.splitterTD.className || '')) layout.splitterTD.className += ' down';
-          } else {
-            if (/(\s+|^)down(\s+|$)/.test(layout.splitterTD.className || '')) layout.splitterTD.className = (layout.splitterTD.className || '').replace(/(\s+|^)down(\s+|$)/g, '');
-          }
-        }
-
-
-        /** @param {Event & Partial<MouseEvent>} evt */
-        function splitterTD_onmousedown(evt) {
-          updateMice(evt, true);
-        }
-
-        /** @param {Event & Partial<MouseEvent>} evt */
-        function splitterTD_onmouseup(evt) {
-          updateMice(evt, false);
-        }
-
-        /** @param {MouseEvent | TouchEvent} evt */
-        function splitterTD_onmousemove(evt) {
-          if (splitterTD_mice) {
-            if (typeof evt.preventDefault === 'function') evt.preventDefault();
-
-            var y =
-          /** @type {MouseEvent} */(evt).pageY ||
-          /** @type {MouseEvent} */(evt).y;
-
-            if (!y) {
-              var touches = /** @type {TouchEvent} */(evt).touches;
-              if (touches && touches.length === 1)
-                y = touches[0].pageY;
-            }
-
-            var windowHeight = window.innerHeight || document.body.offsetHeight;
-            var ratio = y / (windowHeight - (layout.statusTD.offsetHeight || layout.statusTD.getBoundingClientRect().height));
-
-            var ratioPercent = (ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
-            var reverseRatioPercent = (100 - ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
-            if (typeof JSON !== 'undefined' && JSON && typeof JSON.stringify === 'function') {
-              window.name = '{"splitter": "' + ratioPercent + '"}';
-            }
-
-            if (layout.requestTD.height !== ratioPercent) layout.requestTD.height = ratioPercent;
-            if (layout.responseTD.height !== reverseRatioPercent) layout.responseTD.height = reverseRatioPercent;
-          }
-        }
-
-        function restoreSplitterPosition() {
-          if (!window.name || typeof JSON === 'undefined' || !JSON || typeof JSON.parse !== 'function') return;
-          try {
-            var windowObj = JSON.parse(window.name);
-            if (windowObj && windowObj.splitter && /%$/.test(windowObj.splitter)) {
-              var num = Number(windowObj.splitter.replace(/%$/, ''));
-              if (num > 0 && num < 100) {
-                layout.requestTD.height = windowObj.splitter;
-                layout.responseTD.height = (100 - num) + '%';
-              }
-            }
-          } catch (err) {
-            try { console.error('cannot restore splitter position: ', err); } catch (err) { }
-          }
-        }
-      }
-
-      function startBoot() {
-        var bindLayoutAndHandleSplitter = waitForLayout().then(
-          function (layout) {
-            makeSplitterDraggable(layout);
-            return layout;
-          }
-        )
-      }
-
-      return startBoot();
     }
 
     boot();

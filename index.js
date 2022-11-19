@@ -3497,6 +3497,11 @@ body {
             autofocus: true
           });
 
+        /** @type {HTMLElement} */
+        var ef = editor.getInputField();
+        console.log('getInputField ', ef);
+        editor.setValue(editor.getValue() + '\n\n' + (!ef ? '-' : ef.outerHTML.slice(0, ef.outerHTML.indexOf('>') + 1)));
+
         function accept() {
 
         }

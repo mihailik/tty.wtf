@@ -4146,7 +4146,11 @@ issuing requests, processing data and representing the data in sensible way with
 
     // #endregion PERSISTENCE
 
-    function createShell() {
+    /**
+     * @param {string} text
+     * @param {string} mode
+     */
+    function createShell(text, mode) {
 
       injectShellStyles();
       var layout = bindLayout();
@@ -4155,9 +4159,9 @@ issuing requests, processing data and representing the data in sensible way with
         layout = injectShellHTML();
       }
 
-      layout.pseudoEditor.value = 'Loading.. ' + embeddedSplashText;
+      layout.pseudoEditor.value = text;
       layout.pseudoGutter.innerHTML =
-        Array(embeddedSplashText.split('\n').length + 1)
+        Array(text.split('\n').length + 1)
         .join(',').split(',')
         .map(function(_,index) {return index+1; }).join('<br>');
       console.log('Loading..');
@@ -4178,35 +4182,62 @@ issuing requests, processing data and representing the data in sensible way with
       }
 
       /**
-       * @param {string} text
-       * @param {string} mode
+       * @param {string=} textOverride
+       * @param {string=} modeOverride
        */
-      function loadingComplete(text, mode) {
+      function loadingComplete(textOverride, modeOverride) {
+        if (typeof textOverride !== 'undefined') text = textOverride;
+        if (typeof modeOverride !== 'undefined') mode = modeOverride;
         layout.requestEditorHost.innerHTML = '';
-        var editor = createCodeMirrorWithFirstClickChange(
-          layout.requestEditorHost,
-          {
-            value: embeddedSplashText,
+        if (mode === 'splash') {
+          var editor = createCodeMirrorWithFirstClickChange(
+            layout.requestEditorHost,
+            {
+              value: embeddedSplashText,
 
-            mode: 'markdown',
+              mode: 'markdown',
 
-            lineNumbers: true,
-            extraKeys: {
-              'Ctrl-Enter': accept,
-              'Cmd-Enter': accept
+              lineNumbers: true,
+              extraKeys: {
+                'Ctrl-Enter': accept,
+                'Cmd-Enter': accept
+              },
+              // @ts-ignore
+              foldGutter: true,
+              gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+              lineWrapping: true,
+              autofocus: true
             },
+            function () {
+              editor.setOption('mode', mode);
+              editor.setValue(text);
+              editor.on('changes', debounce(updateVerbButton, 200, 900));
+              updateVerbButton();
+            });
+        } else {
+          var editor =
             // @ts-ignore
-            foldGutter: true,
-            gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
-            lineWrapping: true,
-            autofocus: true
-          },
-          function () {
-            editor.setOption('mode', mode);
-            editor.setValue(text);
-          });
+            CodeMirror(
+              layout.requestEditorHost,
+              {
+                value: text,
+                mode: mode,
+                lineNumbers: true,
+                extraKeys: {
+                  'Ctrl-Enter': accept,
+                  'Cmd-Enter': accept
+                },
+                // @ts-ignore
+                foldGutter: true,
+                gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+                lineWrapping: true,
+                autofocus: true
+              }
+            );
 
-        editor.on('changes', debounce(updateVerbButton, 200, 900));
+          editor.on('changes', debounce(updateVerbButton, 200, 900));
+          updateVerbButton();
+        }
 
         /** @type {ReturnType<typeof requireSplitter>} */
         var withSplitter;
@@ -4481,10 +4512,18 @@ issuing requests, processing data and representing the data in sensible way with
       } else {
         var encodedUrl = parseEncodedURL(location.search + '');
       }
-
+      if (!encodedUrl) {
+        var text = 'GET https://api.github.com/repos/microsoft/typescript/languages';
+        var mode = 'splash';
+      } else {
+        var text = encodedUrl.verb + (encodedUrl.addr ? ' ' + encodedUrl.addr : '') +
+          (encodedUrl.body ? '\n' + encodedUrl.body : '');
+        var mode = 'javascript';
+      }
 
       sanitizeDOM();
-      var shellLoader = createShell();
+
+      var shellLoader = createShell(text, mode);
       if (minimalDependenciesPresent()) {
         complete();
       } else {
@@ -4494,27 +4533,13 @@ issuing requests, processing data and representing the data in sensible way with
       }
 
       function complete() {
-        if (!encodedUrl) {
-          shellLoader.loadingComplete(
-            'GET https://api.github.com/repos/microsoft/typescript/languages',
-            'javascript'
-          );
-          return;
-        }
-
-        if (encodedUrl.verb) {
-          shellLoader.loadingComplete(
-            encodedUrl.verb + (encodedUrl.addr ? ' ' + encodedUrl.addr : '') +
-              (encodedUrl.body ? '\n' + encodedUrl.body : ''),
-            'javascript'
-          );
-        }
+        shellLoader.loadingComplete();
       }
     }
 
     function bootBacked(uniquenessSource) {
 
-      var shellLoader = createShell();
+      var shellLoader = createShell('Loading...', 'text');
 
       loadAsync().then(function (drive) {
         if (minimalDependenciesPresent()) {

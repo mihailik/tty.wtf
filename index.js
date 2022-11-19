@@ -490,9 +490,6 @@ body {
 
 #shell .CodeMirror-gutters {
   border-right: solid 1px #e4e4e4;
-}
-
-#shell .CodeMirror-gutter.CodeMirror-linenumbers {
   background: #fbfbfb;
 }
 

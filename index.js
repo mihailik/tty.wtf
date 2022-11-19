@@ -14,6 +14,11 @@ function startHARREST() {
   var importedStyles = [
     'codemirror@5.64.0/lib/codemirror.css'
   ];
+
+  function getTimeNow() {
+    if (typeof Date.now === 'function') return Date.now();
+    return +new Date();
+  }
   
   function detectEnvironmentAndStart() {
 
@@ -86,15 +91,12 @@ function startHARREST() {
       // GET http://wikipedia.org/ --> http://catch.rest/GET+http://wikipedia.org/
       // POST http://wikipedia.org/ {"some":123} --> http://catch.rest/GET+http://wikipedia.org/+//{"some":123}
 
-      var firstLineSeparatedMatch = /^([ \n]+)?([^\n]+)?\n?([\s\S]+)?$/.exec(text);
-      // slashes in the first line are preserved,
-      // except for double-slashes that must be converted to %2F,
-      // except where double-slash is preceded with colon, which is preserved too
-      // also, leading line-breaks (interceded with spaces?) are converted simply to slashes
+      var parsed = parseAsRequest(text);
+      if (!parsed) return text;
 
-      var whitespaceLead = firstLineSeparatedMatch[1];
-      var firstLine = firstLineSeparatedMatch[2];
-      var otherLines = firstLineSeparatedMatch[3];
+      var whitespaceLead = parsed.whitespaceLead;
+      var firstLine = parsed.firstLine;
+      var otherLines = parsed.otherLines;
 
       if (whitespaceLead) whitespaceLead = mangleLeadingWhitespace(whitespaceLead);
       if (firstLine) firstLine = mangleFirstLine(firstLine);
@@ -303,8 +305,7 @@ function startHARREST() {
     function handleRequest(req, res) {
 
       if (/^\/favicon\b/.test(req.url)) {
-        console.log(req.url + ' HTTP/400');
-        res.statusCode = 400;
+        res.statusCode = 200;
         res.end();
         return;
       }
@@ -379,6 +380,49 @@ function startHARREST() {
 
   }
 
+  var parseAsRequest = (function () {
+   
+    var regex_firstLineSeparated = /^([ \n]+)?([^\n]+)?\n?([\s\S]+)?$/;
+    var regex_verbSeparated = /^\s*([A-Z]+)\s+(\S[\s\S]+)\s*$/i;
+
+    /**
+     * @param {string} text
+     */
+    function parseAsRequest(text) {
+      var firstLineSeparatedMatch = regex_firstLineSeparated.exec(text);
+      if (!firstLineSeparatedMatch) return;
+
+      // slashes in the first line are preserved,
+      // except for double-slashes that must be converted to %2F,
+      // except where double-slash is preceded with colon, which is preserved too
+      // also, leading line-breaks (interceded with spaces?) are converted simply to slashes
+
+      var whitespaceLead = firstLineSeparatedMatch[1];
+      var firstLine = firstLineSeparatedMatch[2];
+      var otherLines = firstLineSeparatedMatch[3];
+
+      var verbSeparatedMatch = regex_verbSeparated.exec(firstLine);
+
+      if (verbSeparatedMatch && verbSeparatedMatch.length < 30) {
+        var verb = verbSeparatedMatch[1];
+        var url = verbSeparatedMatch[2];
+      } else {
+        var verb = 'GET';
+        var url = firstLine.replace(/^\s+/, '').replace(/\s+$/, '');
+      }
+
+      return {
+        whitespaceLead: whitespaceLead,
+        firstLine: firstLine,
+        otherLines: otherLines,
+        verb: verb,
+        url: url
+      };
+    }
+
+    return parseAsRequest;
+  })();
+
   function runBrowser() {
 
     document.title = 'Catch Rest ' + String.fromCharCode(55356) + String.fromCharCode(57209);
@@ -391,7 +435,11 @@ function startHARREST() {
     var statusTD = /** @type {HTMLTableCellElement} */(document.getElementById('statusTD'));
     var splitterTD = /** @type {HTMLTableCellElement} */(document.getElementById('splitterTD'));
 
+    var sendBUTTON = /** @type {HTMLButtonElement} */(document.getElementById('sendBUTTON'));
+
+    /** @type {import('codemirror').Editor} */
     var requestCodeMirror;
+    /** @type {import('codemirror').Editor} */
     var responseCodeMirror;
     
     splitterTD.onmousedown = splitterTD_onmousedown;
@@ -568,6 +616,114 @@ function startHARREST() {
       }
     }
 
+    /** @typedef {{
+     *  status: number;
+     *  statusText: string;
+     *  headers: { [header: string]: string | string[] };
+     *  body: string;
+     *  type: ResponseType;
+     *  redirected: boolean;
+     *  url: string;
+     * }} CommonResponseData */
+
+    /**
+     * @param {{ verb: string; url: string; body: string; }} req
+     * @returns {Promise<CommonResponseData | undefined>}
+     */
+    function sendRequestAsync(req) {
+      if (typeof fetch === 'function' && typeof Headers === 'function') return sendRequestAsync.sendUsingFetch(req);
+      else if (typeof XMLHttpRequest === 'function') return sendRequestAsync.sendUsingXMLHttpRequest(req);
+      else if (typeof ActiveXObject === 'function') return sendRequestAsync.sendUsingActiveXObject(req);
+      else throw new Error('Cannot send any requests.');
+    }
+
+    sendRequestAsync.sendUsingFetch = (function () {
+
+      /**
+       * @param {{ url: string; verb: string; }} req
+       */
+      function sendUsingFetch(req) {
+        try {
+
+          var fetchPromise = fetch(
+            req.url,
+            {
+              method: req.verb,
+            });
+
+          return fetchPromise.then(fetchHandleResponse);
+        }
+        catch (fetchEarlyError) {
+          return sendRequestAsync.sendUsingXMLHttpRequest(req);
+        }
+
+        /**
+         * @param {Response} res
+         */
+        function fetchHandleResponse(res) {
+          if (res.status === 200) {
+            var textPromise = res.text();
+            return textPromise.then(function (bodyText) {
+              return fetchHandleBodyText(bodyText, res);
+            });
+          }
+        }
+
+        /**
+         * @param {Response} res
+         */
+        function getHeaders(res) {
+          /** @type {{ [header: string]: string | string[] }} */
+          var headers = {};
+          res.headers.forEach(function (value, key) {
+            var existing = headers[key];
+            if (typeof existing === 'string') headers[key] = [existing, value];
+            else if (existing) existing.push(value);
+            else headers[key] = value;
+          });
+          return headers;
+        }
+
+        /**
+         * @param {string} bodyText
+         * @param {Response} res
+         */
+        function fetchHandleBodyText(bodyText, res) {
+          var headers = getHeaders(res);
+
+          return {
+            status: res.status,
+            statusText: res.statusText,
+            headers: headers,
+            body: bodyText,
+            type: res.type,
+            redirected: res.redirected,
+            url: res.url
+          };
+        }
+      }
+
+      return sendUsingFetch;
+    })();
+
+    sendRequestAsync.sendUsingXMLHttpRequest = (function () {
+      
+      function sendUsingXMLHttpRequest(req) {
+
+      }
+
+      return sendUsingXMLHttpRequest;
+    })();
+
+    sendRequestAsync.sendUsingActiveXObject = (function () {
+
+      function sendUsingActiveXObject(req) {
+
+      }
+
+      return sendUsingActiveXObject;
+    })();
+
     function continueWithDependencies() {
       requestTD.innerHTML = '';
       responseTD.innerHTML = '';
@@ -575,10 +731,81 @@ function startHARREST() {
       responseCodeMirror = CodeMirror(responseTD, { lineNumbers: true, readOnly: true });
 
       requestCodeMirror.on('changes', requestTextChanged);
+      requestTextChanged.timeout = 0;
+
+      var sending;
+
+      sendBUTTON.onclick = sendBUTTON_click;
 
       function requestTextChanged() {
+        clearTimeout(requestTextChanged.timeout);
+        requestTextChanged.timeout = setTimeout(debouncedRequestTextChanged, 100);
+      }
+
+      function debouncedRequestTextChanged() {
+        requestTextChanged.timeout = 0;
         var text = requestCodeMirror.getValue();
         updateLocationWithText(text);
+      }
+
+      function sendBUTTON_click() {
+        sendRequestInteractively();
+      }
+
+      function sendRequestInteractively() {
+        if (requestTextChanged.timeout) {
+          clearTimeout(requestTextChanged.timeout);
+          debouncedRequestTextChanged();
+        }
+
+        var text = requestCodeMirror.getValue();
+        var parsed = parseAsRequest(text);
+
+        if (!parsed) {
+          console.log('Cannot send empty request.');
+          return;
+        }
+
+        var requestStart = getTimeNow();
+        var promiseSendRequest = sendRequestAsync({
+          verb: parsed.verb,
+          url: parsed.url,
+          body: parsed.otherLines
+        });
+
+        sending = promiseSendRequest;
+
+        if (!promiseSendRequest) return;
+
+        promiseSendRequest.then(
+          handleRequestResponse,
+          handleRequestFail
+        );
+
+        /**
+         * @param {CommonResponseData | undefined} res
+         */
+        function handleRequestResponse(res) {
+          var requestTime = getTimeNow() - requestStart;
+          if (!res) {
+            responseCodeMirror.setValue('REQUEST FAILED AS UNKNOWN ' + (requestTime / 1000) + 's');
+            return;
+          }
+
+          responseCodeMirror.setValue(
+            res.status + ' ' + res.statusText + ' ' + (requestTime / 1000) + 's\n\n' +
+            res.body
+          );
+        }
+
+        function handleRequestFail(err) {
+          var requestTime = getTimeNow() - requestStart;
+          if (err && err.stack) {
+            responseCodeMirror.setValue('REQUEST FAILED ' + (requestTime / 1000) + 's\n\n' + err.message + '\n\n' + err.stack);
+          } else {
+            responseCodeMirror.setValue('REQUEST FAILED ' + (requestTime / 1000) + 's\n\n' + err + '');
+          }
+        }
       }
 
       /**

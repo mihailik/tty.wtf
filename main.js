@@ -15,53 +15,6 @@ function catchREST() {
   }
   trimEnd.regex_trailWS = /[\r\n\s]+$/;
 
-  /** @param {string} queryString */
-  function unmangleFromQueryString(queryString) {
-    var pairs = queryString.split('&');
-    var result = {};
-    for (var i = 0; i < pairs.length; i++) {
-      var posEq = pairs[i].indexOf('=');
-      var key = pairs[i].slice(0, Math.max(0, posEq));
-      var value = posEq < 0 ? '' : pairs[i].slice(posEq + 1);
-      switch (key.toLowerCase()) {
-        case 'get':
-          result.verb = 'GET';
-          if (!result.url && value) result.url = value;
-          continue;
-
-        case 'post':
-          result.verb = 'POST';
-          if (posEq > 0) result.body = value;
-          continue;
-
-        case 'put':
-          result.verb = 'PUT';
-          if (posEq > 0) result.body = value;
-          continue;
-
-        case 'body':
-          result.body = value;
-          continue;
-
-        case 'verb':
-          result.verb = value;
-          continue;
-        
-        case 'url':
-          result.url = value;
-          continue;
-
-        default:
-          if (posEq > 0) {
-            if (!result.headers) result.headers = {};
-            result.headers[key] = value;
-          }
-      }
-    }
-
-    return result;
-  }
-
 
   function getTimeNow() {
     if (typeof Date.now === 'function') return Date.now();
@@ -109,6 +62,31 @@ function catchREST() {
     };
   }
 
+  /** @param {string | undefined | null} requestText */
+  function parseTextRequest(requestText) {
+    if (!requestText) return;
+    var firstNonwhitespace = /\S/.exec(requestText);
+    if (!firstNonwhitespace) return;
+
+    var firstLineStart = requestText.lastIndexOf('\n', firstNonwhitespace.index) + 1;
+
+    var leadEmptyLines = requestText.slice(0, firstLineStart);
+    var firstLineEnd = requestText.indexOf('\n', firstLineStart);
+    if (firstLineEnd < 0) firstLineEnd = requestText.length;
+    var firstLine = requestText.slice(firstLineStart, firstLineEnd);
+    var body = firstLineEnd < requestText.length ? requestText.slice(firstLineEnd + 1) : '';
+    return {
+      leadEmptyLines: leadEmptyLines,
+      firstLine: firstLine,
+      body: body
+    };
+  }
+
+  /** @param {string} firstLine */
+  function parseFirstLine(firstLine) {
+    // TODO: detect verb, then URL, potentially infer HTTP/S protocol
+  }
+
   function getVerbOffset(path) {
     var verbMatch = /\/(get|post|put|head|delete|option|connect|trace|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? verbMatch.index : -1;
@@ -118,9 +96,9 @@ function catchREST() {
     // TODO: remove spurious injected scripts
 
     var layout = bindLayout();
-    /** @type {import('codemirror').CodeMirror} */
+    /** @type {import('codemirror').Editor} */
     var requestCodeMirror;
-    /** @type {import('codemirror').CodeMirror} */
+    /** @type {import('codemirror').Editor} */
     var responseCodeMirror;
 
     makeSplitterDraggable();
@@ -129,7 +107,7 @@ function catchREST() {
     if (typeof CodeMirror === 'function') {
       withDependenciesLoaded();
     } else {
-      catchREST.withDependenciesLoaded = withDependenciesLoaded;
+      /** @type {*} */(catchREST).withDependenciesLoaded = withDependenciesLoaded;
     }
 
     function deriveTextFromLocation() {
@@ -149,8 +127,7 @@ function catchREST() {
     }
 
     function withDependenciesLoaded() {
-      catchREST.withDependenciesLoaded = null;
-      status = 'withDependenciesLoaded...';
+      /** @type {*} */(catchREST).withDependenciesLoaded = null;
       createCodeMirrors();
 
       function createCodeMirrors() {
@@ -499,7 +476,7 @@ function catchREST() {
     }
 
     function runAsServer() {
-      build();
+      //build();
 
       var catchREST_secret_variable_name = 'catchREST_secret';
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:1vu3lu30zs5} Sun Nov 06 2022 00:01:45 GMT+0000 (Greenwich Mean Time) with  darwin/x64 -->
+<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:2e91yeib7cv} Sun Nov 06 2022 18:22:59 GMT+0000 (Greenwich Mean Time) with  darwin/x64 -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,17 +10,17 @@
 <title>Catch Rest 🍹</title>
 <script>
 (function() {
-if (location.protocol.indexOf('file') >= 0) return;
-      var verbOffset = getVerbOffset(location.pathname);
-      if (verbOffset < 0) return;
+if (location.protocol.indexOf('file') >= 0) return; // running from local file, no need to adjust base URL
+      var verb = getVerb(location.pathname);
+      if (!verb) return; // no deep URL, no need to adjust base URL
 
-      var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verbOffset);
+      var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verb.index);
       var inject = '<base href="' + baseUrl + '">';
       document.write(inject);
 
-function getVerbOffset(path) {
-    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace|http:|https:)(\/|$)/i.exec(path + '');
-    return verbMatch ? verbMatch.index : -1;
+function getVerb(path) {
+    var verbMatch = /(^|\/)(read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:)(\/|$)/i.exec(path + '');
+    return verbMatch ? { leadingSlash: verbMatch[1], verb: verbMatch[2], trailingSlash: verbMatch[3], index: verbMatch.index + (verbMatch[1] ? 1 : 0) } : void 0;
   }
 })()
 </script>
@@ -43,131 +43,8 @@ body {
   overflow:hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
-
-#layoutTABLE {
-  margin: 0;
-  width: 100%; height: 100%;
-}
-
-#splitterTD {
-  background: #fff0f3;
-  border: solid 1px #fed4dc;
-  border-left: none;
-  cursor: ns-resize;
-  padding: 0.3em;
-  transition: background-color 200ms;
-}
-
-@keyframes fade {
-  from { opacity: 1 }
-  50% { opacity: 0.8 }
-  to { opacity: 1 }
-}
-
-#splitterTD.sending {
-  background: #fcdbe2;
-  animation: 2s infinite alternate fade;
-}
-
-#splitterTD.down {
-  background: #ffe8ed;
-}
-
-#leftTD {
-  background: #fff0f3;
-  padding: 1em;
-}
-
-#sendBUTTON {
-  background: #75424c;
-  border: solid 1px #ebb2c1;
-  border-radius: 0.15em;
-  font-size: 200%;
-  padding: 0.25em;
-  padding-left: 0.45em;
-  padding-right: 0.45em;
-  box-shadow: 2px 2px 8px #a97d89;
-  color: #ffe8ee;
-  cursor: pointer;
-}
-
-#sendBUTTON:disabled {
-  background: #d9a9b2;
-  border: solid 1px #8b7d81;
-  border-radius: 0.15em;
-  font-size: 200%;
-  padding: 0.25em;
-  padding-left: 0.45em;
-  padding-right: 0.45em;
-  color: #ffffff;
-  cursor: default;
-  text-shadow: 0px 0px 5px #140004;
-  box-shadow: none;
-}
-
-#sendBUTTON #sendLabel {
-  transform: scaleX(0.95);
-}
-
-#statusTD {
-  background: #ffa4b4;
-  padding-left: 0.5em;
-  padding-bottom: 0.1em;
-  padding-top: 0.1em;
-}
-
-#requestTD {
-  position: relative;
-  border-left: solid 1px #ffcfd6;
-}
-
-#responseTD {
-  position: relative;
-  border-left: solid 1px #ffcfd6;
-}
-
-td .CodeMirror {
-  position: absolute;
-  left: 0; top: 0;
-  width: 100%; height: 100%;
-  font: inherit;
-}
-
-td .CodeMirror-gutters {
-  border-right: solid 1px #e4e4e4;
-}
-
-td .CodeMirror-gutter.CodeMirror-linenumbers {
-  background: #fbfbfb;
-}
 </style>
-</head><body><table id=layoutTABLE cellspacing=0 cellpadding=0><tr><td height=100%>
-
-    <table cellspacing=0 cellpadding=0 height=100% width=100%><tr>
-      <td id=leftTD width=20% valign=top>
-        <button id=sendBUTTON><span id=sendLabel><span style="filter: blur(2.5px)">GET</span></span></button>
-      </td>
-
-      <td width=80%>
-        <table cellspacing=0 cellpadding=0 height=100% width=100%>
-          <tr>
-            <td height=50% id=requestTD></td>
-          </tr>
-          <tr>
-            <td height=1 id=splitterTD> <span id=splitterLabel>output</span> </td>
-          </tr>
-          <tr>
-            <td height=50% id=responseTD></td>
-          </tr>
-        </table>
-      </td>
-    </tr></table>
-
-  </td></tr>
-  <tr><td height=1 id=statusTD>
-      Loading...
-  </td></tr></table>
-<script src="index.js"></script>
+</head><body><script src="index.js"></script>
 <script src="lib.js"></script>
 <script>
 if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function")

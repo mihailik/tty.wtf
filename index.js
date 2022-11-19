@@ -578,7 +578,7 @@ function startHARREST() {
       var source = unmangleFromURL(
         (location.hash || '').replace(/^#/, '') ||
         (location.search || '').replace(/^\?/, '') ||
-        (location.pathname || '').replace(/^\//, '').replace(/^api\//, '').replace(/^404.html/, '')
+        (location.protocol === 'file:' ? '' : (location.pathname || '').replace(/^\//, '').replace(/^api\//, '').replace(/^404.html/, ''))
       );
 
       return source || '';

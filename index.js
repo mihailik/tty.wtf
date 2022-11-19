@@ -284,10 +284,10 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta property="og:title" content="Catch Rest 🍹">
+<meta property="og:title" content="Catch Rest">
 <meta property="og:type" content="article" />
-<meta property="og:description" content="Catch Rest 🍹!">
-<meta name="twitter:image:alt" content="Catch Rest 🍹!">
+<meta property="og:description" content="Catch Rest">
+<meta name="twitter:image:alt" content="Catch Rest">
 <meta name="twitter:card" content="summary_large_image">
   */});
 
@@ -300,10 +300,9 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       if (verb.verb === 'local') {
         // @ts-ignore
         catchREST_urlencoded = false;
-        return;
       }
 
-      var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verb.index);
+      var baseUrl = location.protocol + '//' + location.host + location.pathname.slice(0, verb.index);
       var inject = '<base href="' + baseUrl + '">';
       document.write(inject);
     }) + '\n\n' +
@@ -320,7 +319,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     var html =
       '<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:' + catchREST_hash + '} ' + new Date() + ' with  ' + pr.platform + '/' + pr.arch + ' -->\n' +
       embeddedMetaBlockHTML + '\n' +
-      '<title>Catch Rest 🍹</title>\n' +
+      '<title>Catch Rest</title>\n' +
 
       '<' + 'script' + '>\n' +
       (urlencoded ? embeddedAdjustUrlencodedBaseURL + '\n' : '') +
@@ -549,8 +548,14 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 
     /** @param {Promise<string>} buildPromise */
     function startServer(port, buildPromise) {
-      return new Promise(function (resolve) { resolve(null); }).then(function () {
+      var mimeByExt = {
+        html: 'text/html',
+        htm: 'text/html',
+        js: 'application/javascript',
+        css: 'style/css'
+      };
 
+      return new Promise(function (resolve) { resolve(null); }).then(function () {
         /** @type {ReturnType<typeof listenToPort>} */
         var listeningServerPromise = listenToPort('', port).catch(function (error) {
           // TODO: if port is not available, send shutdown request and in the meantime start retrying...
@@ -566,121 +571,76 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
             };
 
             /**
-             * @param {HTTPRequest} req
-             * @param {HTTPResponse} res
+             * @param {RequestContext} ctx
              */
-            function handleRequest(req, res) {
+            function handleRequest(ctx) {
               return new Promise(function (resolve) { resolve(null);  }).then(function() {
-                var url = URL.parse(/** @type {string} */(req.url), true /*parseQueryString*/);
-                process.stdout.write(req.method + ' ' + url.pathname);
+                process.stdout.write(ctx.req.method + ' ' + ctx.url.pathname);
 
-                switch ((url.pathname || '').toLowerCase()) {
+                switch (ctx.path.toLowerCase()) {
                   case '/':
                   case '/index.html':
-                    return handleIndexHTMLRequest(req, res);
+                    return handleIndexHTMLRequest(ctx);
 
                   case 'favicon.ico':
-                    return handleFaviconRequest(req, res);
+                    return handleFaviconRequest(ctx);
 
                   case '/control':
-                    return handleControlRequest(req, res, url);
+                    return handleControlRequest(ctx);
 
                   default:
-                    return handleLocalFileRequest(req.url || '/', res);
+                    return handleLocalFileRequest(ctx);
                 }
               });
             }
 
-            /**
-             * @param {HTTPRequest} _req
-             * @param {HTTPResponse} res
-             * @returns {Promise<void>}
-             */
-            function handleIndexHTMLRequest(_req, res) {
-              return new Promise(function (resolve) {
-                res.setHeader('Content-type', 'text/html');
-                res.end(getEmbeddedWholeHTML(true /* urlencoded */));
-                resolve();
-              });
+            /** @param {RequestContext} ctx */
+            function handleIndexHTMLRequest(ctx) {
+                return getEmbeddedWholeHTML(true /* urlencoded */);
             }
 
             /**
-             * @param {string} localPath
-             * @param {HTTPResponse} res
-             * @returns {Promise<void>}
+             * @param {RequestContext} ctx
              */
-            function handleLocalFileRequest(localPath, res) {
+            function handleLocalFileRequest(ctx) {
               return new Promise(function (resolve) { resolve(null); }).then(function() {
-                var mimeByExt = {
-                  html: 'text/html',
-                  htm: 'text/html',
-                  js: 'application/javascript',
-                  css: 'style/css'
-                };
-
                 // TODO: inject ETag for caching
 
-                var verbMatch = getVerb(localPath);
-                if (verbMatch) localPath = localPath.slice(0, verbMatch.index - (verbMatch.leadingSlash ? 1 : 0));
-                if (localPath === '/' || !localPath) localPath = '/index.html';
+                var localPath = ctx.path.replace(/^\/+/, '').replace(/\/\.+/g, '/').replace(/\/\/+/g, '/');
+                if (localPath === '/' || !localPath) localPath = 'index.html';
 
-                var fullPath = __dirname + localPath;
-                return readFileAsync(fullPath, 'binary').then(
-                  function (data) {
-                    var mime = mimeByExt[path.extname(localPath).toLowerCase().replace(/^\./, '')];
-                    if (mime) res.setHeader('Content-type', mime);
-                    console.log(' [200 OK ' + path.relative(__dirname, fullPath) + ':' + data.length + ']');
-                    res.end(data);
-                  },
-                  function (readError) {
-                    res.statusCode = 404;
-                    res.statusMessage = readError.message;
-                    console.log(' [404 ' + path.relative(__dirname, fullPath) + ':' + readError.message + ']');
-                    res.end(readError.stack);
-                  });
+                var fullPath = path.resolve(__dirname, localPath);
+                return readFileAsync(fullPath, 'binary');
               });
             }
 
             /**
-             * @param {HTTPRequest} _req
-             * @param {HTTPResponse} res
-             * @returns {Promise<void>}
+             * @param {RequestContext} ctx
              */
-            function handleFaviconRequest(_req, res) {
-              return new Promise(function (resolve) {
-                // for now just skip
-                res.end();
-                console.log(' []');
-                resolve();
-              });
+            function handleFaviconRequest(ctx) {
+              return '-';
             }
 
             /**
-             * @param {HTTPRequest} req
-             * @param {HTTPResponse} res
-             * @returns {Promise<void>}
+             * @param {RequestContext} ctx
              */
-            function handle404Request(req, res) {
-              return new Promise(function (resolve) {
-                res.statusCode = 404;
-                res.end(req.url + ' NOT FOUND.');
-                resolve();
-              });
+            function handle404Request(ctx) {
+              return {
+                statusCode: 404,
+                body: ctx.path + ' NOT FOUND.'
+              };
             }
 
             /**
-             * @param {import('http').IncomingMessage} req
-             * @param {import('http').ServerResponse} res
-             * @param {import('url').UrlWithParsedQuery} url
-             * @returns {Promise<void> | void}
+             * @param {RequestContext} ctx
              */
-            function handleControlRequest(req, res, url) {
-              if (url.query[catchREST_secret_variable_name] !== shared_process_secret)
-                return handle404Request(req, res);
+            function handleControlRequest(ctx) {
+              if (ctx.url.query && ctx.url.query[catchREST_secret_variable_name] !== shared_process_secret)
+                return handle404Request(ctx);
 
-              switch (url.query.command) {
+              switch (ctx.url.query && ctx.url.query.command) {
                 case 'shutdown':
-                  res.end('OK');
+                  ctx.res.end('OK');
                   if (process.env[catchREST_secret_variable_name]) {
                     process.exit(0);
                   } else {
@@ -690,30 +650,42 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
                       svc();
                     }
                   }
-                  return new Promise(function (resolve) { resolve() });
+                  return;
 
                 case 'restart':
-                  res.end('starting new instance');
+                  ctx.res.end('starting new instance');
                   startNewInstance();
-                  return new Promise(function (resolve) { resolve() });
+                  return;
               }
             }
           });
       });
 
+      /** @typedef {{
+       *  req: import('http').IncomingMessage;
+       *  res: import('http').ServerResponse;
+       *  server: import('http').Server;
+       *  url: import('url').UrlWithParsedQuery;
+       *  verb: { leadingSlash: string, verb: string, trailingSlash: string, index: number } | undefined;
+       *  path: string;
+       *  ext: string
+       * }} RequestContext */
+
+      /** @typedef {string | Buffer | { statusCode?: number, body: string | Buffer | null | undefined } | null | undefined} RequestHandlerResult */
+
       /**
        * 
        * @param {string | null | undefined} host
        * @param {number} port
-       * @returns {Promise<{ port: number, host: string, server: import('http').Server, handle(handler: (req: HTTPRequest, res: HTTPResponse, server: import('http').Server) => Promise<any>): void }>}
+       * @returns {Promise<{ port: number, host: string, server: import('http').Server, handle(handler: (ctx: RequestContext) => Promise<RequestHandlerResult>): void }>}
        */
       function listenToPort(host, port) {
         return new Promise(function (resolve, reject) {
 
-          /** @type {{ req: HTTPRequest, res: HTTPResponse, server: import('http').Server}[]} */
+          /** @type {RequestContext[]} */
           var requestQueue = [];
 
-          /** @type {(req: HTTPRequest, res: HTTPResponse, server: import('http').Server) => Promise<void>} */
+          /** @type {(ctx: RequestContext) => Promise<RequestHandlerResult>} */
           var listener;
           var listenToPort = port;
           var listenToHost = host || '0.0.0.0';
@@ -731,7 +703,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
               port: listenToPort,
               host: listenToHost,
               server: server,
-              /** @param {(req: HTTPRequest, res: HTTPResponse, server: import('http').Server) => Promise<void>} handler */
+              /** @param {(ctx: RequestContext) => Promise<RequestHandlerResult>} handler */
               handle: function (handler) {
                 listener = handler;
                 while (true) {
@@ -749,18 +721,46 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 
           /** @param {HTTPRequest} req @param {HTTPResponse} res */
           function handleRequest(req, res) {
-            var entry = { req: req, res: res, server: server };
+            var url = URL.parse(req.url || '', true /* parseQueryString */);
+            var verb = getVerb(url.pathname);
+            var pathBeforeVerb = verb ? (url.pathname || '').slice(0, verb.index - (verb.leadingSlash ? 1 : 0)) : url.pathname || '';
+            var ext = path.extname(pathBeforeVerb);
+
+            var entry = {
+              req: req,
+              res: res,
+              server: server,
+              url: url,
+              verb: verb,
+              path: pathBeforeVerb,
+              ext: ext
+            };
             if (/** @type {*}*/(listener)) handleWithListener(entry);
             else requestQueue.push(entry);
           }
 
-          /** @param {typeof requestQueue[0]} entry */
+          /** @param {RequestContext} entry */
           function handleWithListener(entry) {
-            var res = listener(entry.req, entry.res, entry.server);
+            var res = listener(entry);
             if (res && typeof res.then === 'function') {
               res.then(
-                function () {
-                  if (!entry.req.complete) {
+                function (result) {
+                  if (!entry.res.headersSent) {
+                    if (result && (typeof result === 'string' || /** @type {Buffer} */(result).length > 0 && typeof /** @type {Buffer} */(result)[0] === 'number')) {
+                      var mime = mimeByExt[entry.ext] || mimeByExt['html'];
+                      if (mime) entry.res.setHeader('Content-type', mime);
+                      console.log(' [' + entry.path + ':' + /** @type {*} */(result).length + ']');
+                      entry.res.end(result);
+                      return;
+                    }
+                    else if (result && /** @type {{ body?: unknown }} */(result).body) {
+                      if (typeof /** @type {*} */(result).statusCode === 'number') {
+                        entry.res.statusCode = /** @type {*} */(result).statusCode;
+                        entry.res.end(/** @type {*} */(result).body);
+                        return;
+                      }
+                    }
+
                     return new Promise(function (resolve) { setTimeout(resolve, 100); }).then(function () {
                       if (!entry.req.complete) 
                         console.log('Request promise completed, but request not yet handled: ' + entry.req.method + ' ' + entry.req.url);
@@ -770,9 +770,10 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
                 function (error) {
                   if (!entry.res.closed) {
                     if (!entry.res.headersSent) {
-                      entry.res.statusCode = 500;
+                      entry.res.statusCode = error.code === 'ENOENT' ? 404 : 500;
                       entry.res.statusMessage = error && error.message || String(error);
                       entry.res.setHeader('Content-type', 'text/plain');
+                      console.log(' <' + entry.res.statusCode + ' ' + (error.code ? 'code:' + error.code : error.errorCode ? 'errorCode: ' + error.errorCode : error.message) + '>');
                     }
 
                     var errorResponse = error && error.stack ? error.stack :

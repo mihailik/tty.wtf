@@ -3687,7 +3687,11 @@ issuing requests, processing data and representing the data in sensible way with
 
             if (parsFirst && parsFirst.url) {
               editor.setOption('readOnly', true);
-              var ftc = fetch(parsFirst.url, { method: parsFirst.verb });
+              var ftc = fetch(parsFirst.url, {
+                method: parsFirst.verb,
+                body: parsFirst.verb === 'GET' || !pars.body ? undefined :
+                  pars.body
+              });
               ftc.then(
                 function (response) {
                   response.text().then(

@@ -214,6 +214,18 @@ body {
   color: #ddd;
 }
 
+#shell #contentPageHost {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+
+#shell #contentPageHost #requestEditorHost {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+
 #shell #pseudoGutter {
   border-right: solid 1px #e4e4e4;
   background: #fbfbfb;
@@ -240,6 +252,14 @@ body {
 #shell #leftBar {
   background: #fbfbfb;
 }
+
+#shell .goButton {
+  border-radius: 100%;
+  width: 4em;
+  height: 4em;
+  margin-top: 3em;
+  margin-left: 0.6em;
+}
 */});
 
   var embeddedShellLayoutHTML = getFunctionCommentContent(function () { /*
@@ -253,10 +273,12 @@ body {
   </div>
 
   <div style="position: relative; width: 100%; height: 100%;">
-    <div id=editorHost style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-      <div id="pseudoGutter">1</div>
-      <textarea id="pseudoEditor">
-      </textarea>
+    <div id=contentPageHost>
+      <div id=requestEditorHost>
+        <div id="pseudoGutter">1</div>
+        <textarea id="pseudoEditor">
+        </textarea>
+      </div>
     </div>
   </div>
 
@@ -3597,13 +3619,13 @@ issuing requests, processing data and representing the data in sensible way with
       }
 
       function loadingComplete() {
-        layout.editorHost.innerHTML = '';
+        layout.requestEditorHost.innerHTML = '';
 
         /** @type {import('codemirror').Editor} */
         var editor =
           // @ts-ignore
           CodeMirror(
-            layout.editorHost,
+            layout.requestEditorHost,
             {
               value: embeddedSplashText,
 
@@ -3616,30 +3638,77 @@ issuing requests, processing data and representing the data in sensible way with
               autofocus: true
             });
 
+        var leftClickKeyMap = {
+          LeftClick: updateTextFirst
+        };
+        editor.addKeyMap(leftClickKeyMap);
+
         var timeoutChangesDebounce;
         editor.on('changes', function () {
-          clearTimeout(timeoutChangesDebounce);
-          timeoutChangesDebounce = setTimeout(function() {
-            var pars = parseTextRequest(editor.getValue());
-            if (pars && pars.firstLine) {
-              var parsFirst = parseFirstLine(pars.firstLine);
-            }
-
-            if (parsFirst) console.log('edited ', pars, ' url ', parsFirst);
-            else if (pars) console.log('edited ', pars);
-
-            if (parsFirst && parsFirst.verb) {
-              layout.leftBottom.innerHTML = '<button>' + parsFirst.verb.toUpperCase() + '</button>';
-            }
-
-            if (parsFirst && parsFirst.verbPos > 0) {
-              // highlight inside CodeMirror
-            }
-          }, 400);
+          timeoutChangesDebounce = setTimeout(updateVerbButton, 200);
         });
 
-        function accept() {
+        function updateTextFirst() {
+          editor.removeKeyMap(leftClickKeyMap);
+          console.log('removed keymap');
 
+          editor.setValue('GET https://api.github.com/repos/microsoft/typescript/languages');
+        }
+
+        function updateVerbButton() {
+          var pars = parseTextRequest(editor.getValue());
+          if (pars && pars.firstLine) {
+            var parsFirst = parseFirstLine(pars.firstLine);
+          }
+
+          if (parsFirst) console.log('edited ', pars, ' url ', parsFirst);
+          else if (pars) console.log('edited ', pars);
+
+          if (parsFirst && parsFirst.verb) {
+            layout.leftTop.innerHTML = '<button class=goButton>' + parsFirst.verb.toUpperCase() + '</button>';
+
+            var goButton = layout.leftTop.getElementsByClassName('goButton')[0];
+            goButton.onclick = function () {
+              accept();
+            };
+          } else {
+            layout.leftTop.innerHTML = '';
+          }
+
+          if (parsFirst && parsFirst.verbPos > 0) {
+            // highlight inside CodeMirror
+          }
+        }
+
+        function accept() {
+          var pars = parseTextRequest(editor.getValue());
+          if (pars && pars.firstLine) {
+            var parsFirst = parseFirstLine(pars.firstLine);
+
+            if (parsFirst && parsFirst.url) {
+              editor.setOption('readOnly', true);
+              var ftc = fetch(parsFirst.url, { method: parsFirst.verb });
+              ftc.then(
+                function (response) {
+                  response.text().then(
+                    function (text) {
+                      editor.setOption('readOnly', false);
+                      editor.setValue(
+                        editor.getValue() + '\n\n' +
+                        text);
+                    },
+                    function (error) {
+                      alert(err.message);
+                      editor.setOption('readOnly', false);
+                    }
+                  )
+                }, function (err) {
+                  alert(err.message);
+                  editor.setOption('readOnly', false);
+                }
+              )
+            }
+          }
         }
       }
 
@@ -3651,7 +3720,8 @@ issuing requests, processing data and representing the data in sensible way with
         var leftMiddle = /** @type {HTMLElement} */(document.getElementById('leftMiddle'));
         var leftBottom = /** @type {HTMLElement} */(document.getElementById('leftBottom'));
  
-        var editorHost = /** @type {HTMLElement} */(document.getElementById('editorHost'));
+        var contentPageHost = /** @type {HTMLElement} */(document.getElementById('contentPageHost'));
+        var requestEditorHost = /** @type {HTMLElement} */(document.getElementById('requestEditorHost'));
 
         var pseudoEditor = /** @type {HTMLTextAreaElement} */(document.getElementById('pseudoEditor'));
         var pseudoGutter = /** @type {HTMLElement} */(document.getElementById('pseudoGutter'));
@@ -3659,13 +3729,14 @@ issuing requests, processing data and representing the data in sensible way with
         return {
           shell: shell,
           leftBar: leftBar, leftTop: leftTop, leftMiddle: leftMiddle, leftBottom: leftBottom,
-          editorHost: editorHost,
+          contentPageHost: contentPageHost,
+          requestEditorHost: requestEditorHost,
           pseudoEditor: pseudoEditor,
           pseudoGutter: pseudoGutter,
           allFound:
             !!shell &&
             !!leftBar && !!leftTop && !!leftMiddle && !!leftBottom &&
-            !!editorHost &&
+            !!contentPageHost && !!requestEditorHost &&
             !!pseudoEditor && /textarea/i.test(pseudoEditor.tagName || '') && !!pseudoGutter
         };
       }

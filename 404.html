@@ -179,7 +179,7 @@ function startHARREST() {
 
   function runBrowser() {
 
-    document.title = 'HAR Rest';
+    document.title = 'Catch Rest ' + String.fromCharCode(55356) + String.fromCharCode(57209);
     populateInnerHTML();
 
     var layoutTABLE = /** @type {HTMLTableElement} */(document.getElementById('layoutTABLE'));
@@ -383,6 +383,21 @@ function startHARREST() {
     }
 
     function populateInnerHTML() {
+      if (!document.body) {
+        var body = document.createElement('body');
+        var docElem = document.documentElement;
+        if (!docElem) {
+          docElem = document.getElementsByTagName('html')[0];
+
+          if (!docElem) {
+            docElem = document.getElementsByTagName('head')[0];
+            if (docElem) docElem = /** @type {HTMLElement} */(docElem.parentElement);
+          }
+        }
+        docElem.appendChild(body);
+      }
+
+
       cleanContent();
 
       var container = document.createElement('div');

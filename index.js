@@ -213,6 +213,28 @@ body {
 </div>
   */});
 
+  var embeddedSplashText = getFunctionCommentContent(function() {/*
+# This is a prototype project code name CATCH REST
+
+The goal is to allow on-the-fly active editor similar in effect to REPL or Notebooks.
+
+The first milestone will be an HTTP request tool, where you type the request,
+able to fire it and look at the results. Reasonable auto-detection of input/output format
+for JSON and so on.
+
+The request is meant to be completely captured inside the plain text, and re-formatted
+in a manner of syntax highlighting. I.e. copy-pasteable plain text.
+
+Additionally the typed request is intended to be captured in a modified URL of this page.
+Making the whole URL copy-pasteable and able to pass as a link, and reproduced.
+
+The next step is to allow for wider Markdown to be used, with inclusion of scripted fields.
+
+The plan is to allow JavaScript and some kind of simplified Excel syntax inside scripted fields.
+That, plus HTTP requester would allow for more complex processing of Internet data,
+issuing requests, processing data and representing the data in sensible way with tables/charts.
+  */});
+
   var embeddedMetaBlockHTML = getFunctionCommentContent(function () {/*
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -3495,7 +3517,11 @@ body {
       injectStyle();
       var layout = injectShellHTML();
 
-      layout.pseudoEditor.value = 'Loading..';
+      layout.pseudoEditor.value = 'Loading.. ' + embeddedSplashText;
+      layout.pseudoGutter.innerHTML =
+        Array(embeddedSplashText.split('\n').length + 1)
+        .join(',').split(',')
+        .map(function(_,index) {return index+1; }).join('<br>');
       console.log('Loading..');
 
       return {
@@ -3504,7 +3530,7 @@ body {
       };
 
       function loadingTakesTime() {
-        layout.pseudoEditor.value = 'Loading...';
+        layout.pseudoEditor.value = (layout.pseudoEditor.value || '').replace(/^Loading\.\./, 'Loading...');
         // TODO: whatever progress...
       }
 
@@ -3515,7 +3541,7 @@ body {
         var editor = CodeMirror(
           layout.editorHost,
           {
-            value: 'Loaded OK [*]',
+            value: embeddedSplashText,
 
             lineNumbers: true,
             extraKeys: {
@@ -3525,11 +3551,6 @@ body {
             lineWrapping: true,
             autofocus: true
           });
-
-        /** @type {HTMLElement} */
-        var ef = editor.getInputField();
-        console.log('getInputField ', ef);
-        editor.setValue(editor.getValue() + '\n\n' + (!ef ? '-' : ef.outerHTML.slice(0, ef.outerHTML.indexOf('>') + 1)));
 
         function accept() {
 

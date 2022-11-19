@@ -283,9 +283,12 @@ issuing requests, processing data and representing the data in sensible way with
 
       '<style>\n' +
       embeddedMinCSS + '\n' +
+      embeddedShellCSS + '\n' +
       '</style>\n' +
 
       '</' + 'head' + '><' + 'body' + '>' +
+
+      embeddedShellLayoutHTML + '\n\n' +
 
       '<' + 'script' + ' src="index.js"></' + 'script' + '>\n' +
       '<' + 'script' + ' src="lib.js"></' + 'script' + '>\n' +

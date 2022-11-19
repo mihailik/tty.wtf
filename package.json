@@ -1,0 +1,27 @@
+{
+  "name": "har-rest",
+  "version": "1.0.0",
+  "description": "HAR Rest Tool",
+  "main": "index.html",
+  "private": true,
+  "scripts": {
+    "start": "node index.html",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/har-rest/har-rest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/har-rest/har-rest/issues"
+  },
+  "homepage": "http://har.rest/",
+  "devDependencies": {
+    "codemirror": "^5.64.0",
+    "typescript": "^4.5.4",
+    "xlsx": "^0.17.4"
+  }
+}

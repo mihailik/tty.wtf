@@ -1,114 +1,433 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <!--
-    avoid this, it messes up some layout logic in Safari
-    meta name="viewport" content="width=device-width, initial-scale=1.0"
-  -->
-  <title>HAR-REST</title>
-<style>
-html {
-  margin:0;padding:0;
-  width:100%;height:100%;
-  overflow:hidden;
-}
-body {
-  margin:0;padding:0;
-  width:100%;height:100%;
-  overflow:hidden;
-}
+// <script>
+function startHARREST() {
 
-#layoutTABLE {
-  margin: 0;
-  width: 100%; height: 100%;
-}
+  var importedJS = [
+    'codemirror/lib/codemirror.js',
+    'typescript/lib/typescript.js'
+  ]
 
-#splitterTD {
-  background: #ffe8ed;
-  border: solid 1px#ffdfe5;
-}
+  var importedStyles = [
+    'codemirror/lib/codemirror.css'
+  ];
 
-#leftTD {
-  background: #fff0f3;
-  border-right: solid 1px #ffe4e8;
-}
+  var libDTS = [
+    'typescript/lib/lib.d.ts'
+  ];
+  
+  function detectEnvironmentAndStart() {
 
-#statusTD {
-  background: #ffa4b4;
-}
-</style>
-</head>
-<body>
-<table id=layoutTABLE cellspacing=0 cellpadding=0>
-<tr>
-  <td id=leftTD width=20% rowspan=3>
+    switch (detectEnvironment()) {
+      case 'browser': return runBrowser();
+      case 'node': return runNode();
+    }
 
-  </td>
-  <td width=80% id=requestTD>
+    throw new Error('Running in an unsupported environment.');
 
-  </td>
-</tr>
-<tr height=1>
-  <td width=80% id=splitterTD>
-    -splitter-
-  </td>
-</tr>
-<tr>
-  <td width=80% id=responseTD>
+    function detectEnvironment() {
+      if (typeof window !== 'undefined' && window && typeof window.alert === 'function'
+        && typeof document !== 'undefined' && document && typeof document.createElement === 'function')
+        return 'browser';
+      if (typeof process !== 'undefined' && process && process.argv && typeof process.argv.length === 'number'
+          && typeof require === 'function' && typeof require.resolve === 'function')
+        return 'node';
+    }
+  }
 
-  </td>
-</tr>
-<tr>
-  <td height=1 colspan=2 id=statusTD>
-    Loading...
-  </td>
-</tr>
-</table>
-<script>
-  function startHARREST() {
-    function detectEnvironmentAndStart() {
+  function getFunctionCommentContent(fn) {
+    return (fn + '').replace(/^([\s\S\n\r]*\/\*\s*)([\s\S\n\r]*)(\s*\*\/[\s\r\n]*}[\s\r\n]*)$/, function (whole, lead, content, tail) { return content; });
+  }
 
-      switch (detectEnvironment()) {
-        case 'browser': return runBrowser();
+  function runNode() {
+    var fs = require('fs');
+    var path = require('path');
+    var http = require('http');
+    var child_process = require('child_process');
+    var server;
+
+    var HTTP_PORT = 3100;
+
+    if (typeof allImports === 'undefined') {
+      populateAllImports();
+    }
+
+    requestShutdownExisting(function(shutdownResult) {
+      console.log('Existing run: ', shutdownResult);
+
+      console.log('HAR Rest node server@' + process.pid);
+      server = http.createServer(handleRequest);
+      server.listen(HTTP_PORT);
+
+      fs.watchFile(__filename, function () {
+        initiateRestart(3000);
+      });
+    });
+
+    /**
+     * @param callback {(result: 'exited' | 'failed' | 'timeout') => void}
+     */
+    function requestShutdownExisting(callback) {
+      var postShutdownRequest = http.request(
+        'http://localhost:' + HTTP_PORT + '/shutdown', 
+        {
+          method: 'POST'
+        });
+      
+        var requestCompleted = false;
+
+      var requestTimeout = setTimeout(function() {
+        if (requestCompleted) return;
+        requestCompleted = true;
+        callback('timeout');
+      }, 10000);
+
+      postShutdownRequest.on('error', function() {
+        if (requestCompleted) return;
+        clearTimeout(requestTimeout);
+        callback('failed');
+      });
+
+      postShutdownRequest.on('end', function() {
+        if (requestCompleted) return;
+        clearTimeout(requestTimeout);
+        callback('exited');
+      });
+    }
+
+    /**
+     * @param req {import('http').IncomingMessage}
+     * @param res {import('http').ServerResponse}
+     */
+    function handleRequest(req, res) {
+
+      if (/^\/favicon\b/.test(req.url)) {
+        console.log(req.url + ' HTTP/400');
+        res.statusCode = 400;
+        res.end();
+        return;
+      }
+      else if (/^\/restart\b/.test(req.url)) {
+        if (req.method === 'GET') {
+          res.setHeader('Content-Type', 'text/html');
+          res.end('<form method=POST> RESTART: <input type=submit> </form>');
+          return;
+        }
+
+        initiateRestart();
+        res.end('RESTART INITIATED');
+        return;
+      }
+      else if (/^\/shutdown\b/.test(req.url)) {
+        if (req.method === 'GET') {
+          res.setHeader('Content-Type', 'text/html');
+          res.end('<form method=POST> SHUTDOWN: <input type=submit> </form>');
+          return;
+        }
+
+        initiateShutdown();
+        res.end('SHUTDOWN INITIATED');
+        return;
       }
 
-      throw new Error('Running in an unsupported environment.');
+      var html =
+        '// <' + 'script' + '> \n' +
+        startHARREST + '\n' +
+        '\n' +
+        'startHARREST(); \n' +
+        '// </' + 'script' + '><' + 'script' + '> \n' +
+        allImports + '\n' +
+        '// </' + 'script' + '>\n';
+      
+      res.setHeader('Content-Type', 'text/html');
+      res.end(html);
+      console.log(req.url + ' HTTP/200');
+    }
 
-      function detectEnvironment() {
-        if (typeof window !== 'undefined' && window && typeof window.alert === 'function'
-            && typeof document !== 'undefined' && document && typeof document.createElement === 'function')
-          return 'browser';
+    function initiateShutdown() {
+      setTimeout(function () {
+        process.exit();
+      }, 500);
+    }
+
+    var restartTimeout;
+    var restarting;
+
+    function initiateRestart(timeout) {
+      if (restarting) return;
+      clearTimeout(restartTimeout);
+
+      restartTimeout = setTimeout(function () {
+        console.log('Restarting on change...');
+        restarting = true;
+        server.close(function () {
+          console.log('starting new process: ', process.argv);
+          console.log('');
+          child_process.spawn(
+            process.argv[0],
+            process.argv.slice(1),
+            { stdio: 'inherit' }
+          );
+          setTimeout(function () {
+            process.exit();
+          }, 300);
+        });
+      }, timeout || 300);
+
+    }
+
+    function populateAllImports() {
+      var allJSImportsArray = [];
+      for (var i = 0; i < importedJS.length; i++) {
+        var file = path.resolve(__dirname, 'node_modules', importedJS[i]);
+        if (!fs.existsSync(file)) {
+          console.log(importedJS[i] + ' cannot be found at ' + file);
+          continue;
+        }
+
+        allJSImportsArray.push({
+          file: file,
+          content: fs.readFileSync(file)
+        });
+      }
+
+      var allCSSImportsArray = [];
+      for (var i = 0; i < importedStyles.length; i++) {
+        var file = path.resolve(__dirname, 'node_modules', importedStyles[i]);
+        if (!fs.existsSync(file)) {
+          console.log(importedStyles[i] + ' cannot be found at ' + file);
+          continue;
+        }
+
+        allCSSImportsArray.push({
+          file: file,
+          content: fs.readFileSync(file)
+        });
+      }
+
+      var allImportsText = 'function allImports() { \n';
+      for (var i = 0; i < allJSImportsArray.length; i++) {
+        allImportsText += 
+          (allImportsText ? '\n\n' : '') +
+          '// ' + allJSImportsArray[i].file + '\n' +
+          allJSImportsArray[i].content;
+      }
+
+      allImportsText +=
+        '\n\n\n' +
+        'var sty = document.createElement("style");\n' +
+        'sty["text" in sty ? "text" : "innerHTML"] = ""';
+      for (var i = 0; i < allCSSImportsArray.length; i++) {
+        allImportsText +=
+          ' + \n' +
+          '/* ' + allCSSImportsArray[i].file + ' */ ' + JSON.stringify(allCSSImportsArray[i].content.toString());
+      }
+      allImportsText +=
+        ';\n' +
+        'document.body.appendChild(sty);';
+
+      allImportsText +=
+        '\n' +
+        '}\n';
+
+      console.log('loaded ' + allJSImportsArray.length + ' JS, ' + allCSSImportsArray.length + ' CSS imports, ' + allImportsText.length + ' characters');
+
+      allImports = allImportsText;
+    }
+  }
+
+  function runBrowser() {
+
+    document.title = 'HAR Rest';
+    populateInnerHTML();
+
+    var layoutTABLE = document.getElementById('layoutTABLE');
+    var leftTD = document.getElementById('leftTD');
+    var requestTD = document.getElementById('requestTD');
+    var responseTD = document.getElementById('responseTD');
+    var statusTD = document.getElementById('statusTD');
+
+    if (typeof allImports === 'function') {
+      allImports();
+      set(statusTD, 'Loaded.');
+      continueWithDependencies();
+    } else {
+      window.onload = function() {
+        if (typeof allImports === 'function') {
+          allImports();
+          set(statusTD, 'Loaded.');
+          continueWithDependencies();
+        } else {
+          set(statusTD, 'Dependencies are not loaded.');
+        }
+      };
+      set(statusTD, 'Loading dependencies...');
+    }
+
+    function continueWithDependencies() {
+      CodeMirror(requestTD, { lineNumbers: true });
+      CodeMirror(responseTD, { lineNumbers: true });
+    }
+
+    function docHead() {
+      var head = document.head;
+      if (!head) {
+        var list = document.getElementsByTagName('head');
+        if (list) head = list[0];
+      }
+
+      return head;
+    }
+
+    /**
+     * @param elem {HTMLElement}
+     */
+    function cleanContent(elem) {
+      if (!elem) {
+        var head = docHead();
+        if (head) cleanContent(head);
+        var body = document.body;
+        if (body) cleanContent(body);
+        return;
+      }
+
+      var thisScript = document.scripts && document.scripts[0];
+
+      var children = elem.childNodes || elem.children;
+      var remove = [];
+      for (var i = 0; i < children.length; i++) {
+        var ch = children[i];
+        if (ch.nodeType === 3) {
+          remove.push(ch);
+          continue;
+        }
+        else if (/script/i.test(ch.tagName || '') && ch !== thisScript) {
+          remove.push(ch);
+        }
+      }
+
+      for (var i = 0; i < remove.length; i++) {
+        remove[i].parentElement.removeChild(remove[i]);
       }
     }
 
-    function runBrowser() {
-      var layoutTABLE = document.getElementById('layoutTABLE');
-      var leftTD = document.getElementById('leftTD');
-      var requestTD = document.getElementById('requestTD');
-      var statusTD = document.getElementById('statusTD');
+    function populateInnerHTML() {
+      cleanContent();
 
-      set(statusTD, 'Loaded.');
+      var container = document.createElement('div');
+      container.innerHTML = getFunctionCommentContent(initialHTML);
+      var children = (container.childNodes || container.children);
+      var add = [];
+      for (var i = 0; i < children.length; i++) {
+        add.push(children[i]);
+      }
+      for (var i = 0; i < add.length; i++) {
+        document.body.appendChild(add[i]);
+      }
+    }
 
-
-      function set(elem, value) {
-        if (typeof value === 'string') {
-          if (elem && 'textContent' in elem) {
-            elem.textContent = value;
-          } else if (elem && 'innerText' in elem) {
-            elem.innerText = value;
-          } else {
-            elem.text = value;
-          }
+    function set(elem, value) {
+      if (typeof value === 'string') {
+        if (elem && 'textContent' in elem) {
+          elem.textContent = value;
+        } else if (elem && 'innerText' in elem) {
+          elem.innerText = value;
+        } else {
+          elem.text = value;
         }
       }
     }
 
-    detectEnvironmentAndStart();
+    function initialHTML() {
+
+      // <meta charset="UTF-8">
+      // <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      // avoid this, it messes up some layout logic in Safari
+      // meta name="viewport" content="width=device-width, initial-scale=1.0"
+
+      /*
+      
+      <title>HAR-REST</title>
+    <style>
+    html {
+      margin:0;padding:0;
+      width:100%;height:100%;
+      overflow:hidden;
+    }
+    body {
+      margin:0;padding:0;
+      width:100%;height:100%;
+      overflow:hidden;
+    }
+    
+    #layoutTABLE {
+      margin: 0;
+      width: 100%; height: 100%;
+    }
+    
+    #splitterTD {
+      background: #ffe8ed;
+      border: solid 1px#ffdfe5;
+    }
+    
+    #leftTD {
+      background: #fff0f3;
+      border-right: solid 1px #ffe4e8;
+    }
+    
+    #statusTD {
+      background: #ffa4b4;
+    }
+
+    #requestTD {
+      position: relative;
+    }
+
+    #responseTD {
+      position: relative;
+    }
+
+    td .CodeMirror {
+      position: absolute;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+    }
+    </style>
+    </head>
+
+    <table id=layoutTABLE cellspacing=0 cellpadding=0>
+    <tr>
+      <td id=leftTD width=20% rowspan=3>
+    
+      </td>
+      <td width=80% height=50% id=requestTD>
+    
+      </td>
+    </tr>
+    <tr height=1>
+      <td width=80% id=splitterTD>
+        -splitter-
+      </td>
+    </tr>
+    <tr>
+      <td width=80% height=50% id=responseTD>
+    
+      </td>
+    </tr>
+    <tr>
+      <td height=1 colspan=2 id=statusTD>
+        Loading...
+      </td>
+    </tr>
+    </table>
+    
+    */
+
+    }
+
   }
 
-  startHARREST();
-</script>
-</body>
-</html>
+  detectEnvironmentAndStart();
+  
+}
+
+startHARREST();
+// </script>

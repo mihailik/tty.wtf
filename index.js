@@ -1,14 +1,19 @@
 // @ts-check <script>
 function catchREST() {
 
-// Debug! Temporary!
-window.onerror = function() {
-var txt = '';
-for (var i=0;i<arguments.length;i++)
-  txt+=(i+1)+' '+arguments[I]+'\n';
-alert(txt);
-};
-
+  // Debug! Temporary!
+  if (typeof window !== 'undefined' && window) {
+    window.onerror = function () {
+      var txt = '';
+      for (var i = 0; i < arguments.length; i++) {
+        var add = String(arguments[i]);
+        if (!txt || add.length <= 10) txt += ' ' + add;
+        else if (txt.indexOf(add) >= 0) continue;
+        else txt += '\n' + add;
+      };
+      alert(txt);
+    };
+  }
 
   // #region polyfills
 
@@ -298,6 +303,7 @@ alert(txt);
     return +new Date();
   }
 
+  /** @param {string} url */
   function parseEncodedURL(url) {
     var verbMatch = getVerb(url);
     if (!verbMatch) return;
@@ -712,11 +718,21 @@ issuing requests, processing data and representing the data in sensible way with
       var imports = [
         'codemirror/lib/codemirror.js',
         'codemirror/lib/codemirror.css',
-        'codemirror/mode/javascript/javascript.js',
-        'codemirror/mode/markdown/markdown.js',
+
+        'codemirror/addon/fold/foldcode.js',
         'codemirror/addon/fold/foldgutter.js',
-        'codemirror/addon/fold/foldgutter.css',
+        'codemirror/addon/fold/brace-fold.js',
+        'codemirror/addon/fold/xml-fold.js',
+        'codemirror/addon/fold/indent-fold.js',
         'codemirror/addon/fold/markdown-fold.js',
+        'codemirror/addon/fold/comment-fold.js',
+        'codemirror/mode/javascript/javascript.js',
+        'codemirror/mode/xml/xml.js',
+        'codemirror/mode/css/css.js',
+        'codemirror/mode/htmlmixed/htmlmixed.js',
+        'codemirror/mode/python/python.js',
+        'codemirror/mode/markdown/markdown.js',
+        'codemirror/addon/fold/foldgutter.css',
 
         'xlsx/dist/xlsx.full.min.js',
         //'xlsx/jszip.js'
@@ -1576,23 +1592,21 @@ issuing requests, processing data and representing the data in sensible way with
 
     // #region PERSISTENCE
 
-    var persistence = (function () {
-
-      /** @typedef {{
-       *  domTimestamp?: number;
-       *  domTotalSize?: number;
-       *  domLoadedSize?: number;
-       *  loadedFileCount?: number;
-       *  storageName?: string;
-       *  storageTimestamp?: number;
-       *  storageLoadFailures?: { [storage: string]: string; };
-       *  newDOMFiles?: string[];
-       *  newStorageFiles?: string[];
-       *  read(path: string): any;
-       *  continueLoading();
-       *  finishParsing(): Drive.Detached.DOMDrive;
-       *  ondomnode?: (node: any, recognizedKind?: 'file' | 'totals', recognizedEntity?: any) => void;
-       * }} BootState */
+    /** @typedef {{
+ *  domTimestamp?: number;
+ *  domTotalSize?: number;
+ *  domLoadedSize?: number;
+ *  loadedFileCount?: number;
+ *  storageName?: string;
+ *  storageTimestamp?: number;
+ *  storageLoadFailures?: { [storage: string]: string; };
+ *  newDOMFiles?: string[];
+ *  newStorageFiles?: string[];
+ *  read(path: string): any;
+ *  continueLoading();
+ *  finishParsing(): Drive.Detached.DOMDrive;
+ *  ondomnode?: (node: any, recognizedKind?: 'file' | 'totals', recognizedEntity?: any) => void;
+ * }} BootState */
 
       // function formatTotalsInner(timestamp: number, totalSize: number): string;
       // function formatFileInner(path: string, content: any): string;
@@ -1603,52 +1617,54 @@ issuing requests, processing data and representing the data in sensible way with
       // function parseFileInner(content: string): { path: string; read(): string; };
       // function parseHTML(html: string): { files: { path: string; content: string; start: number; end: number; }[]; totals: {size?: number; timestamp?: number; start: number; end: number;}; };
 
-      /** @typedef {{
-       *  timestamp?: number;
-       *  files(): string[];
-       *  read(file: string): string;
-       *  write(file: string, content: string | null);
-       *  storedSize?(file: string): number | null;
-       * }} Drive */
+    /** @typedef {{
+     *  timestamp?: number;
+     *  files(): string[];
+     *  read(file: string): string;
+     *  write(file: string, content: string | null);
+     *  storedSize?(file: string): number | null;
+     * }} Drive */
 
-      /** @typedef {{
-       *  timestamp?: number;
-       *  write(file: string, content: string, encoding: string): void;
-       *  forget(file: string): void;
-       * }} Drive.Shadow */
+    /** @typedef {{
+     *  timestamp?: number;
+     *  write(file: string, content: string, encoding: string): void;
+     *  forget(file: string): void;
+     * }} Drive.Shadow */
 
-      /** @typedef {{
-       *  name: string;
-       *  detect(uniqueKey: string, callback: (error?: string, detached?: Drive.Detached) => void): void;
-       * }} Drive.Optional */
+    /** @typedef {{
+     *  name: string;
+     *  detect(uniqueKey: string, callback: (error?: string, detached?: Drive.Detached) => void): void;
+     * }} Drive.Optional */
 
-      /** @typedef {{
-       *  timestamp: number | undefined;
-       *  totalSize?: number;
-       *  applyTo(mainDrive: Drive.Detached.DOMUpdater, callback: Drive.Detached.CallbackWithShadow): void;
-       *  purge(callback: Drive.Detached.CallbackWithShadow): void;
-       * }} Drive.Detached; */
+    /** @typedef {{
+     *  timestamp: number | undefined;
+     *  totalSize?: number;
+     *  applyTo(mainDrive: Drive.Detached.DOMUpdater, callback: Drive.Detached.CallbackWithShadow): void;
+     *  purge(callback: Drive.Detached.CallbackWithShadow): void;
+     * }} Drive.Detached; */
 
-      /** @typedef {{
-       *  (loaded: Drive.Shadow): void;
-       *  progress?: (current: number, total: number) => void;
-       * }} Drive.Detached.CallbackWithShadow */
+    /** @typedef {{
+     *  (loaded: Drive.Shadow): void;
+     *  progress?: (current: number, total: number) => void;
+     * }} Drive.Detached.CallbackWithShadow */
 
-      /** @typedef {{
-       *  timestamp?: number;
-       *  write(file: string, content: string | null, encoding?: string): void;
-       * }} Drive.Detached.DOMUpdater */
+    /** @typedef {{
+     *  timestamp?: number;
+     *  write(file: string, content: string | null, encoding?: string): void;
+     * }} Drive.Detached.DOMUpdater */
 
-      /** @typedef {{
-       *  write(file: string, content: string | null, encoding?: string): void;
-       * } & Drive} Drive.Detached.DOMDrive */
+    /** @typedef {{
+     *  write(file: string, content: string | null, encoding?: string): void;
+     * } & Drive} Drive.Detached.DOMDrive */
 
-      /** @typedef {{
-       *  timestamp: number;
-       *  totalSize: number;
-       *  node: Comment;
-       *  updateNode(): string | undefined;
-       * }} DOMTotals */
+    /** @typedef {{
+     *  timestamp: number;
+     *  totalSize: number;
+     *  node: Comment;
+     *  updateNode(): string | undefined;
+     * }} DOMTotals */
+
+    var persistence = (function () {
 
       /**
        * @param {Document} document
@@ -4161,7 +4177,11 @@ issuing requests, processing data and representing the data in sensible way with
         // TODO: whatever progress...
       }
 
-      function loadingComplete() {
+      /**
+       * @param {string} text
+       * @param {string} mode
+       */
+      function loadingComplete(text, mode) {
         layout.requestEditorHost.innerHTML = '';
         var editor = createCodeMirrorWithFirstClickChange(
           layout.requestEditorHost,
@@ -4182,8 +4202,8 @@ issuing requests, processing data and representing the data in sensible way with
             autofocus: true
           },
           function () {
-            editor.setOption('mode', 'javascript');
-            editor.setValue('GET https://api.github.com/repos/microsoft/typescript/languages');
+            editor.setOption('mode', mode);
+            editor.setValue(text);
           });
 
         editor.on('changes', debounce(updateVerbButton, 200, 900));
@@ -4456,19 +4476,39 @@ issuing requests, processing data and representing the data in sensible way with
     }
 
     function bootUrlEncoded() {
-      var verbMatch = getVerb(location.pathname);
-      if (verbMatch) {
+      if (/http/.test(location.protocol)) {
+        var encodedUrl = parseEncodedURL(location.pathname + '');
+      } else {
+        var encodedUrl = parseEncodedURL(location.search + '');
       }
+
 
       sanitizeDOM();
       var shellLoader = createShell();
       if (minimalDependenciesPresent()) {
-        shellLoader.loadingComplete();
+        complete();
       } else {
         /** @type {*} */(catchREST)['continue'] = function () {
-          // TODO: check if CodeMirror still not loaded (use alternative ways like unpkg etc.)
-          shellLoader.loadingComplete();
+          complete();
         };
+      }
+
+      function complete() {
+        if (!encodedUrl) {
+          shellLoader.loadingComplete(
+            'GET https://api.github.com/repos/microsoft/typescript/languages',
+            'javascript'
+          );
+          return;
+        }
+
+        if (encodedUrl.verb) {
+          shellLoader.loadingComplete(
+            encodedUrl.verb + (encodedUrl.addr ? ' ' + encodedUrl.addr : '') +
+              (encodedUrl.body ? '\n' + encodedUrl.body : ''),
+            'javascript'
+          );
+        }
       }
     }
 
@@ -4478,18 +4518,47 @@ issuing requests, processing data and representing the data in sensible way with
 
       loadAsync().then(function (drive) {
         if (minimalDependenciesPresent()) {
-          shellLoader.loadingComplete();
+          complete();
         } else {
-        /** @type {*} */(catchREST)['continue'] = function () {
-            // TODO: check if CodeMirror still not loaded (use alternative ways like unpkg etc.)
-            shellLoader.loadingComplete();
+          /** @type {*} */(catchREST)['continue'] = function () {
+            complete();
           };
         }
 
-        console.log('drive loaded ', drive);
+          console.log('drive loaded ', drive);
+
+        function complete() {
+          var allFiles = drive.files();
+          var bestFile = findBestFile();
+
+          var detectMode =
+            /\.json$/i.test(bestFile) ? 'json' :
+              /\.js$/i.test(bestFile) ? 'javascript' :
+                /\.html$/i.test(bestFile) ? 'html' :
+                  /\.md$/i.test(bestFile) ? 'markdown' :
+                    'text';
+
+          shellLoader.loadingComplete(
+            drive.read(bestFile),
+            detectMode
+          );
+
+          function findBestFile() {
+            var bestFile =
+              allFiles.filter(function (f) { return /index\.js/i.test(f); })[0] ||
+              allFiles.filter(function (f) { return /index\.html/i.test(f); })[0] ||
+              allFiles.filter(function (f) { return /README/i.test(f); })[0] ||
+              allFiles[0];
+
+            return bestFile;
+          }
+        }
       });
 
-      /** @param {((progress: { loadedSize: number, anticipatedTotalSize: number | undefined, fileCount: number }) => void)=} progressCallback */
+      /**
+       * @param {((progress: { loadedSize: number, anticipatedTotalSize: number | undefined, fileCount: number }) => void)=} progressCallback
+       * @returns {Promise<Drive.Detached.DOMDrive>}
+       */
       function loadAsync(progressCallback) {
         return new Promise(function (resolve, reject) {
           var persist = persistence(document, uniquenessSource);

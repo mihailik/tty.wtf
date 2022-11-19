@@ -3564,6 +3564,8 @@ shell layout
     // #endregion PERSISTENCE
 
     function createShell() {
+      sanitizeDOM();
+
       // TODO: update box model
       var host = document.createElement('div');
       host.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding-top: 10%; text-align: center;';
@@ -3593,6 +3595,26 @@ shell layout
           {
             value: 'Loaded OK [*]'
           });
+      }
+    }
+
+    function sanitizeDOM() {
+      for (var i = document.body.childNodes.length - 1; i >= 0; i--) {
+        var nod = document.body.childNodes.item ? document.body.childNodes.item(i) : document.body.childNodes[i];
+        if (!nod) continue;
+        switch (nod.nodeType) {
+          case 1: // element
+            var elem = /** @type {HTMLElement} */(nod);
+            // for now, just let script and style only
+            if (/^(script|style)$/i.test(elem.tagName || '')) continue;
+            break;
+
+          case 3: // text-node
+          case 4: // cdata
+            break;
+        }
+
+        document.body.removeChild(nod);
       }
     }
 

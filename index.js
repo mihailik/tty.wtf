@@ -4192,7 +4192,8 @@ issuing requests, processing data and representing the data in sensible way with
         layout = injectShellHTML();
       }
 
-      layout.pseudoEditor.value = text;
+      layout.pseudoEditor.value =
+        mode === 'splash' ? embeddedSplashText : text;
       layout.pseudoGutter.innerHTML =
         Array(text.split('\n').length + 1)
         .join(',').split(',')

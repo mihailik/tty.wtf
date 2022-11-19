@@ -464,7 +464,6 @@ function startHARREST() {
           || /^\/404.html/.test(location.pathname || ''); // path starts with /404.html, this is GitHub or CodeSpaces preview
 
         var allowReplaceState =
-          !/\//.test(encoded) &&
           !isFileProtocol &&
           !isAboutProtocol &&
           hasReplaceState;

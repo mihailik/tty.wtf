@@ -323,7 +323,8 @@ shell layout
     /** @type {Partial<typeof process>} */
     var pr = typeof process !== 'undefined' && process || {};
     var html =
-      '<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:' + catchREST_hash + '} ' + new Date() + ' with  ' + pr.platform + '/' + pr.arch + ' -->\n' +
+      '<!' + 'DOCTYPE html' + '><' + 'html lang="en"' + 
+      '><' + 'head' + '><!-- {build-by-hash:' + catchREST_hash + '} ' + new Date() + ' with  ' + pr.platform + '/' + pr.arch + ' -->\n' +
       embeddedMetaBlockHTML + '\n' +
       '<title>Catch Rest</title>\n' +
 
@@ -335,7 +336,7 @@ shell layout
       embeddedMinCSS + '\n' +
       '</style>\n' +
 
-      '</head><body>' +
+      '</' + 'head' + '><' + 'body' + '>' +
 
       '<' + 'script' + ' src="index.js"></' + 'script' + '>\n' +
       '<' + 'script' + ' src="lib.js"></' + 'script' + '>\n' +
@@ -344,7 +345,7 @@ shell layout
       'catchREST("page");\n' +
       '</' + 'script' + '>\n' +
 
-      '</body></html>';
+      '</' + 'body' + '></' + 'html' + '>';
     
     return html;
   }

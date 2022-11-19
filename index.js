@@ -140,7 +140,7 @@ function catchREST() {
 
   /** @param {string | null | undefined} path */
   function getVerb(path) {
-    var verbMatch = /(^|\/)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:)(\/|$)/i.exec(path + '');
+    var verbMatch = /(^|\/)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? { leadingSlash: verbMatch[1], verb: verbMatch[2], trailingSlash: verbMatch[3], index: verbMatch.index + (verbMatch[1] ? 1 : 0) } : void 0;
   }
 

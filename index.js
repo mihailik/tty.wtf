@@ -345,7 +345,8 @@ issuing requests, processing data and representing the data in sensible way with
     var pr = typeof process !== 'undefined' && process || {};
     var html =
       '<!' + 'DOCTYPE html' + '><' + 'html lang="en"' + 
-      '><' + 'head' + '><!-- {build-by-hash:' + catchREST_hash + '} ' + new Date() + ' with  ' + pr.platform + '/' + pr.arch + ' -->\n' +
+      '><' + 'head' + '>\n' +
+      '<!-- {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' with  ' + pr.platform + '/' + pr.arch + '} -->\n' +
       embeddedMetaBlockHTML + '\n' +
       '<title>Catch Rest</title>\n' +
 
@@ -455,7 +456,7 @@ issuing requests, processing data and representing the data in sensible way with
 
       function detectLocalBuildValid() {
         return new Promise(function (resolve) {
-          var markerRegexp = new RegExp('\\{build-by-hash:' + catchREST_hash + '\\}');
+          var markerRegexp = new RegExp('\\{build-by-hash:' + catchREST_hash);
           var indexHTMLPromise = readFileAsync(indexHTML_path);
           var index404HTMLPromise = readFileAsync(index404HTML_path);
           var libJSPromise = readFileAsync(libJS_path);
@@ -553,32 +554,38 @@ issuing requests, processing data and representing the data in sensible way with
             });
           });
 
-        /** @param {{ importLocalPath: string, fullPath?: string, content: string }[]} imports */
+        /**
+         * @param {{ importLocalPath: string, fullPath?: string, content: string }[]} imports
+         * @returns {Promise<string>}
+         */
         function withImports(imports) {
           var combinedLib = combineLib(imports);
 
           var builtHTML = getEmbeddedWholeHTML(true /* urlencoded */);
 
-          var writeIndexHTML = writeUnlessExactExceptMarker(
+          var skipIndexHTML = skipUnlessUpdated(
             indexHTML_path,
             builtHTML
           );
-          var writeIndex404HTML = writeUnlessExactExceptMarker(
+          var skipIndex404HTML = skipUnlessUpdated(
             index404HTML_path,
             getEmbeddedWholeHTML(true /* urlencoded */)
           );
-          var writeLib = writeUnlessExactExceptMarker(
+          var skipLib = skipUnlessUpdated(
             libJS_path,
             combinedLib
           );
 
-          return Promise.all([writeIndexHTML, writeIndex404HTML, writeLib]).then(
+          return Promise.all([skipIndexHTML, skipIndex404HTML, skipLib]).then(
             function (skipped) {
               var skippedIndexHTML = skipped[0], skippedIndex404HTML = skipped[1], skippedLib = skipped[2];
+
               if (skippedIndexHTML && skippedIndex404HTML && skippedLib)
                 return 'Build already matches files.';
-              if (!skippedIndexHTML && !skippedIndex404HTML && !skippedLib) return
-              'Build updated index.html, 404.html and lib.js with hash ' + catchREST_hash;
+
+              if (!skippedIndexHTML && !skippedIndex404HTML && !skippedLib)
+                return 'Build updated index.html, 404.html and lib.js with hash ' + catchREST_hash;
+
               return 'Build only updated ' +
                 (skippedIndexHTML ? '' : 'index.html ') +
                 (skippedIndex404HTML ? '' : '404.html ') +
@@ -586,12 +593,20 @@ issuing requests, processing data and representing the data in sensible way with
                 'with hash ' + catchREST_hash;
             });
 
-          function writeUnlessExactExceptMarker(filePath, content) {
+          function skipUnlessUpdated(filePath, content) {
             var alreadyMatchesPromise = readFileAsync(filePath).then(
               function (oldContent) {
-                var markerRegexp = /\{build-by-hash:[^}]\}/g;
-                if (oldContent.replace(markerRegexp, '') === content.replace(markerRegexp, ''))
+                var markerRegexp = /\{build-by-hash:([^}]+)\}/g;
+                if (oldContent.replace(markerRegexp, '') === content.replace(markerRegexp, '')) {
                   return true;
+                }
+
+                var oldReduc = oldContent.replace(markerRegexp, '');
+                var newReduc = content.replace(markerRegexp, '');
+
+                var oldOffset = oldReduc.indexOf(newReduc);
+                var newOffset = newReduc.indexOf(oldReduc);
+                console.log(' ' + filePath + ' ' + oldOffset + '-' + newOffset);
               },
               function () {// failed to read old file -- fine, just write then
               }
@@ -601,7 +616,8 @@ issuing requests, processing data and representing the data in sensible way with
               return alreadyMatches || writeFileAsync(filePath, content);
             });
           }
-        }      });
+        }
+      });
     }
 
     /** @param {Promise<string>} buildPromise */
@@ -3694,7 +3710,7 @@ issuing requests, processing data and representing the data in sensible way with
           if (parsFirst && parsFirst.verb) {
             layout.leftTop.innerHTML = '<button class=goButton>' + parsFirst.verb.toUpperCase() + '</button>';
 
-            var goButton = layout.leftTop.getElementsByClassName('goButton')[0];
+            var goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByClassName('goButton')[0]);
             goButton.onclick = function () {
               accept();
             };
@@ -3728,7 +3744,7 @@ issuing requests, processing data and representing the data in sensible way with
                         editor.getValue() + '\n\n' +
                         text);
                     },
-                    function (error) {
+                    function (err) {
                       alert(err.message);
                       editor.setOption('readOnly', false);
                     }

@@ -1,5 +1,5 @@
 // @ts-check
-function startCatchREST() {
+function catchREST() {
 
   var unicodeTitle = 'Catch REST ' + String.fromCharCode(55356) + String.fromCharCode(57209);
   var disableTypeScript = true;
@@ -161,11 +161,11 @@ function startCatchREST() {
       return text.replace(regex_slash, '%2F');
     }
 
-    var regex_hexedColonEqualPlusQuestionSlash = /%3A|%3D|%20|%3F|%2F/ig;
+    var regex_hexedColonEqualPlusSlash = /%3A|%3D|%20|%2F/ig;
 
     /** @param {string} text */
     function mangleText(text) {
-      return encodeURIComponent(text).replace(regex_hexedColonEqualPlusQuestionSlash, replaceColonEqualPlusQuestionSlash);
+      return encodeURIComponent(text).replace(regex_hexedColonEqualPlusSlash, replaceColonEqualPlusQuestionSlash);
     }
 
     /** @param {string} matchText */
@@ -251,6 +251,12 @@ function startCatchREST() {
     return (fn + '').replace(/^([\s\S\n\r]*\/\*\s*)([\s\S\n\r]*)(\s*\*\/[\s\r\n]*}[\s\r\n]*)$/, function (whole, lead, content, tail) { return content; });
   }
 
+  function addExportsOn(exports) {
+    exports.mangleForURL = mangleForURL;
+    exports.unmangleFromURL = unmangleFromURL;
+    exports.parseAsRequest = parseAsRequest;
+  }
+
   /**
    * @param {boolean} asModule
    */
@@ -267,7 +273,13 @@ function startCatchREST() {
     if (!asModule) {
       runAsScript();
     }
-    //TODO: run as module? for testing too
+    else {
+      runAsModule(module.exports);
+    }
+
+    function runAsModule(exports) {
+      addExportsOn(exports);
+    }
 
     function runAsScript() {
 
@@ -497,8 +509,8 @@ function startCatchREST() {
     function getCurrentJS() {
       var jsText =
         '// @ts-check\n' +
-        startCatchREST + '\n\n' +
-        'startCatchREST();\n';
+        catchREST + '\n\n' +
+        'catchREST();\n';
       return jsText;
     }
 
@@ -680,8 +692,8 @@ function startCatchREST() {
          */
         function handleRequestResponseWithBody(res, bodyText) {
           resolve({
-            status: res.statusCode,
-            statusText: res.statusMessage,
+            status: /** @type {number} */(res.statusCode),
+            statusText: /** @type {string} */(res.statusMessage),
             headers: res.headers,
             body: bodyText,
             url: url
@@ -835,8 +847,9 @@ function startCatchREST() {
         proc.send({ scriptParent: process.pid, platform: process.platform, cwd: process.cwd });
 
         // main process: keep pumping piped stdio
-        proc.stdout.read();
-        proc.stdout.on('data', function (procOut) {
+        var stdout = /** @type {import('stream').Readable} */(proc.stdout);
+        stdout.read();
+        stdout.on('data', function (procOut) {
           process.stdout.write(procOut);
         });
 
@@ -929,6 +942,7 @@ function startCatchREST() {
   })();
 
   function runBrowser() {
+    addExportsOn(catchREST);
 
     document.title = unicodeTitle;
     populateInnerHTML();
@@ -970,6 +984,7 @@ function startCatchREST() {
           typeof CodeMirror === 'function' &&
 
           (disableTypeScript ? true :
+            // @ts-ignore TypeScript/ts global is defined
             typeof ts !== 'undefined' && typeof ts.createCompilerHost === 'function') &&
 
           // @ts-ignore JSZipSync is defined
@@ -1796,4 +1811,4 @@ function startCatchREST() {
 
 }
 
-startCatchREST();
+catchREST();

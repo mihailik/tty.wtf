@@ -34,23 +34,159 @@ function startHARREST() {
     }
   }
 
-  /** @param mangled {string} */
-  function unmangleFromURL(mangled) {
-    return decodeURIComponent(mangled
-      .replace(/\//g, '\n')
-      .replace(/\+/g, ' ')
-    );
-  }
+  var unmangleFromURL = (function () {
 
-  /** @param {string} text */
-  function mangleForURL(text) {
-    // var firstLineBreak = text.indexOf('\n');
-    return encodeURIComponent(text)
-      .replace(/%3A/ig, ':')
-      .replace(/%3D/ig, '=')
-      .replace(/%20/ig, '+')
-      .replace(/%0A/gi, '$/');
-  }
+    var regex_doubleSlashWithoutLeadingColon = /[^:]\/\//;
+
+    /** @param mangled {string} */
+    function unmangleFromURL(mangled) {
+
+      var matchEndFirstLine = regex_doubleSlashWithoutLeadingColon.exec(mangled);
+      if (!matchEndFirstLine)
+        return unmangleFirstLine(mangled);
+
+      return (
+        unmangleFirstLine(mangled.slice(0, matchEndFirstLine.index + 1)) + '\n' +
+        unmangleSubsequentLines(mangled.slice(matchEndFirstLine.index + matchEndFirstLine[0].length))
+      );
+    }
+
+    /** @param {string} text */
+    function unmangleFirstLine(text) {
+      return decodeURIComponent(text.replace(/\+/g, '%20'));
+    }
+
+    return unmangleFirstLine;
+
+    /** @param {string} text */
+    function unmangleSubsequentLines(text) {
+      return decodeURIComponent(text.replace(/\+/g, '%20'))
+        .replace(/\//g, '\n');
+    }
+
+    return unmangleSubsequentLines;
+
+    return unmangleFromURL;
+  })();
+
+  var mangleForURL = (function () {
+
+    /** @param {string} text */
+    function mangleForURL(text) {
+      if (!text) return '';
+
+      // POST http://wikipedia.org
+      // { "some": 123,
+      //   "another": [1,2,3]
+      // }
+      //
+      // becomes:
+      // http://catch.rest/POST+http://wikipedia.org//{+"some":+123,/++"another":+[1,2,3]/}
+      //
+      // GET http://wikipedia.org/ --> http://catch.rest/GET+http://wikipedia.org/
+      // POST http://wikipedia.org/ {"some":123} --> http://catch.rest/GET+http://wikipedia.org/+//{"some":123}
+
+      var firstLineSeparatedMatch = /^([ \n]+)?([^\n]+)?\n?([\s\S]+)?$/.exec(text);
+      // slashes in the first line are preserved,
+      // except for double-slashes that must be converted to %2F,
+      // except where double-slash is preceded with colon, which is preserved too
+      // also, leading line-breaks (interceded with spaces?) are converted simply to slashes
+
+      var whitespaceLead = firstLineSeparatedMatch[1];
+      var firstLine = firstLineSeparatedMatch[2];
+      var otherLines = firstLineSeparatedMatch[3];
+
+      if (whitespaceLead) whitespaceLead = mangleLeadingWhitespace(whitespaceLead);
+      if (firstLine) firstLine = mangleFirstLine(firstLine);
+      if (otherLines) otherLines = mangleOtherLines(otherLines);
+
+      return (whitespaceLead || '') + (firstLine || '') + (otherLines ? '//' + otherLines : '');
+    }
+
+    var regex_SpaceOrNewline = /[ \n]/g;
+
+    /** @param {string} leadingWhitespace */
+    function mangleLeadingWhitespace(leadingWhitespace) {
+      return leadingWhitespace.replace(regex_SpaceOrNewline, replaceSpaceOrNewline);
+    }
+
+    /** @param {string} spaceOrNewline */
+    function replaceSpaceOrNewline(spaceOrNewline) {
+      if (spaceOrNewline === ' ') return '+';
+      else return '/';
+    }
+
+    var regex_colonSlashOrSlash = /(:\/\/+)|(\/\/+)|(\/$)/g;
+    var regex_slash = /\//g;
+
+    /** @param {string} firstLine */
+    function mangleFirstLine(firstLine) {
+      var pos = regex_colonSlashOrSlash.lastIndex = 0;
+      var result = '';
+      while (true) {
+        var match = regex_colonSlashOrSlash.exec(firstLine);
+        if (!match) {
+          result += mangleText(firstLine.slice(pos));
+          return result;
+        }
+
+        if (match && match[0].charCodeAt(0) === 47 /* slash */) {
+          if (match[0] === '/') {
+            // terminating slash
+            if (match.index > pos) result += mangleText(firstLine.slice(pos, match.index)) + '/+';
+            else result += '/+';
+          } else {
+            if (match.index > pos) result += mangleText(firstLine.slice(pos, match.index)) + replaceSlashesWith2F(match[0]);
+            else result += replaceSlashesWith2F(match[0]);
+          }
+        } else {
+          if (match.index > pos) result += mangleText(firstLine.slice(pos, match.index)) + match[0];
+          else result += match[0];
+        }
+        pos = match.index + match[0].length;
+      }
+    }
+
+    /** @param {string} text */
+    function replaceSlashesWith2F(text) {
+      return text.replace(regex_slash, '%2F');
+    }
+
+    var regex_hexedColonEqualPlusQuestionSlash = /%3A|%3D|%20|%3F|%2F/ig;
+
+    /** @param {string} text */
+    function mangleText(text) {
+      return encodeURIComponent(text).replace(regex_hexedColonEqualPlusQuestionSlash, replaceColonEqualPlusQuestionSlash);
+    }
+
+    /** @param {string} matchText */
+    function replaceColonEqualPlusQuestionSlash(matchText) {
+      if (matchText === '%3A') return ':';
+      else if (matchText === '%3D') return '=';
+      else if (matchText === '%20') return '+';
+      else if (matchText === '%3F') return '?';
+      else return '/';
+    }
+
+    var regex_hexedColonEqualPlusNewline = /%3A|%3D|%20|%0A/ig;
+
+    /** @param {string} otherLines */
+    function mangleOtherLines(otherLines) {
+      return encodeURIComponent(otherLines).replace(regex_hexedColonEqualPlusNewline, replaceColonEqualPlusNewline);
+    }
+
+    /** @param {string} matchText */
+    function replaceColonEqualPlusNewline(matchText) {
+      if (matchText === '%3A') return ':';
+      else if (matchText === '%3D') return '=';
+      else if (matchText === '%20') return '+';
+      else return '/';
+    }
+
+
+    return mangleForURL;
+  })();
+
 
   /** @param source {string} */
   function decodeText(source) {

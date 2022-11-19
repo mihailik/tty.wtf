@@ -34,6 +34,56 @@ function startHARREST() {
     }
   }
 
+  /** @param mangled {string} */
+  function unmangleFromURL(mangled) {
+    return decodeURIComponent(mangled
+      .replace(/\//g, '\n')
+      .replace(/\+/g, ' ')
+    );
+  }
+
+  /** @param {string} text */
+  function mangleForURL(text) {
+    return encodeURIComponent(text)
+      .replace(/%3A/ig, ':')
+      .replace(/%20/ig, '+')
+      .replace(/%0A/gi, '/');
+  }
+
+  /** @param source {string} */
+  function decodeText(source) {
+    if (!source) return '';
+
+    if (/^txt~/.test(source)) {
+      return source.slice('txt~'.length);
+    } else if (/^b~/.test(source)) {
+      return convertFromCompressed(source.slice('b~'.length));
+    } else {
+      return source;
+    }
+  }
+
+  /** @param {string} text */
+  function convertFromCompressed(text) {
+    try {
+      /** @type {number[]} */
+      var bytes = [];
+      var bytesStr = atob(text);
+      for (var i = 0; i < bytesStr.length; i++) {
+        bytes.push(bytesStr.charCodeAt(i));
+      }
+
+      var jsz = JSZipSync(bytes);
+      /** @type {string} */
+      var content = jsz.file('t').asText();
+      return content;
+    }
+    catch (err) {
+      console.error('decompression error: ', err);
+      return '';
+    }
+  }
+
   function getFunctionCommentContent(fn) {
     return (fn + '').replace(/^([\s\S\n\r]*\/\*\s*)([\s\S\n\r]*)(\s*\*\/[\s\r\n]*}[\s\r\n]*)$/, function (whole, lead, content, tail) { return content; });
   }
@@ -212,6 +262,17 @@ function startHARREST() {
       });
     }
 
+    function getLocationSource() {
+      if (!location) location = window.location;
+      var source = unmangleFromURL(
+        (location.hash || '').replace(/^#/, '') ||
+        (location.search || '').replace(/^\?/, '') ||
+        (location.pathname || '').replace(/^\//, '').replace(/^404.html/, '').replace(/^index.html/, '')
+      );
+
+      return source || '';
+    }
+
     /**
      * @param {(src: string) => string} mapSrc
      * @param {(success: boolean) => void} callback
@@ -350,7 +411,9 @@ function startHARREST() {
     }
 
     function continueWithDependencies() {
-      CodeMirror(requestTD, { lineNumbers: true });
+      requestTD.innerHTML = '';
+      responseTD.innerHTML = '';
+      CodeMirror(requestTD, { lineNumbers: true, value: deriveTextFromLocation() });
       CodeMirror(responseTD, { lineNumbers: true, readOnly: true });
     }
 
@@ -427,6 +490,36 @@ function startHARREST() {
     }
 
     restoreSplitterPosition();
+    setTmpTexts();
+
+    function setTmpTexts() {
+      var tmpText = document.createElement('pre');
+      var tmpBorder = document.createElement('pre');
+      tmpBorder.style.cssText = tmpText.style.cssText = 'font: inherit; overflow: auto; height: 100%; width: 100%; border-left: solid #fbfbfb 2em; padding: 0.24em; padding-left: 0.11em;';
+      set(tmpText, deriveTextFromLocation());
+      requestTD.appendChild(tmpText);
+      responseTD.append(tmpBorder);
+    }
+
+
+    /**
+     * @param {typeof window.location=} location
+     **/
+    function deriveTextFromLocation(location) {
+      var decoded = decodeText(getLocationSource());
+      return decoded;
+    }
+
+    function getLocationSource() {
+      if (!location) location = window.location;
+      var source = unmangleFromURL(
+        (location.hash || '').replace(/^#/, '') ||
+        (location.search || '').replace(/^\?/, '') ||
+        (location.pathname || '').replace(/^\//, '').replace(/^api\//, '').replace(/^404.html/, '')
+      );
+
+      return source || '';
+    }
 
     function restoreSplitterPosition() {
       if (!window.name || typeof JSON === 'undefined' || !JSON || typeof JSON.parse !== 'function') return;

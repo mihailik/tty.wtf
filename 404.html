@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:1tpovumz7yc} Thu Nov 17 2022 00:00:23 GMT+0000 (Greenwich Mean Time) with  darwin/x64 -->
+<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:14z3kh6y21f} Thu Nov 17 2022 22:47:53 GMT+0000 (Coordinated Universal Time) with  linux/x64 -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -66,6 +66,18 @@ body {
   color: #ddd;
 }
 
+#shell #contentPageHost {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+
+#shell #contentPageHost #requestEditorHost {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+
 #shell #pseudoGutter {
   border-right: solid 1px #e4e4e4;
   background: #fbfbfb;
@@ -92,6 +104,14 @@ body {
 #shell #leftBar {
   background: #fbfbfb;
 }
+
+#shell .goButton {
+  border-radius: 100%;
+  width: 4em;
+  height: 4em;
+  margin-top: 3em;
+  margin-left: 0.6em;
+}
 </style>
 </head><body><div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 3em;">
 
@@ -103,10 +123,12 @@ body {
   </div>
 
   <div style="position: relative; width: 100%; height: 100%;">
-    <div id=editorHost style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-      <div id="pseudoGutter">1</div>
-      <textarea id="pseudoEditor">
-      </textarea>
+    <div id=contentPageHost>
+      <div id=requestEditorHost>
+        <div id="pseudoGutter">1</div>
+        <textarea id="pseudoEditor">
+        </textarea>
+      </div>
     </div>
   </div>
 

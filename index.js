@@ -96,7 +96,7 @@ function catchREST() {
   function parseFirstLine(firstLine) {
     // TODO: detect verb, then URL, potentially infer HTTP/S protocol
 
-    var verbMatch = /^(\*)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace)(\s+|$)/i.exec(firstLine + '');
+    var verbMatch = /^(\s*)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace)(\s+|$)/i.exec(firstLine + '');
     if (!verbMatch) {
       var url = firstLine.replace(/^\s+/, '');
       var urlPos = firstLine.length - url.length;
@@ -111,6 +111,9 @@ function catchREST() {
           urlPos: urlPos
         };
       }
+
+      // neither HTTP verb matched, nor URL
+      return;
     }
 
     var leadWhitespace = verbMatch[1] || '';
@@ -243,6 +246,10 @@ body {
 <div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 3em;">
 
   <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 3em;">
+    <table style="width: 100%; height: 100%; position: relative; z-index: 100000;" cellspacing=0 cellpadding=0>
+    <tr><td valign=top id=leftTop>^</td></tr>
+    <tr><td id=leftMiddle> - </td></tr>
+    <tr><td valign=bottom id=leftBottom> v </td></tr></table>
   </div>
 
   <div style="position: relative; width: 100%; height: 100%;">
@@ -3609,13 +3616,26 @@ issuing requests, processing data and representing the data in sensible way with
               autofocus: true
             });
 
+        var timeoutChangesDebounce;
         editor.on('changes', function () {
-          var pars = parseTextRequest(editor.getValue());
-          if (pars && pars.firstLine) {
-            var parsFirst = parseFirstLine(pars.firstLine);
-          }
+          clearTimeout(timeoutChangesDebounce);
+          timeoutChangesDebounce = setTimeout(function() {
+            var pars = parseTextRequest(editor.getValue());
+            if (pars && pars.firstLine) {
+              var parsFirst = parseFirstLine(pars.firstLine);
+            }
 
-          console.log('edited ', { ...pars, first: parsFirst });
+            if (parsFirst) console.log('edited ', pars, ' url ', parsFirst);
+            else if (pars) console.log('edited ', pars);
+
+            if (parsFirst && parsFirst.verb) {
+              layout.leftBottom.innerHTML = '<button>' + parsFirst.verb.toUpperCase() + '</button>';
+            }
+
+            if (parsFirst && parsFirst.verbPos > 0) {
+              // highlight inside CodeMirror
+            }
+          }, 400);
         });
 
         function accept() {
@@ -3627,6 +3647,9 @@ issuing requests, processing data and representing the data in sensible way with
         var shell = /** @type {HTMLElement} */(document.getElementById('shell'));
  
         var leftBar = /** @type {HTMLElement} */(document.getElementById('leftBar'));
+        var leftTop = /** @type {HTMLElement} */(document.getElementById('leftTop'));
+        var leftMiddle = /** @type {HTMLElement} */(document.getElementById('leftMiddle'));
+        var leftBottom = /** @type {HTMLElement} */(document.getElementById('leftBottom'));
  
         var editorHost = /** @type {HTMLElement} */(document.getElementById('editorHost'));
 
@@ -3635,13 +3658,14 @@ issuing requests, processing data and representing the data in sensible way with
 
         return {
           shell: shell,
-          leftBar: leftBar,
+          leftBar: leftBar, leftTop: leftTop, leftMiddle: leftMiddle, leftBottom: leftBottom,
           editorHost: editorHost,
           pseudoEditor: pseudoEditor,
           pseudoGutter: pseudoGutter,
           allFound:
             !!shell &&
-            !!leftBar && !!editorHost &&
+            !!leftBar && !!leftTop && !!leftMiddle && !!leftBottom &&
+            !!editorHost &&
             !!pseudoEditor && /textarea/i.test(pseudoEditor.tagName || '') && !!pseudoGutter
         };
       }

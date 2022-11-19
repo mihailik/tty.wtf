@@ -44,10 +44,12 @@ function startHARREST() {
 
   /** @param {string} text */
   function mangleForURL(text) {
+    // var firstLineBreak = text.indexOf('\n');
     return encodeURIComponent(text)
       .replace(/%3A/ig, ':')
+      .replace(/%3D/ig, '=')
       .replace(/%20/ig, '+')
-      .replace(/%0A/gi, '/');
+      .replace(/%0A/gi, '$/');
   }
 
   /** @param source {string} */

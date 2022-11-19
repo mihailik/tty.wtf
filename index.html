@@ -1,1 +1,9 @@
 <script src="/index.js"></script>
+<script>
+  (function() {
+    if (location.protocol !== 'file:') return;
+    var script = document.createElement('script');
+    script.src = location.pathname.replace(/index.html$/, 'index.js');
+    document.scripts[document.scripts.length-1].parentElement.appendChild(script);
+  })()
+</script>

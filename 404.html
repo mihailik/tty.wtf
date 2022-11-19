@@ -5,6 +5,7 @@ function startHARREST() {
   var importedJS = [
     'codemirror@5.64.0/lib/codemirror.js',
     'typescript@4.5.4/lib/typescript.js',
+    'ts-jsonp@4.7.4/index.js',
     // 'xlsx@0.17.4/dist/xlsx.full.min.js'
     'xlsx@0.17.4/xlsx.js',
     'xlsx@0.17.4/jszip.js'
@@ -12,10 +13,6 @@ function startHARREST() {
 
   var importedStyles = [
     'codemirror/lib/codemirror.css'
-  ];
-
-  var libDTS = [
-    'typescript/lib/lib.d.ts'
   ];
   
   function detectEnvironmentAndStart() {
@@ -227,13 +224,6 @@ function startHARREST() {
         var script = document.createElement('script');
         script.src = mapSrc(importedJS[i]);
         dependencyElements.push(script);
-
-        if (/typescript@/.test(importedJS[i])) {
-          var libdtsScript = document.createElement('script');
-          libdtsScript.src = 'https://api.allorigins.win/get?callback=libdtsLoaded&url=https://unpkg.com/typescript@4.7.4/lib/lib.d.ts';
-          window.libdtsLoaded = libdtsLoaded;
-          document.head.appendChild(libdtsScript);
-        }
       }
 
       for (var i = 0; i < importedStyles.length; i++) {
@@ -243,29 +233,7 @@ function startHARREST() {
         dependencyElements.push(link);
       }
 
-      loadDependencyElements(dependencyElements, scriptsLoaded);
-
-      var libdtsComplete, scriptsComplete;
-
-      function checkBothLoaded() {
-        if (libdtsComplete && scriptsComplete) {
-          ts.libdts = libdtsComplete;
-          callback(scriptsComplete.success);
-        }
-      }
-
-      function libdtsLoaded(data) {
-        libdtsComplete = data.contents;
-
-        checkBothLoaded();
-      }
-
-      /** @param {boolean} success */
-      function scriptsLoaded(success) {
-        scriptsComplete = { success: success };
-
-        checkBothLoaded();
-      }
+      loadDependencyElements(dependencyElements, callback);
     }
 
     /**

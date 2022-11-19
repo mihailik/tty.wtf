@@ -3509,8 +3509,7 @@ body {
       }
 
       function loadingComplete() {
-        layout.pseudoEditor.onclick = () => {
-          layout.editorHost.innerHTML = '';
+        layout.editorHost.innerHTML = '';
 
         /** @type {import('codemirror').Editor} */
         var editor = CodeMirror(
@@ -3531,8 +3530,6 @@ body {
         var ef = editor.getInputField();
         console.log('getInputField ', ef);
         editor.setValue(editor.getValue() + '\n\n' + (!ef ? '-' : ef.outerHTML.slice(0, ef.outerHTML.indexOf('>') + 1)));
-
-        };
 
         function accept() {
 

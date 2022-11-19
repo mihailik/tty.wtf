@@ -1,5 +1,6 @@
+const path = require('path');
+
 // @ts-check <script>
-status = 'script start...';
 function catchREST() {
 
   /** @param {Function} fn */
@@ -69,8 +70,46 @@ function catchREST() {
     return +new Date();
   }
 
+  function parseEncodedURL(url) {
+    var verbOffset = getVerbOffset(url);
+    if (verbOffset < 0) return;
+
+    var encodedStr = url.slice(verbOffset + 1);
+    var posEndVerbSlash = encodedStr.indexOf('/');
+    var verb;
+    if (posEndVerbSlash >= 0) {
+      verb = encodedStr.slice(0, posEndVerbSlash);
+      encodedStr = encodedStr.slice(posEndVerbSlash + 1);
+    } else {
+      verb = encodedStr;
+      encodedStr = '';
+    }
+
+    var addr;
+    var addrEndPos = encodedStr.indexOf('//');
+    if (addrEndPos >= 0) {
+      addr = encodedStr.slice(0, addrEndPos); // TODO: unescape strange characters here?
+      encodedStr = encodedStr.slice(addrEndPos + 2);
+    } else {
+      addr = encodedStr;
+      encodedStr = '';
+    }
+
+    var body = encodedStr;
+
+    return {
+      verb: verb,
+      addr: addr,
+      body: body
+    };
+  }
+
+  function getVerbOffset(path) {
+    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/?)$/i.exec(path + '');
+    return verbMatch ? verbMatch.index : -1;
+  }
+
   function runBrowser() {
-    status = 'runBrowser...';
     // TODO: remove spurious injected scripts
 
     var layout = bindLayout();
@@ -88,6 +127,20 @@ function catchREST() {
       catchREST.withDependenciesLoaded = withDependenciesLoaded;
     }
 
+    function deriveTextFromLocation() {
+      var source =
+        location.hash && location.hash !== '#' ? location.hash.replace(/^#/, '') :
+          location.pathname;
+
+      var parsed = parseEncodedURL(source);
+
+      var text = (parsed.verb || 'GET').toUpperCase();
+      if (parsed.addr) text += ' ' + parsed.addr;
+      if (parsed.body) text += '\n' + parsed.body;
+
+      return text;
+    }
+
     function withDependenciesLoaded() {
       catchREST.withDependenciesLoaded = null;
       status = 'withDependenciesLoaded...';
@@ -96,7 +149,7 @@ function catchREST() {
       function createCodeMirrors() {
         // @ts-ignore CodeMirror is defined
         var CodeMirrorCtor = CodeMirror;
-        var locationText = 'deriveTextFromLocation();';
+        var locationText = deriveTextFromLocation();
         //updateSendLabel(locationText);
         requestCodeMirror = CodeMirrorCtor(layout.requestTD,
           {
@@ -104,7 +157,7 @@ function catchREST() {
             value: locationText,
             extraKeys: {
               'Ctrl-Enter': sendRequestInteractively,
-              'Cmd-Enter': sendRequestInteractively,
+              'Cmd-Enter': sendRequestInteractively
             },
             lineWrapping: true,
             autofocus: true
@@ -129,6 +182,21 @@ function catchREST() {
 
         }
       }
+    }
+
+    function on(elem, eventName, callback) {
+      if (elem.addEventListener) return elem.addEventListener(eventName, callback);
+      else if (elem.attachEvent) return elem.attachEvent('on' + eventName, callback);
+      else elem['on' + eventName] = function (evt) {
+        if (!evt) evt = typeof event === 'undefined' ? void 0 : event;
+        return callback(evt);
+      };
+    }
+
+    function off(elem, eventName, callback) {
+      if (elem.removeEventListener) return elem.removeEventListener(eventName, callback);
+      else if (elem.detachEvent) return elem.detachEvent('on' + eventName, callback);
+      else elem['on' + eventName] = null;
     }
 
     function set(elem, value) {
@@ -169,14 +237,14 @@ function catchREST() {
     function makeSplitterDraggable() {
       restoreSplitterPosition();
 
-      layout.splitterTD.onmousedown = splitterTD_onmousedown;
-      layout.splitterTD.ontouchstart = splitterTD_onmousedown;
-      layout.splitterTD.ontouchend = splitterTD_onmouseup;
-      layout.splitterTD.onmouseup = splitterTD_onmouseup;
-      layout.splitterTD.onmousemove = splitterTD_onmousemove;
-      window.onmousemove = splitterTD_onmousemove;
-      window.ontouchmove = splitterTD_onmousemove;
-      window.onmouseup = splitterTD_onmouseup
+      on(layout.splitterTD, 'mousedown', splitterTD_onmousedown);
+      on(layout.splitterTD, 'touchstart', splitterTD_onmousedown);
+      on(layout.splitterTD, 'touchend', splitterTD_onmouseup);
+      on(layout.splitterTD, 'mouseup', splitterTD_onmouseup);
+      on(layout.splitterTD, 'mousemove', splitterTD_onmousemove);
+      on(window, 'mousemove', splitterTD_onmousemove);
+      on(window, 'touchmove', splitterTD_onmousemove);
+      on(window, 'mouseup', splitterTD_onmouseup);
 
       /** @type {boolean} */
       var splitterTD_mice;
@@ -186,7 +254,8 @@ function catchREST() {
        * @param {boolean} down
        */
       function updateMice(evt, down) {
-        if (evt.button) down = false;
+        // TODO: handle right-click specially!
+        // if (evt.button) down = false;
         splitterTD_mice = down;
 
         if (splitterTD_mice) {
@@ -222,7 +291,8 @@ function catchREST() {
               y = touches[0].pageY;
           }
 
-          var ratio = y / (window.innerHeight - (layout.statusTD.offsetHeight || layout.statusTD.getBoundingClientRect().height));
+          var windowHeight = window.innerHeight || document.body.offsetHeight;
+          var ratio = y / (windowHeight - (layout.statusTD.offsetHeight || layout.statusTD.getBoundingClientRect().height));
 
           var ratioPercent = (ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
           var reverseRatioPercent = (100 - ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
@@ -270,16 +340,17 @@ function catchREST() {
         'codemirror/lib/codemirror.js',
         'codemirror/lib/codemirror.css',
 
-        'typescript/lib/typescript.js',
-        // include lib.d.ts here? probably no
-
         'xlsx/dist/xlsx.full.min.js',
         //'xlsx/jszip.js'
+
+        'typescript/lib/typescript.js'
+        // include lib.d.ts here? probably no
       ];
 
       var combinedJS = '';
 
-      for (var im of imports) {
+      for (var i = 0; i < imports.length; i++) {
+        var im = imports[i];
         var scriptFilePath = path.resolve(__dirname, 'node_modules', im);
         var content = fs.readFileSync(scriptFilePath, 'utf8');
         console.log(im + ' [' + content.length + ']');
@@ -330,7 +401,7 @@ function catchREST() {
           replacements.sort(function (r1, r2) { return r1.pos - r2.pos });
           var updatedContent = '';
           var lastPos = 0;
-          for (let i = 0; i < replacements.length; i++) {
+          for (var i = 0; i < replacements.length; i++) {
             var repl = replacements[i];
             if (repl.pos > lastPos) updatedContent += content.slice(lastPos, repl.pos);
             updatedContent += repl.text;
@@ -543,10 +614,10 @@ function catchREST() {
           '  ' +
           (process.env[catchREST_secret_variable_name] ? '~' + process.pid : '[' + process.pid + ']') +
           req.method + url.pathname);
-        switch (url.pathname?.toLowerCase()) {
+        switch ((url.pathname || '').toLowerCase()) {
           case '/':
           case '/index.html':
-            return handleLocalFileRequest(__dirname + '/index.html', res);
+            return handleLocalFileRequest('/index.html', res);
 
           case 'favicon.ico':
             return handleFaviconRequest(req, res);
@@ -555,7 +626,7 @@ function catchREST() {
             return handleControlRequest(req, res, url);
 
           default:
-            return handleLocalFileRequest(__dirname + '/' + (req.url || '').replace(/^\/+/, '') , res);
+            return handleLocalFileRequest(req.url || '/', res);
         }
       }
 
@@ -564,15 +635,32 @@ function catchREST() {
        * @param {HTTPResponse} res
        */
       function handleLocalFileRequest(filePath, res) {
+        var mimeByExt = {
+          html: 'text/html',
+          htm: 'text/html',
+          js: 'application/javascript',
+          css: 'style/css'
+        };
+
         // TODO: inject ETag for caching
-        res.setHeader('Content-type', 'text/html');
+
+        var verbOffset = getVerbOffset(filePath);
+        if (verbOffset >= 0) filePath = filePath.slice(0, verbOffset);
+        if (filePath === '/' || !filePath) filePath = '/index.html';
+
         var fs = require('fs');
-        fs.readFile(filePath, function (err, data) {
+        var path = require('path');
+
+        var fullPath = __dirname + filePath;
+        fs.readFile(fullPath, function (err, data) {
           if (err) {
             res.statusCode = 404;
             console.log(' ' + (res.statusMessage = err.code || err.message || String(err)));
             res.end();
           } else {
+            var mime = mimeByExt[path.extname(filePath).toLowerCase().replace(/^\./, '')];
+            if (mime) res.setHeader('Content-type', mime);
+
             res.end(data);
             console.log(' [' + data.length + ']');
           }
@@ -734,13 +822,6 @@ function catchREST() {
     }
 
     function runAsTests() {
-      runTests(
-        function (text) { console.log(text); },
-        function (describe, it) {
-          tests(describe, it);
-          nodeTests(describe, it);
-        }
-      );
     }
 
     function derivePort(str) {
@@ -753,13 +834,6 @@ function catchREST() {
       return Math.floor(val * 3000) + 4000;
     }
 
-    /**
-     * @param {(name: string, body: Function) => void} describe
-     * @param {(name: string, body: Function) => void} it
-     */
-    function nodeTests(describe, it) {
-    }
-
     if (asModule) return runAsModule();
     else if (process.argv.filter(function (arg) { return arg === '--test' || arg === '/test'; }).length) return runAsTests();
     else return runAsServer();
@@ -770,77 +844,7 @@ function catchREST() {
     WScript.Echo('Catch REST is unable to run in WSH mode. Install node.js and run Catch REST inside of it.');
   }
 
-  /**
-   * @param {(name: string, body: Function) => void} describe
-   * @param {(name: string, body: Function) => void} it
-   */
-  function tests(describe, it) {
-    describe('unmangleFromQueryString', function () {
-      var data = {
-        '': {},
-        'post=none': { verb: 'POST', body: 'none' },
-        'put=none': { verb: 'PUT', body: 'none' },
-        'url=some': { url: 'some' }
-      };
-      for (var queryString in data) {
-        setTest(queryString, data[queryString]);
-      }
-
-      function setTest(queryString, data) {
-        var expected = JSON.stringify(data);
-        it(JSON.stringify(queryString) + ' --> ' + expected, function () {
-          var actual = JSON.stringify(unmangleFromQueryString(queryString));
-          if (actual !== expected) throw new Error('mismatch:\n' + actual + ' instead of expected\n' + expected);
-        });
-      }
-    });
-
-    describe('trimEnd', function () {
-      it('null --> ""', function () {
-        if (trimEnd(null) !== '') throw new Error('"' + trimEnd(null) + '"');
-      });
-
-      it('undefined --> ""', function () {
-        if (trimEnd(void 0) !== '') throw new Error('"' + trimEnd(void 0) + '"');
-      });
-
-      it('"" --> ""', function () {
-        if (trimEnd('') !== '') throw new Error('"' + trimEnd('') + '"');
-      });
-
-      it('"a\\n " --> "a"', function () {
-        if (trimEnd('a\n ') !== 'a') throw new Error('"' + trimEnd('a\n ') + '"');
-      });
-    });
-
-    describe('getFunctionCommentContent', function () {
-      it('named function', function () {
-        if (getFunctionCommentContent(myFn) !== 'comment') throw new Error(myFn + ' resulted in "' + getFunctionCommentContent(myFn) + '"');
-        function myFn() { /* comment */}
-      });
-
-      it('unnamed function', function () {
-        var fn = function () { /* comment ABC*/ };
-        var str = getFunctionCommentContent(fn);
-        if (str !== 'comment ABC') throw new Error(fn + ' resulted in "' + str + '"');
-      });
-
-      it('multiline function', function () {
-        if (getFunctionCommentContent(myFn) !== 'comment\nvery important') throw new Error(myFn + ' resulted in "' + getFunctionCommentContent(myFn) + '"');
-        function myFn() {
-          /*
-comment
-very important
-          */
-        }
-      });
-    });
-  }
-
   function detectEnvironmentAndStart() {
-    status = 'detectEnvironmentAndStart...';
-    status = 'detectEnvironmentAndStart: ' + detectEnvironment() + '...';
-
     switch (detectEnvironment()) {
       case 'browser': return runBrowser();
       case 'node-script': return runNode(false /* asModule */);
@@ -851,10 +855,10 @@ very important
     throw new Error('Running in an unsupported environment.');
 
     function detectEnvironment() {
-      if (typeof window !== 'undefined' && window && typeof window.alert === 'function'
-        && typeof document !== 'undefined' && document && typeof document.createElement === 'function')
+      if (typeof window !== 'undefined' && window && /**@type{*}*/(window.alert)
+        && typeof document !== 'undefined' && document && /**@type{*}*/(document.createElement))
         return 'browser';
-      
+
       // TODO: detect worker in browser
 
       if (typeof process !== 'undefined' && process && process.argv && typeof process.argv.length === 'number'
@@ -872,8 +876,6 @@ very important
   }
 
 
-  status = 'catchREST...';
   detectEnvironmentAndStart();
 }
-status = 'nearly catchREST()...';
 catchREST(); //</script>

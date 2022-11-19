@@ -7,26 +7,57 @@
 <meta property="og:description" content="Catch Rest 🍹!">
 <meta name="twitter:image:alt" content="Catch Rest 🍹!">
 <meta name="twitter:card" content="summary_large_image">
+
 <script>
-status = 'location check...';
+if (!window.addEventListener) {
+  window.onerror = function() {
+    var txt = '';
+    for (var i = 0; i < arguments.length; i++) {
+      var errTxt = getErrText(arguments[i]);
+      if (errTxt) {
+        txt += txt ? txt + ' \n' + errTxt : errTxt;
+      }
+    }
+    alert(txt);
+
+    function getErrText(err) {
+      if (err == null) return String(err);
+      if (typeof err === 'string') return err;
+      if (err.stackTrace) return err.message + ' :: ' + err.stackTrace;
+      else if (err.stack) return err.message + ' :: ' + err.stackTrace;
+      else if (err.message) return err.message;
+      else return String(err);
+    }
+
+  };
+}
 </script>
 
 <script>
-status = 'location check script...';
 (function() {
   if (location.protocol.indexOf('file') >= 0) return;
-  var posMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/?)$/i.exec(location.pathname+'');
-  if (!posMatch) return;
+  var verbOffset = getVerbOffset(location.pathname);
+  if (verbOffset < 0) return;
 
-  var baseUrl = location.protocol + '//' + location.hostname + '/' + location.pathname.slice(0, posMatch.index);
-  status = 'location check baseUrl=' + baseUrl + ' ...';
+  var baseUrl = location.protocol + '//' + location.hostname + '/' + location.pathname.slice(0, verbOffset);
   var inject = '<base href="' + baseUrl + '">';
-  if (typeof Promise !== 'function') {
-    inject += '<' + 'script' + 'src="' + baseUrl + '/lib/poly.js"></' + 'script' + '>';
-  }
-  status = 'location check baseUrl=' + baseUrl + ' write()...';
   document.write(inject);
+
+  function getVerbOffset(path) {
+    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/?)$/i.exec(path + '');
+    return verbMatch ? verbMatch.index : -1;
+  }
 })()
+</script>
+<script>
+if (typeof Promise === 'undefined' || typeof Object.defineProperties !== 'function') {
+  (function() {
+    var script = document.createElement('script');
+    script.src = 'lib/poly.js';
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(script);
+  })();
+}
+
 </script>
 
 <style>
@@ -176,20 +207,25 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       Loading...
   </td></tr></table>
 
-<script>
+<scripta>
 status = 'main.js...';
-</script>
+</scripta>
 <script src="main.js"></script>
-<script>
+<scripta>
 status = 'combined.js...';
-</script>
-<script src="lib/combined.js"></script>
+</scripta>
+<scripta src="lib/combined.js"></scripta>
 
-<script>
+<scripta>
+status = 'check if need to call withDependenciesLoaded: catchREST: ' + typeof catchREST + '...';
+status = 'check if need to call withDependenciesLoaded: catchREST: ' + typeof catchREST + ', catchREST.withDependenciesLoaded ' + typeof (typeof catchREST === 'undefined' ? catchREST : catchREST.withDependenciesLoaded) + '...';
+</scripta>
+<scripta>
 if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function") {
   status = 'catchREST.withDependenciesLoaded() from body...';
   catchREST.withDependenciesLoaded();
+  status = 'completed.';
 }
-</script>
+</scripta>
 
 </body></html>

@@ -151,31 +151,38 @@ body {
 }
   */});
 
-  var embeddedCodeMirrorCSS = function(prefix) {
-    var css = getFunctionCommentContent(function() { /*
-{prefix} .CodeMirror {
+  var embeddedShellCSS = getFunctionCommentContent(function() { /*
+#shell .CodeMirror {
   position: absolute;
   left: 0; top: 0;
   width: 100%; height: 100%;
   font: inherit;
 }
 
-{prefix} .CodeMirror-gutters {
+#shell .CodeMirror-gutters {
   border-right: solid 1px #e4e4e4;
 }
 
-{prefix} .CodeMirror-gutter.CodeMirror-linenumbers {
+#shell .CodeMirror-gutter.CodeMirror-linenumbers {
   background: #fbfbfb;
 }
-    */});
 
-    if (prefix) return css.replace(/\{prefix\}/g, prefix);
-    else return css.replace(/\{prefix\}\s*/g, '');
-  }
+#shell #leftBar {
+  background: #fbfbfb;
+}
+*/});
 
   var embeddedShellLayoutHTML = getFunctionCommentContent(function () { /*
-<div style="position: fixed; left: 0; top: 0; width: 100%; height: 100%">
-shell layout
+<div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 3em;">
+
+  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 3em;">
+  </div>
+
+  <div style="position: relative; width: 100%; height: 100%;">
+    <div id=editorHost style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+    </div>
+  </div>
+
 </div>
   */});
 
@@ -3459,12 +3466,9 @@ shell layout
     function createShell() {
 
       injectStyle();
+      var layout = injectShellHTML();
 
-      var host = document.createElement('div');
-      host.id = 'editor-host';
-      host.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding-top: 10%; text-align: center;';
-      set(host, 'Loading..');
-      document.body.appendChild(host);
+      set(layout.editorHost, 'Loading..');
       console.log('Loading..');
 
       return {
@@ -3473,22 +3477,14 @@ shell layout
       };
 
       function loadingTakesTime() {
-        set(host, 'Loading...');
+        set(layout.editorHost, 'Loading...');
         // TODO: whatever progress...
       }
 
       function loadingComplete() {
-        Object.assign(host.style, {
-          padding: 0,
-          margin: 0
-        });
-        var editorHost = document.createElement('div');
-        editorHost.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: silver; text-align: left;';
-        host.innerHTML = '';
-        host.appendChild(editorHost);
         /** @type {import('codemirror').Editor} */
         var editor = CodeMirror(
-          editorHost,
+          layout.editorHost,
           {
             value: 'Loaded OK [*]',
 
@@ -3506,12 +3502,32 @@ shell layout
         }
       }
 
+      function bindLayout() {        
+        var shell = /** @type {HTMLElement} */(document.getElementById('shell'));
+ 
+        var leftBar = /** @type {HTMLElement} */(document.getElementById('leftBar'));
+ 
+        var editorHost = /** @type {HTMLElement} */(document.getElementById('editorHost'));
+
+        return {
+          shell: shell,
+          leftBar: leftBar,
+          editorHost: editorHost
+        };
+      }
+
       function injectShellHTML() {
+        var virt = document.createElement('div');
+        virt.innerHTML = embeddedShellLayoutHTML;
+        var content = virt.getElementsByTagName('div')[0];
+        document.body.appendChild(content);
+
+        return bindLayout();
       }
 
       function injectStyle() {
         var style = document.createElement('style');
-        set(style, embeddedCodeMirrorCSS('#editor-host'));
+        set(style, embeddedShellCSS);
         var head = document.head || document.getElementsByTagName('head')[0];
         if (!head) {
           head = document.createElement('head');

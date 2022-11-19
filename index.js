@@ -1,16 +1,21 @@
 // @ts-check
-function startHARREST() {
+function startCatchREST() {
 
   var unicodeTitle = 'Catch Rest ' + String.fromCharCode(55356) + String.fromCharCode(57209);
+  var disableTypeScript = true;
 
   var importedJS = [
     'codemirror@5.64.0/lib/codemirror.js',
-    'typescript@4.7.3/lib/typescript.js',
-    'ts-jsonp@4.7.3/index.js',
+
     // 'xlsx@0.17.4/dist/xlsx.full.min.js'
     'xlsx@0.17.4/xlsx.js',
     'xlsx@0.17.4/jszip.js'
   ];
+
+  if (!disableTypeScript) {
+    importedJS.push('typescript@4.7.3/lib/typescript.js');
+    importedJS.push('ts-jsonp@4.7.3/index.js');
+  }
 
   var importedStyles = [
     'codemirror@5.64.0/lib/codemirror.css'
@@ -278,24 +283,21 @@ function startHARREST() {
         return;
       }
 
-      console.log('HAR Rest node server@' + process.pid + ' init...');
+      process.stdout.write('Catch Rest node server@');
       var startServerPromise = startServer(handleRequest, HTTP_PORT);
       startServerPromise.then(
         function (listeningServer) {
-          console.log('HAR Rest node server@' + process.pid + ' listening on http://localhost:' + HTTP_PORT + '/');
+          process.stdout.write(' listening on http://localhost:' + HTTP_PORT + '/\n');
           server = listeningServer;
 
           if (process.connected) {
-            console.log('process is connected!');
             watchDedicatedTtyParentAndExit();
           } else {
-            console.log('process is rooted!');
             watchSelfAndRestart();
           }
         },
         function (startServerError) {
-          console.log('Could not start HTTP service at http://localhost:' + HTTP_PORT + '/ ', startServerError);
-          console.log('shutting down...');
+          console.log('\n\nSHUTDOWN: CANNOT START http://localhost:' + HTTP_PORT + '/\n', startServerError);
           initiateShutdown();
         }
       );
@@ -361,18 +363,20 @@ function startHARREST() {
                 retryCount = (retryCount || 0) +1;
 
                 // first try failed, request shutdown and keep retrying
-                console.log('Port is busy, requesting http://localhost:' + port + '/shutdown ...');
+                process.stdout.write(' handover..');
                 if (scriptParent) {
-                  process.send({ server: { requestTimeout: server.requestTimeout }, platform: process.platform, cwd: process.cwd });
+                  // @ts-ignore when scriptParent is set, process.send will exist
+                  process.send(
+                    { server: { requestTimeout: server.requestTimeout }, platform: process.platform, cwd: process.cwd });
                 }
 
                 requestShutdownExisting(port).then(
                   function () {
-                    console.log('shutdown request OK');
+                    process.stdout.write('.');
                     tryStarting();
                   },
                   function (err) {
-                    console.log('shutdown request failed ', err);
+                    process.stdout.write(' [' + err.message + ']');
                     tryStarting
                   })
               } else {
@@ -490,8 +494,8 @@ function startHARREST() {
     function getCurrentJS() {
       var jsText =
         '// @ts-check\n' +
-        startHARREST + '\n' +
-        'startHARREST()\n';
+        startCatchREST + '\n' +
+        'statCatchREST()\n';
       return jsText;
     }
 
@@ -503,7 +507,7 @@ function startHARREST() {
       res.statusCode = 200;
       var jsText = getCurrentJS();
 
-      console.log(req.method + ' ' + req.url + ' [application/javascript ' + jsText.length + '] 200/OK');
+      process.stdout.write(req.method + ' ' + req.url + ' [application/javascript ' + jsText.length + '] 200/OK\n');
       res.setHeader('Content-Type', 'application/javascript');
       res.end(jsText);
     }
@@ -520,7 +524,7 @@ function startHARREST() {
         return;
       }
 
-      console.log(req.method + ' ' + req.url + ' --> initiating restart...');
+      console.log(req.method + ' ' + req.url + ' --> initiating restart... ');
       initiateRestart('Restart request from HTTP ' + req.method + ' ' +req.url);
       res.end('RESTART INITIATED');
     }
@@ -834,10 +838,9 @@ function startHARREST() {
         proc.send({ scriptParent: process.pid, platform: process.platform, cwd: process.cwd });
 
         // main process: keep pumping piped stdio
-        console.log('chained ' + proc.pid + '>' + process.pid);
         proc.stdout.read();
         proc.stdout.on('data', function (procOut) {
-          process.stdout.write(proc.pid + '>' + process.pid + ' ' + procOut);
+          process.stdout.write(procOut);
         });
 
         proc.on('exit', () => {
@@ -967,7 +970,10 @@ function startHARREST() {
         var allScriptsLoaded =
           // @ts-ignore CodeMirror is defined
           typeof CodeMirror === 'function' &&
-          typeof ts !== 'undefined' && typeof ts.createCompilerHost === 'function' &&
+
+          (disableTypeScript ? true :
+            typeof ts !== 'undefined' && typeof ts.createCompilerHost === 'function') &&
+
           // @ts-ignore JSZipSync is defined
           typeof JSZipSync === 'function';
 
@@ -1785,4 +1791,4 @@ function startHARREST() {
   
 }
 
-startHARREST();
+startCatchREST();

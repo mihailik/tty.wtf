@@ -44,7 +44,7 @@ if (!window.addEventListener) {
   document.write(inject);
 
   function getVerbOffset(path) {
-    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/|$)/i.exec(path + '');
+    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? verbMatch.index : -1;
   }
 })()

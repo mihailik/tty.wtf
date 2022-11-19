@@ -45,7 +45,7 @@ function catchREST() {
 
         case 'verb':
           result.verb = value;
-          continue;O
+          continue;
         
         case 'url':
           result.url = value;
@@ -83,8 +83,15 @@ function catchREST() {
       encodedStr = '';
     }
 
+    if (verb === 'http:' || verb === 'https:') {
+      encodedStr = verb + encodedStr;
+      verb = 'get';
+    }
+
     var addr;
     var addrEndPos = encodedStr.indexOf('//');
+    if (addrEndPos > 0 && encodedStr.charAt(addrEndPos-1) === ':')
+      addrEndPos = encodedStr.indexOf('//', addrEndPos + 2);
     if (addrEndPos >= 0) {
       addr = encodedStr.slice(0, addrEndPos); // TODO: unescape strange characters here?
       encodedStr = encodedStr.slice(addrEndPos + 2);
@@ -103,7 +110,7 @@ function catchREST() {
   }
 
   function getVerbOffset(path) {
-    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/|$)/i.exec(path + '');
+    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? verbMatch.index : -1;
   }
 
@@ -128,9 +135,10 @@ function catchREST() {
     function deriveTextFromLocation() {
       var source =
         location.hash && location.hash !== '#' ? location.hash.replace(/^#/, '') :
-          location.pathname;
+          (location.pathname + (location.search || ''));
 
-      var parsed = parseEncodedURL(source);
+      source = source.replace(/%([a-z0-9][a-z0-9])/ig, function (_, hex) { return String.fromCharCode(Number('0x' + hex)); });
+      var parsed = parseEncodedURL(source) || {};
 
       var text = (parsed.verb || 'GET').toUpperCase();
       if (parsed.addr) text += ' ' + parsed.addr;

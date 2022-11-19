@@ -190,9 +190,11 @@ function startHARREST() {
     var splitterTD = /** @type {HTMLTableCellElement} */(document.getElementById('splitterTD'));
     
     splitterTD.onmousedown = splitterTD_onmousedown;
+    splitterTD.ontouchstart = splitterTD_onmousedown;
     splitterTD.onmouseup = splitterTD_onmouseup;
     //splitterTD.onmousemove = splitterTD_onmousemove;
     window.onmousemove = splitterTD_onmousemove;
+    window.ontouchmove = splitterTD_onmousemove;
 
     if (location.protocol === 'file:') {
       loadDependenciesFromLocalNodeModules(function (success) {
@@ -291,17 +293,16 @@ function startHARREST() {
       }
     }
 
-    /** @type {number} */
+    /** @type {boolean} */
     var splitterTD_mice;
 
     /**
-     * @param {{ button: number }} evt
+     * @param {{ button?: number }} evt
      * @param {boolean} down
      */
     function updateMice(evt, down) {
-      var mask = 1 << (evt.button || 0);
-      if (down) splitterTD_mice |= mask;
-      else splitterTD_mice &= ~mask;
+      if (evt.button) down = false;
+      splitterTD_mice = down;
 
       if (splitterTD_mice) {
         if (!/(\s+|^)down(\s+|$)/.test(splitterTD.className || '')) splitterTD.className += ' down';
@@ -310,7 +311,7 @@ function startHARREST() {
       }
     }
 
-        /** @param {MouseEvent} evt */
+        /** @param {MouseEvent | TouchEvent} evt */
     function splitterTD_onmousedown(evt) {
       updateMice(evt, true);
     }
@@ -320,12 +321,22 @@ function startHARREST() {
       updateMice(evt, false);
     }
 
-    /** @param {MouseEvent} evt */
+    /** @param {MouseEvent | TouchEvent} evt */
     function splitterTD_onmousemove(evt) {
       if (splitterTD_mice) {
         if (typeof evt.preventDefault === 'function') evt.preventDefault();
 
-        var ratio = (evt.pageY || evt.y) / (window.innerHeight - (statusTD.offsetHeight || statusTD.getBoundingClientRect().height));
+        var y =
+          /** @type {MouseEvent} */(evt).pageY ||
+          /** @type {MouseEvent} */(evt).y;
+        
+        if (!y) {
+          var touches = /** @type {TouchEvent} */(evt).touches;
+          if (touches && touches.length === 1)
+            y = touches[0].pageY;
+        }
+
+        var ratio = y / (window.innerHeight - (statusTD.offsetHeight || statusTD.getBoundingClientRect().height));
 
         var ratioPercent = (ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
         var reverseRatioPercent = (100 - ratio * 100).toFixed(2).replace(/0+$/, '') + '%';
@@ -461,6 +472,7 @@ function startHARREST() {
       border: solid 1px #fed4dc;
       border-left: none;
       cursor: ns-resize;
+      pading: 0.3em;
     }
 
     #splitterTD.down {

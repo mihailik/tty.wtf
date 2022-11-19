@@ -1173,11 +1173,9 @@ function startCatchREST() {
      * @returns {Promise<CommonResponseData | undefined>}
      */
     function sendRequestAsync(req) {
-      if (typeof location !== 'undefined' && location.host && /localhost|127/.test(location.host)) {
-        return sendRequestAsync.detectAndSendDirectly(req);
-      }
-
-      return sendRequestAsync.sendViaCorsProxy(req);
+      var isLocalhosted = typeof location !== 'undefined' && location && location.host && /localhost|127/.test(location.host);
+      if (isLocalhosted) return sendRequestAsync.sendViaCorsProxy(req);
+      else return sendRequestAsync.detectAndSendDirectly(req);
     }
 
     sendRequestAsync.sendViaCorsProxy = (function () {

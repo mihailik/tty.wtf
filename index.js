@@ -452,7 +452,7 @@ body {
   overflow:hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
-  */});
+  */}) + '\n.cssAuthenticityMarker{/' + '* {build-by-hash:' + catchREST_hash + '} *' + '/}';
 
   var embeddedShellCSS = getFunctionCommentContent(function() { /*
 #shell .CodeMirror {
@@ -4326,6 +4326,8 @@ issuing requests, processing data and representing the data in sensible way with
       }
 
       function injectStyle() {
+        if (verifyAuthenticStylesPresent()) return;
+
         var style = document.createElement('style');
         set(style, embeddedShellCSS);
         var head = document.head || document.getElementsByTagName('head')[0];
@@ -4334,6 +4336,14 @@ issuing requests, processing data and representing the data in sensible way with
           document.children[0].appendChild(head);
         }
         head.appendChild(style);
+
+        function verifyAuthenticStylesPresent() {
+          var allStyles = document.getElementsByTagName('style');
+          for (var i = 0; i < allStyles.length; i++) {
+            var sty = allStyles[i];
+            if ((sty.innerHTML || '').indexOf(catchREST_hash) >= 0) return true;
+          }
+        }
       }
     }
 

@@ -791,8 +791,9 @@ issuing requests, processing data and representing the data in sensible way with
                 processedContent = strictES3(importEntry.importLocalPath, importEntry.content);
                 // concatenate most TypeScript namespaces
                 processedContent = processedContent.replace(/\}\)\(ts\s*\|\|\s*\(ts\s*=\s*\{\}\)\);\s*(((\s*\/\/[^\n]*\n)|(\s*\/\*+[^\*]*\*\/))*)\s*var\s*ts;\s*\(function\s*\(ts\)\s*\{/g, '\n\n$1\n');
-                // exclude 'ts.' prefix to refer to values within ts namespace directly
-                processedContent = processedContent.replace(/([^.])\bts\./g, '$1');
+
+                // This causes errors:  exclude 'ts.' prefix to refer to values within ts namespace directly
+                // processedContent = processedContent.replace(/([^.])\bts\./g, '$1');
               }
               return '// #region ' + path.basename(importEntry.importLocalPath).replace(/\.js$/, '') + '\n' + processedContent + '\n' + '// #endregion';
             case '.css': return (

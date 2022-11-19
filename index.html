@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head>
+<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:y6xu4a1j5m} Sat Nov 05 2022 16:51:43 GMT+0000 (Greenwich Mean Time) with  darwin/x64 -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,59 +7,23 @@
 <meta property="og:description" content="Catch Rest 🍹!">
 <meta name="twitter:image:alt" content="Catch Rest 🍹!">
 <meta name="twitter:card" content="summary_large_image">
-
-<script>
-if (!window.addEventListener) {
-  window.onerror = function() {
-    var txt = '';
-    for (var i = 0; i < arguments.length; i++) {
-      var errTxt = getErrText(arguments[i]);
-      if (errTxt) {
-        txt += txt ? txt + ' \n' + errTxt : errTxt;
-      }
-    }
-    alert(txt);
-
-    function getErrText(err) {
-      if (err == null) return String(err);
-      if (typeof err === 'string') return err;
-      if (err.stackTrace) return err.message + ' :: ' + err.stackTrace;
-      else if (err.stack) return err.message + ' :: ' + err.stackTrace;
-      else if (err.message) return err.message;
-      else return String(err);
-    }
-
-  };
-}
-</script>
-
+<title>Catch Rest 🍹</title>
 <script>
 (function() {
-  if (location.protocol.indexOf('file') >= 0) return;
-  var verbOffset = getVerbOffset(location.pathname);
-  if (verbOffset < 0) return;
+if (location.protocol.indexOf('file') >= 0) return;
+      var verbOffset = getVerbOffset(location.pathname);
+      if (verbOffset < 0) return;
 
-  var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verbOffset);
-  var inject = '<base href="' + baseUrl + '">';
-  document.write(inject);
+      var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verbOffset);
+      var inject = '<base href="' + baseUrl + '">';
+      document.write(inject);
 
-  function getVerbOffset(path) {
+function getVerbOffset(path) {
     var verbMatch = /\/(get|post|put|head|delete|option|connect|trace|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? verbMatch.index : -1;
   }
 })()
 </script>
-<script>
-if (typeof Promise === 'undefined' || typeof Object.defineProperties !== 'function') {
-  (function() {
-    var script = document.createElement('script');
-    script.src = 'lib/poly.js';
-    (document.body || document.getElementsByTagName('head')[0]).appendChild(script);
-  })();
-}
-
-</script>
-
 <style>
 html {
   box-sizing: border-box;
@@ -177,10 +141,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
   background: #fbfbfb;
 }
 </style>
-<title>Catch Rest 🍹</title>
-</head><body>
-
-  <table id=layoutTABLE cellspacing=0 cellpadding=0><tr><td height=100%>
+</head><body><table id=layoutTABLE cellspacing=0 cellpadding=0><tr><td height=100%>
 
     <table cellspacing=0 cellpadding=0 height=100% width=100%><tr>
       <td id=leftTD width=20% valign=top>
@@ -206,14 +167,10 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
   <tr><td height=1 id=statusTD>
       Loading...
   </td></tr></table>
-
-<script src="main.js"></script>
-<script src="lib/combined.js"></script>
-
+<script src="index.js"></script>
+<script src="lib.js"></script>
 <script>
-if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function") {
-  catchREST.withDependenciesLoaded();
-}
+if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function")
+ catchREST.withDependenciesLoaded();
 </script>
-
 </body></html>

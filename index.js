@@ -364,8 +364,8 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       shared_process_secret = calcHash(__dirname.toLowerCase()) + '-' + Math.random().toString(36).replace(/[\.+-,]/g, '') + '-' + Math.random().toString(36).replace(/[\.+-,]/g, '');
     }
 
-    /** @typedef {import("http").IncomingMessage} HTTPRequest */
-    /** @typedef {import("http").ServerResponse} HTTPResponse */
+    /** @typedef {import('http').IncomingMessage} HTTPRequest */
+    /** @typedef {import('http').ServerResponse} HTTPResponse */
 
     // #region COMMON NODE UTILS
 
@@ -494,7 +494,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       function combineLib(imports) {
         var combined = imports.map(function (importEntry) {
           switch (path.extname(importEntry.importLocalPath).toLowerCase()) {
-            case ".js": return '// #region ' + path.basename(importEntry.importLocalPath).replace(/\.js$/, '') + '\n' + importEntry.content + '\n' + '// #endregion';
+            case '.js': return '// #region ' + path.basename(importEntry.importLocalPath).replace(/\.js$/, '') + '\n' + importEntry.content + '\n' + '// #endregion';
             case '.css': return (
               '///// ' + path.basename(importEntry.importLocalPath) + ' /////\n' +
               '(function() { var style = document.createElement("style");\n' +
@@ -669,9 +669,9 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
             }
 
             /**
-             * @param {import("http").IncomingMessage} req
-             * @param {import("http").ServerResponse} res
-             * @param {import("url").UrlWithParsedQuery} url
+             * @param {import('http').IncomingMessage} req
+             * @param {import('http').ServerResponse} res
+             * @param {import('url').UrlWithParsedQuery} url
              * @returns {Promise<void> | void}
              */
             function handleControlRequest(req, res, url) {

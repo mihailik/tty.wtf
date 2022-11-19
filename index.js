@@ -702,6 +702,8 @@ issuing requests, processing data and representing the data in sensible way with
       var imports = [
         'codemirror/lib/codemirror.js',
         'codemirror/lib/codemirror.css',
+        'codemirror/mode/javascript/javascript.js',
+        'codemirror/mode/markdown/markdown.js',
 
         'xlsx/dist/xlsx.full.min.js',
         //'xlsx/jszip.js'
@@ -4134,6 +4136,8 @@ issuing requests, processing data and representing the data in sensible way with
           {
             value: embeddedSplashText,
 
+            mode: 'markdown',
+
             lineNumbers: true,
             extraKeys: {
               'Ctrl-Enter': accept,
@@ -4143,6 +4147,7 @@ issuing requests, processing data and representing the data in sensible way with
             autofocus: true
           },
           function () {
+            editor.setOption('mode', 'javascript');
             editor.setValue('GET https://api.github.com/repos/microsoft/typescript/languages');
           });
 
@@ -4150,6 +4155,8 @@ issuing requests, processing data and representing the data in sensible way with
 
         /** @type {ReturnType<typeof requireSplitter>} */
         var withSplitter;
+        /** @type {import('codemirror').Editor} */
+        var replyEditor;
 
         function updateVerbButton() {
           var pars = parseTextRequest(editor.getValue());
@@ -4268,22 +4275,53 @@ issuing requests, processing data and representing the data in sensible way with
                   var text = response.body;
                   editor.setOption('readOnly', false);
                   set(withSplitter.splitterContainer, 'Done.');
-                  set(withSplitter.bottomHost, '');
-                  var injectPre = document.createElement('pre');
-                  injectPre.style.cssText = 'margin: 0; padding: 0.6em; font: inherit;';
-                  set(injectPre, text);
-                  withSplitter.bottomHost.appendChild(injectPre);
+
+                  if (!replyEditor) {
+                    replyEditor = createReplyCodeMirror(
+                      withSplitter.bottomHost,
+                      text
+                    );
+                  } else {
+                    replyEditor.setValue(text);
+                  }
+
                 }, function (err) {
                   editor.setOption('readOnly', false);
                   set(withSplitter.splitterContainer, 'Failed.');
-                  set(withSplitter.bottomHost, '');
-                  var injectErrorPre = document.createElement('pre');
-                  injectErrorPre.style.color = 'firebrick';
-                  set(injectErrorPre, err.message);
-                  withSplitter.bottomHost.appendChild(injectErrorPre);
+                  if (!replyEditor) {
+                    replyEditor = createReplyCodeMirror(
+                      withSplitter.bottomHost,
+                      err.message
+                    );
+                  } else {
+                    replyEditor.setValue(err.message);
+                  }
                 }
               )
             }
+          }
+
+          /**
+           * @param {HTMLElement} host
+           * @param {string} initalValue
+           * @returns {import('codemirror').Editor}
+           */
+          function createReplyCodeMirror(host, initalValue) {
+            var cm =
+              //@ts-ignore
+              CodeMirror(
+                host,
+                {
+                  value: initalValue,
+
+                  mode: 'javascript',
+
+                  lineNumbers: true,
+                  readOnly: true,
+                  lineWrapping: true
+                });
+
+            return cm;
           }
         }
       }

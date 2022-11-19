@@ -1520,7 +1520,6 @@ shell layout
         }
 
         function finishOptionalDetection() {
-
           if (shadow) {
             for (var i = 0; i < toForgetShadow.length; i++) {
               shadow.forget(toForgetShadow[i]);
@@ -3564,9 +3563,36 @@ shell layout
     // #endregion PERSISTENCE
 
     function createShell() {
+      // TODO: update box model
       var host = document.createElement('div');
-      host.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%;';
+      host.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding-top: 10%; text-align: center;';
+      set(host, 'Loading..');
       document.body.appendChild(host);
+
+      return {
+        loadingTakesTime,
+        loadingComplete
+      };
+
+      function loadingTakesTime() {
+        set(host, 'Loading...');
+        // TODO: whatever progress...
+      }
+
+      function loadingComplete() {
+        Object.assign(host.style, {
+          padding: 0,
+          margin: 0
+        });
+        var editorHost = document.createElement('div');
+        editorHost.style.cssText = 'position: absolute; left: 0; top: 0; width: 0; height: 0; background: silver;';
+        host.appendChild(editorHost);
+        var editor = CodeMirror(
+          editorHost,
+          {
+            value: 'Loaded OK [*]'
+          });
+      }
     }
 
     // local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:
@@ -3579,13 +3605,31 @@ shell layout
       if (verbMatch) {
       }
 
-      createShell();
+      var shellLoader = createShell();
+      if (typeof CodeMirror === 'function') {
+        shellLoader.loadingComplete();
+      } else {
+        /** @type {*} */(catchREST)['continue'] = function () {
+          // TODO: check if CodeMirror still not loaded (use alternative ways like unpkg etc.)
+          shellLoader.loadingComplete();
+        };
+      }
     }
 
     function bootBacked(uniquenessSource) {
 
-      createShell();
+      var shellLoader = createShell();
+
       loadAsync().then(function (drive) {
+        if (typeof CodeMirror === 'function') {
+          shellLoader.loadingComplete();
+        } else {
+        /** @type {*} */(catchREST)['continue'] = function () {
+            // TODO: check if CodeMirror still not loaded (use alternative ways like unpkg etc.)
+            shellLoader.loadingComplete();
+          };
+        }
+
         console.log('drive loaded ', drive);
       });
 

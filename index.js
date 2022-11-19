@@ -3539,6 +3539,11 @@ issuing requests, processing data and representing the data in sensible way with
         loadingComplete
       };
 
+      function triggerVSCodeTypings() {
+        var cm = require('codemirror');
+        return cm;
+      }
+
       function loadingTakesTime() {
         layout.pseudoEditor.value = (layout.pseudoEditor.value || '').replace(/^Loading\.\./, 'Loading...');
         // TODO: whatever progress...
@@ -3563,6 +3568,15 @@ issuing requests, processing data and representing the data in sensible way with
               lineWrapping: true,
               autofocus: true
             });
+
+        editor.on('changes', function () {
+          var pars = parseTextRequest(editor.getValue());
+          if (pars && pars.firstLine) {
+            var parsFirst = parseFirstLine(pars.firstLine);
+          }
+
+          console.log('edited ', { ...pars, first: parsFirst });
+        });
 
         function accept() {
 

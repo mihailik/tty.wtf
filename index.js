@@ -3564,13 +3564,13 @@ shell layout
     // #endregion PERSISTENCE
 
     function createShell() {
-      sanitizeDOM();
 
       // TODO: update box model
       var host = document.createElement('div');
       host.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; padding-top: 10%; text-align: center;';
       set(host, 'Loading..');
       document.body.appendChild(host);
+      console.log('Loading..');
 
       return {
         loadingTakesTime,
@@ -3588,13 +3588,33 @@ shell layout
           margin: 0
         });
         var editorHost = document.createElement('div');
-        editorHost.style.cssText = 'position: absolute; left: 0; top: 0; width: 0; height: 0; background: silver;';
+        editorHost.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: silver; text-align: left;';
+        host.innerHTML = '';
         host.appendChild(editorHost);
+        /** @type {import('codemirror').Editor} */
         var editor = CodeMirror(
           editorHost,
           {
-            value: 'Loaded OK [*]'
+            value: 'Loaded OK [*]',
+
+            lineNumbers: true,
+            extraKeys: {
+              'Ctrl-Enter': accept,
+              'Cmd-Enter': accept
+            },
+            lineWrapping: true,
+            autofocus: true
           });
+
+        var wrapper = editor.getWrapperElement();
+        Object.assign(wrapper.style, {
+          width: '100%', height: '100%',
+          font: 'inherit'
+        });
+
+        function accept() {
+
+        }
       }
     }
 
@@ -3628,6 +3648,7 @@ shell layout
       if (verbMatch) {
       }
 
+      sanitizeDOM();
       var shellLoader = createShell();
       if (typeof CodeMirror === 'function') {
         shellLoader.loadingComplete();

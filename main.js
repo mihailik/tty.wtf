@@ -138,7 +138,8 @@ function catchREST() {
           (location.pathname + (location.search || ''));
 
       source = source.replace(/%([a-z0-9][a-z0-9])/ig, function (_, hex) { return String.fromCharCode(Number('0x' + hex)); });
-      var parsed = parseEncodedURL(source) || {};
+      var parsed = parseEncodedURL(source);
+      if (!parsed) return '';
 
       var text = (parsed.verb || 'GET').toUpperCase();
       if (parsed.addr) text += ' ' + parsed.addr;

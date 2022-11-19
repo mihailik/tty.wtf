@@ -705,8 +705,8 @@ issuing requests, processing data and representing the data in sensible way with
         'codemirror/lib/codemirror.css',
         'codemirror/mode/javascript/javascript.js',
         'codemirror/mode/markdown/markdown.js',
-        'codemirror/mode/addon/fold/foldgutter.js',
-        'codemirror/mode/addon/fold/foldgutter.css',
+        'codemirror/addon/fold/foldgutter.js',
+        'codemirror/addon/fold/foldgutter.css',
         'codemirror/addon/fold/markdown-fold.js',
 
         'xlsx/dist/xlsx.full.min.js',

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:2e91yeib7cv} Sun Nov 06 2022 18:22:59 GMT+0000 (Greenwich Mean Time) with  darwin/x64 -->
+<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:1xf18sczk6u} Sun Nov 06 2022 20:26:17 GMT+0000 (Greenwich Mean Time) with  darwin/x64 -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,17 +9,22 @@
 <meta name="twitter:card" content="summary_large_image">
 <title>Catch Rest 🍹</title>
 <script>
-(function() {
+catchREST_urlencoded = true; (function() {
 if (location.protocol.indexOf('file') >= 0) return; // running from local file, no need to adjust base URL
       var verb = getVerb(location.pathname);
       if (!verb) return; // no deep URL, no need to adjust base URL
+      if (verb.verb === 'local') {
+        // @ts-ignore
+        catchREST_urlencoded = false;
+        return;
+      }
 
       var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verb.index);
       var inject = '<base href="' + baseUrl + '">';
       document.write(inject);
 
 function getVerb(path) {
-    var verbMatch = /(^|\/)(read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:)(\/|$)/i.exec(path + '');
+    var verbMatch = /(^|\/)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? { leadingSlash: verbMatch[1], verb: verbMatch[2], trailingSlash: verbMatch[3], index: verbMatch.index + (verbMatch[1] ? 1 : 0) } : void 0;
   }
 })()
@@ -47,7 +52,6 @@ body {
 </head><body><script src="index.js"></script>
 <script src="lib.js"></script>
 <script>
-if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function")
- catchREST.withDependenciesLoaded();
+catchREST("page");
 </script>
 </body></html>

@@ -97,7 +97,7 @@ function catchREST() {
 
   /** @param {string | null | undefined} path */
   function getVerb(path) {
-    var verbMatch = /(^|\/)(read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:)(\/|$)/i.exec(path + '');
+    var verbMatch = /(^|\/)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? { leadingSlash: verbMatch[1], verb: verbMatch[2], trailingSlash: verbMatch[3], index: verbMatch.index + (verbMatch[1] ? 1 : 0) } : void 0;
   }
 
@@ -291,11 +291,17 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 <meta name="twitter:card" content="summary_large_image">
   */});
 
-  var embeddedAdjustBaseURL = '(function() {\n' +
+  var embeddedAdjustUrlencodedBaseURL =
+    'catchREST_urlencoded = true; (function() {\n' +
     getFunctionBody(function () {
       if (location.protocol.indexOf('file') >= 0) return; // running from local file, no need to adjust base URL
       var verb = getVerb(location.pathname);
       if (!verb) return; // no deep URL, no need to adjust base URL
+      if (verb.verb === 'local') {
+        // @ts-ignore
+        catchREST_urlencoded = false;
+        return;
+      }
 
       var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verb.index);
       var inject = '<base href="' + baseUrl + '">';
@@ -304,8 +310,11 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     getVerb + '\n' +
     '})()';
 
-
-  var embeddedWholeHTML = (function () {
+  /**
+   * @param {boolean=} urlencoded Whether trigger URLENCODED option inside the script
+   * @param {string=} verbPlaceholder Verb that will likely render this page
+   */
+  function getEmbeddedWholeHTML(urlencoded, verbPlaceholder) {
     /** @type {Partial<typeof process>} */
     var pr = typeof process !== 'undefined' && process || {};
     var html =
@@ -314,7 +323,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       '<title>Catch Rest 🍹</title>\n' +
 
       '<' + 'script' + '>\n' +
-      embeddedAdjustBaseURL + '\n' +
+      (urlencoded ? embeddedAdjustUrlencodedBaseURL + '\n' : '') +
       '</' + 'script' + '>\n' +
 
       '<style>\n' +
@@ -327,15 +336,14 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       '<' + 'script' + ' src="lib.js"></' + 'script' + '>\n' +
 
       '<' + 'script' + '>\n' +
-      'if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function")\n' +
-      ' catchREST.withDependenciesLoaded();\n' +
+      'catchREST("page");\n' +
       '</' + 'script' + '>\n' +
 
       '</body></html>';
     
     return html;
-  })();
-;
+  }
+
   // #endregion EMBEDDED RESOURCES
 
   /** @param {NodeModule=} module */
@@ -412,18 +420,24 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       ];
 
       var indexHTML_path = path.resolve(__dirname, 'index.html');
+      var index404HTML_path = path.resolve(__dirname, '404.html');
       var libJS_path = path.resolve(__dirname, 'lib.js');
 
       function detectLocalBuildValid() {
         return new Promise(function (resolve) {
           var markerRegexp = new RegExp('\\{build-by-hash:' + catchREST_hash + '\\}');
           var indexHTMLPromise = readFileAsync(indexHTML_path);
+          var index404HTMLPromise = readFileAsync(index404HTML_path);
           var libJSPromise = readFileAsync(libJS_path);
-          Promise.all([indexHTMLPromise, libJSPromise]).then(
+          Promise.all([indexHTMLPromise, index404HTMLPromise, libJSPromise]).then(
             function (result) {
               var indexHTML_content = result[0];
-              var libJS_content = result[1];
-              resolve(markerRegexp.test(indexHTML_content) && markerRegexp.test(libJS_content));
+              var index404HTML_content = result[1];
+              var libJS_content = result[2];
+              resolve(
+                markerRegexp.test(indexHTML_content) &&
+                markerRegexp.test(index404HTML_content) &&
+                markerRegexp.test(libJS_content));
             },
             function () {
               // failed to read
@@ -513,162 +527,178 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
         function withImports(imports) {
           var combinedLib = combineLib(imports);
 
-          var writeHTML = writeFileAsync(
+          var writeIndexHTML = writeFileAsync(
             indexHTML_path,
-            embeddedWholeHTML
+            getEmbeddedWholeHTML(true /* urlencoded */)
+          );
+          var writeIndex404HTML = writeFileAsync(
+            index404HTML_path,
+            getEmbeddedWholeHTML(true /* urlencoded */)
           );
           var writeLib = writeFileAsync(
             libJS_path,
             combinedLib
           );
 
-          return Promise.all([writeHTML, writeLib]).then(function () {
+          return Promise.all([writeIndexHTML, writeIndex404HTML, writeLib]).then(function () {
             return 'Updated HTML and library with hash: ' + catchREST_hash;
           });
         }
       });
     }
 
-    /** @param {Promise} buildPromise */
-    function startServer(buildPromise) {
-      return new Promise(function (resolve, reject) {
-        var port = derivePort(__dirname);
+    /** @param {Promise<string>} buildPromise */
+    function startServer(port, buildPromise) {
+      return new Promise(function (resolve) { resolve(null); }).then(function () {
 
+        /** @type {ReturnType<typeof listenToPort>} */
         var listeningServerPromise = listenToPort('', port).catch(function (error) {
           // TODO: if port is not available, send shutdown request and in the meantime start retrying...
           throw new Error();
         });
 
-        listeningServerPromise.then(function (listeningServer) {
-          console.log('server listening on http://localhost:' + listeningServer.port + '/');
-          listeningServer.handle(handleRequest);
+        return listeningServerPromise.then(
+          function (listeningServer) {
+            listeningServer.handle(handleRequest);
+            return {
+              listeningServer: listeningServer,
+              message: 'server listening on http://localhost:' + listeningServer.port + '/'
+            };
 
-          /**
-           * @param {HTTPRequest} req
-           * @param {HTTPResponse} res
-           */
-          function handleRequest(req, res) {
-            return new Promise(function (resolve, reject) {
-              var url = URL.parse(/** @type {string} */(req.url), true /*parseQueryString*/);
+            /**
+             * @param {HTTPRequest} req
+             * @param {HTTPResponse} res
+             */
+            function handleRequest(req, res) {
+              return new Promise(function (resolve) { resolve(null);  }).then(function() {
+                var url = URL.parse(/** @type {string} */(req.url), true /*parseQueryString*/);
+                process.stdout.write(req.method + ' ' + url.pathname);
 
-              switch ((url.pathname || '').toLowerCase()) {
-                case '/':
-                case '/index.html':
-                  return handleIndexHTMLRequest(req, res);
+                switch ((url.pathname || '').toLowerCase()) {
+                  case '/':
+                  case '/index.html':
+                    return handleIndexHTMLRequest(req, res);
 
-                case 'favicon.ico':
-                  return handleFaviconRequest(req, res);
+                  case 'favicon.ico':
+                    return handleFaviconRequest(req, res);
 
-                case '/control':
-                  return handleControlRequest(req, res, url);
+                  case '/control':
+                    return handleControlRequest(req, res, url);
 
-                default:
-                  return handleLocalFileRequest(req.url || '/', res);
-              }
-            });
-          }
+                  default:
+                    return handleLocalFileRequest(req.url || '/', res);
+                }
+              });
+            }
 
-          /**
-           * @param {HTTPRequest} _req
-           * @param {HTTPResponse} res
-           * @returns {Promise<void>}
-           */
-          function handleIndexHTMLRequest(_req, res) {
-            return new Promise(function (resolve) {
-              res.setHeader('Content-type', 'text/html');
-              res.end(embeddedWholeHTML);
-              resolve();
-            });
-          }
-
-          /**
-           * @param {string} localPath
-           * @param {HTTPResponse} res
-           * @returns {Promise<void>}
-           */
-          function handleLocalFileRequest(localPath, res) {
-            return new Promise(function (resolve) {
-              var mimeByExt = {
-                html: 'text/html',
-                htm: 'text/html',
-                js: 'application/javascript',
-                css: 'style/css'
-              };
-
-              // TODO: inject ETag for caching
-
-              var verbMatch = getVerb(localPath);
-              if (verbMatch) localPath = localPath.slice(0, verbMatch.index - (verbMatch.leadingSlash ? 1 : 0));
-              if (localPath === '/' || !localPath) localPath = '/index.html';
-
-              var fullPath = __dirname + localPath;
-              readFileAsync(fullPath, 'binary').then(function (data) {
-                var mime = mimeByExt[path.extname(localPath).toLowerCase().replace(/^\./, '')];
-                if (mime) res.setHeader('Content-type', mime);
-                res.end(data);
+            /**
+             * @param {HTTPRequest} _req
+             * @param {HTTPResponse} res
+             * @returns {Promise<void>}
+             */
+            function handleIndexHTMLRequest(_req, res) {
+              return new Promise(function (resolve) {
+                res.setHeader('Content-type', 'text/html');
+                res.end(getEmbeddedWholeHTML(true /* urlencoded */));
                 resolve();
               });
-            });
-          }
-
-          /**
-           * @param {HTTPRequest} _req
-           * @param {HTTPResponse} res
-           * @returns {Promise<void>}
-           */
-          function handleFaviconRequest(_req, res) {
-            return new Promise(function (resolve) {
-              // for now just skip
-              res.end();
-              console.log(' []');
-              resolve();
-            });
-          }
-
-          /**
-           * @param {HTTPRequest} req
-           * @param {HTTPResponse} res
-           * @returns {Promise<void>}
-           */
-          function handle404Request(req, res) {
-            return new Promise(function (resolve) {
-              res.statusCode = 404;
-              res.end(req.url + ' NOT FOUND.');
-              resolve();
-            });
-          }
-
-          /**
-           * @param {import("http").IncomingMessage} req
-           * @param {import("http").ServerResponse} res
-           * @param {import("url").UrlWithParsedQuery} url
-           * @returns {Promise<void> | void}
-           */
-          function handleControlRequest(req, res, url) {
-            if (url.query[catchREST_secret_variable_name] !== shared_process_secret)
-              return handle404Request(req, res);
-
-            switch (url.query.command) {
-              case 'shutdown':
-                res.end('OK');
-                if (process.env[catchREST_secret_variable_name]) {
-                  process.exit(0);
-                } else {
-                  while (true) {
-                    var svc = shutdownServices.pop();
-                    if (!svc) break;
-                    svc();
-                  }
-                }
-                return new Promise(function (resolve) { resolve() });
-
-              case 'restart':
-                res.end('starting new instance');
-                startNewInstance();
-                return new Promise(function (resolve) { resolve() });
             }
-          }
-        });
+
+            /**
+             * @param {string} localPath
+             * @param {HTTPResponse} res
+             * @returns {Promise<void>}
+             */
+            function handleLocalFileRequest(localPath, res) {
+              return new Promise(function (resolve) { resolve(null); }).then(function() {
+                var mimeByExt = {
+                  html: 'text/html',
+                  htm: 'text/html',
+                  js: 'application/javascript',
+                  css: 'style/css'
+                };
+
+                // TODO: inject ETag for caching
+
+                var verbMatch = getVerb(localPath);
+                if (verbMatch) localPath = localPath.slice(0, verbMatch.index - (verbMatch.leadingSlash ? 1 : 0));
+                if (localPath === '/' || !localPath) localPath = '/index.html';
+
+                var fullPath = __dirname + localPath;
+                return readFileAsync(fullPath, 'binary').then(
+                  function (data) {
+                    var mime = mimeByExt[path.extname(localPath).toLowerCase().replace(/^\./, '')];
+                    if (mime) res.setHeader('Content-type', mime);
+                    console.log(' [200 OK ' + path.relative(__dirname, fullPath) + ':' + data.length + ']');
+                    res.end(data);
+                  },
+                  function (readError) {
+                    res.statusCode = 404;
+                    res.statusMessage = readError.message;
+                    console.log(' [404 ' + path.relative(__dirname, fullPath) + ':' + readError.message + ']');
+                    res.end(readError.stack);
+                  });
+              });
+            }
+
+            /**
+             * @param {HTTPRequest} _req
+             * @param {HTTPResponse} res
+             * @returns {Promise<void>}
+             */
+            function handleFaviconRequest(_req, res) {
+              return new Promise(function (resolve) {
+                // for now just skip
+                res.end();
+                console.log(' []');
+                resolve();
+              });
+            }
+
+            /**
+             * @param {HTTPRequest} req
+             * @param {HTTPResponse} res
+             * @returns {Promise<void>}
+             */
+            function handle404Request(req, res) {
+              return new Promise(function (resolve) {
+                res.statusCode = 404;
+                res.end(req.url + ' NOT FOUND.');
+                resolve();
+              });
+            }
+
+            /**
+             * @param {import("http").IncomingMessage} req
+             * @param {import("http").ServerResponse} res
+             * @param {import("url").UrlWithParsedQuery} url
+             * @returns {Promise<void> | void}
+             */
+            function handleControlRequest(req, res, url) {
+              if (url.query[catchREST_secret_variable_name] !== shared_process_secret)
+                return handle404Request(req, res);
+
+              switch (url.query.command) {
+                case 'shutdown':
+                  res.end('OK');
+                  if (process.env[catchREST_secret_variable_name]) {
+                    process.exit(0);
+                  } else {
+                    while (true) {
+                      var svc = shutdownServices.pop();
+                      if (!svc) break;
+                      svc();
+                    }
+                  }
+                  return new Promise(function (resolve) { resolve() });
+
+                case 'restart':
+                  res.end('starting new instance');
+                  startNewInstance();
+                  return new Promise(function (resolve) { resolve() });
+              }
+            }
+          });
       });
 
       /**
@@ -690,6 +720,10 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 
           var server = http.createServer(function (req, res) {
             handleRequest(req, res);
+          });
+
+          shutdownServices.push(function () {
+            server.close();
           });
 
           server.on('listening', function () {
@@ -751,24 +785,46 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       }
     }
 
+    function watchSelf() {
+      var changeDebounceTimeout;
+      var watcher = createWatcher();
+
+      shutdownServices.push(function () {
+        watcher.close();
+      });
+
+      function checkAndTriggerRestart() {
+        var currentContent = fs.readFileSync(__filename, 'utf8');
+        if (currentContent.indexOf(catchREST + '') < 0) {
+          // TODO: log stdio restart due to file change
+          startNewInstance();
+        }
+      }
+
+      function createWatcher() {
+        var watcher = fs.watch(__filename, function () {
+          clearTimeout(changeDebounceTimeout);
+          changeDebounceTimeout = setTimeout(checkAndTriggerRestart, 200);
+        });
+        return watcher;
+      }
+    }
+
     function startNewInstance() {
-      if (startNewInstance.current) return startNewInstance.current;
+      if (startNewInstance.current) {
+        return startNewInstance.current;
+      }
 
       return startNewInstance.current = new Promise(function (resolve, reject) {
-
         setTimeout(function () {
           startNewInstance.current = null;
         }, 1000);
 
         if (process.env[catchREST_secret_variable_name] && process.send) {
-          process.send({
-            command: 'start'
-          });
-
+          process.send({ command: 'start' });
           return;
         }
 
-        var child_process = require('child_process');
         /** @type{Record<string,string>} */
         var env = {};
         env[catchREST_secret_variable_name] = shared_process_secret;
@@ -829,7 +885,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
           var posCurrent = runningChildProcesses.indexOf(proc);
           if (posCurrent >= 0) runningChildProcesses.splice(posCurrent, 1);
 
-          // TODO: debounce with timeout, shutdown if no longer runningChildProcesses-
+          // TODO: debounce with timeout, shutdown if no longer runningChildProcesses
         }
 
       });
@@ -846,16 +902,57 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       });
     }
 
+    function shutdownPredecessorIfNeeded(port) {
+      if (process.env[catchREST_secret_variable_name]) {
+        return requestShutdown(port).then(function () {
+          // response may come before server is down and HTTP port fully released
+          return new Promise(function (resolve) { setTimeout(resolve, 100); }).then(function () {
+            return 'Catch REST~' + process.pid;
+          });
+        });
+      } else {
+        return new Promise(function (resolve) { resolve('Catch REST[' + process.pid + ']'); });
+      }
+    }
+
+    function requestShutdown(port) {
+      return new Promise(function (resolve, reject) {
+        var http = require('http');
+        var requestUrl = 'http://localhost:' + port + '/control?' + catchREST_secret_variable_name + '=' + shared_process_secret + '&command=shutdown';
+        var httpReq = http.request(requestUrl, { method: 'POST' });
+        var data = '';
+        httpReq.on('data', function (chunk) {
+          data += chunk;
+        });
+        httpReq.on('close', function () {
+          resolve(data);
+        });
+        httpReq.on('error', function (error) {
+          resolve(error);
+        });
+        httpReq.end();
+      });
+    }
+
     function bootNode() {
       var buildPromise = build();
-      var serverPromise = startServer(buildPromise);
+      var port = derivePort(__dirname);
+      var serverPromise = shutdownPredecessorIfNeeded(port).then(
+        function (shutdownMessage) {
+          process.stdout.write(shutdownMessage + '@' + port + ' ');
+          return startServer(port, buildPromise);
+        });
 
       return Promise.all([buildPromise, serverPromise]).then(
         function (promResults) {
           var buildResult = promResults[0];
           var serverResult = promResults[1];
 
-          console.log(buildResult, serverResult);
+          console.log(
+            buildResult,
+            serverResult.message
+          );
+          watchSelf();
 
           return launchBrowser().then(
             function (browserResult) {
@@ -3065,8 +3162,19 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 
     // #enregion PERSISTENCE
 
-    // read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:
+    // local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:
     function loadVerb(verb) {
+
+    }
+
+    function bootUrlEncoded() {
+      var verbMatch = getVerb(location.pathname);
+      if (verbMatch) {
+        boot
+      }
+    }
+
+    function bootBacked(uniquenessSource) {
 
     }
 
@@ -3079,7 +3187,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
      *    - auto-detection of verb from content?
      *    - support "attachments"
      *    - special case of empty: show splash
-     * 2. LARGE
+     * 2. BACKED
      *    - content is extracted from HTML body
      *    - formats to support (MIME multipart? comment-file? CSV? Markdown?)
      *    - changes loaded from storage (webSQL, indexedDB, localStorage) and applied on top
@@ -3089,12 +3197,9 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     function boot() {
       // @ts-ignore
       if (typeof catchREST_urlencoded !== 'undefined' && catchREST_urlencoded) {
-        var verbMatch = getVerb(location.pathname);
-        if (verbMatch) {
-          // TODO: load splash/editor
-        }
+        bootUrlEncoded();
       } else {
-        // TODO: load using persistence
+        bootBacked(location.pathname);
       }
     }
 
@@ -3284,6 +3389,10 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     // TODO: stick sdome exports on 'this' and exit?
     throw new Error('Environment was not recognised.');
   }
+
+  // re-entering will be diverted (and can be overridden by whatever is actually running)
+  if (/** @type {*} */(catchREST)['continue']) return /** @type {*} */(catchREST)['continue']();
+  /** @type {*} */(catchREST)['continue'] = function () { };
 
   detectEnvironmentAndStart();
 } catchREST();

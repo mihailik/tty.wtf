@@ -1,5 +1,3 @@
-const path = require('path');
-
 // @ts-check <script>
 function catchREST() {
 
@@ -47,7 +45,7 @@ function catchREST() {
 
         case 'verb':
           result.verb = value;
-          continue;
+          continue;O
         
         case 'url':
           result.url = value;
@@ -105,7 +103,7 @@ function catchREST() {
   }
 
   function getVerbOffset(path) {
-    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/?)$/i.exec(path + '');
+    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/|$)/i.exec(path + '');
     return verbMatch ? verbMatch.index : -1;
   }
 
@@ -631,10 +629,10 @@ function catchREST() {
       }
 
       /**
-       * @param {string} filePath
+       * @param {string} localPath
        * @param {HTTPResponse} res
        */
-      function handleLocalFileRequest(filePath, res) {
+      function handleLocalFileRequest(localPath, res) {
         var mimeByExt = {
           html: 'text/html',
           htm: 'text/html',
@@ -644,21 +642,22 @@ function catchREST() {
 
         // TODO: inject ETag for caching
 
-        var verbOffset = getVerbOffset(filePath);
-        if (verbOffset >= 0) filePath = filePath.slice(0, verbOffset);
-        if (filePath === '/' || !filePath) filePath = '/index.html';
+        var verbOffset = getVerbOffset(localPath);
+        if (verbOffset >= 0) localPath = localPath.slice(0, verbOffset);
+        if (localPath === '/' || !localPath) localPath = '/index.html';
 
         var fs = require('fs');
         var path = require('path');
 
-        var fullPath = __dirname + filePath;
+        var fullPath = __dirname + localPath;
+        process.stdout.write(' [' + verbOffset + '] ' + fullPath + '...');
         fs.readFile(fullPath, function (err, data) {
           if (err) {
             res.statusCode = 404;
             console.log(' ' + (res.statusMessage = err.code || err.message || String(err)));
             res.end();
           } else {
-            var mime = mimeByExt[path.extname(filePath).toLowerCase().replace(/^\./, '')];
+            var mime = mimeByExt[path.extname(localPath).toLowerCase().replace(/^\./, '')];
             if (mime) res.setHeader('Content-type', mime);
 
             res.end(data);

@@ -39,12 +39,12 @@ if (!window.addEventListener) {
   var verbOffset = getVerbOffset(location.pathname);
   if (verbOffset < 0) return;
 
-  var baseUrl = location.protocol + '//' + location.hostname + '/' + location.pathname.slice(0, verbOffset);
+  var baseUrl = location.protocol + '//' + location.host + '/' + location.pathname.slice(0, verbOffset);
   var inject = '<base href="' + baseUrl + '">';
   document.write(inject);
 
   function getVerbOffset(path) {
-    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/?)$/i.exec(path + '');
+    var verbMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/|$)/i.exec(path + '');
     return verbMatch ? verbMatch.index : -1;
   }
 })()
@@ -207,25 +207,13 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
       Loading...
   </td></tr></table>
 
-<scripta>
-status = 'main.js...';
-</scripta>
 <script src="main.js"></script>
-<scripta>
-status = 'combined.js...';
-</scripta>
-<scripta src="lib/combined.js"></scripta>
+<script src="lib/combined.js"></script>
 
-<scripta>
-status = 'check if need to call withDependenciesLoaded: catchREST: ' + typeof catchREST + '...';
-status = 'check if need to call withDependenciesLoaded: catchREST: ' + typeof catchREST + ', catchREST.withDependenciesLoaded ' + typeof (typeof catchREST === 'undefined' ? catchREST : catchREST.withDependenciesLoaded) + '...';
-</scripta>
-<scripta>
+<script>
 if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function") {
-  status = 'catchREST.withDependenciesLoaded() from body...';
   catchREST.withDependenciesLoaded();
-  status = 'completed.';
 }
-</scripta>
+</script>
 
 </body></html>

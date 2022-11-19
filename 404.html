@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:8w0swgpggh} Wed Nov 16 2022 20:41:07 GMT+0000 (Greenwich Mean Time) with  darwin/x64 -->
+<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:21kb03lx1j4} Wed Nov 16 2022 22:59:38 GMT+0000 (Coordinated Universal Time) with  linux/x64 -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -47,8 +47,65 @@ body {
   overflow:hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
+#shell .CodeMirror {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  font: inherit;
+}
+
+#shell .CodeMirror-gutters {
+  border-right: solid 1px #e4e4e4;
+}
+
+#shell .CodeMirror-gutter.CodeMirror-linenumbers {
+  background: #fbfbfb;
+  color: #999;
+}
+
+#shell #pseudoGutter {
+  border-right: solid 1px #e4e4e4;
+  background: #fbfbfb;
+  color: #999;
+
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%; width: 2.3em;
+  text-align: right;
+  padding-top: 0.25em;
+  padding-right: 0.2em;
+}
+
+#shell #pseudoEditor {
+  font: inherit;
+  width: 100%; height: 100%;
+  border: none;
+  padding: 0.25em;
+  padding-left: 0.6em;
+  margin-left: 2em;
+  outline: none;
+}
+
+#shell #leftBar {
+  background: #fbfbfb;
+}
 </style>
-</head><body><script src="index.js"></script>
+</head><body><div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 3em;">
+
+  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 3em;">
+  </div>
+
+  <div style="position: relative; width: 100%; height: 100%;">
+    <div id=editorHost style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+      <div id="pseudoGutter">1</div>
+      <textarea id="pseudoEditor">
+      </textarea>
+    </div>
+  </div>
+
+</div>
+
+<script src="index.js"></script>
 <script src="lib.js"></script>
 <script>
 catchREST("page");

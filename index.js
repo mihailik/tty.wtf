@@ -3518,7 +3518,11 @@ issuing requests, processing data and representing the data in sensible way with
     function createShell() {
 
       injectStyle();
-      var layout = injectShellHTML();
+      var layout = bindLayout();
+      if (!layout.allFound) {
+        if (layout.shell) layout.shell.parentElement?.removeChild(layout.shell);
+        layout = injectShellHTML();
+      }
 
       layout.pseudoEditor.value = 'Loading.. ' + embeddedSplashText;
       layout.pseudoGutter.innerHTML =
@@ -3541,33 +3545,35 @@ issuing requests, processing data and representing the data in sensible way with
         layout.editorHost.innerHTML = '';
 
         /** @type {import('codemirror').Editor} */
-        var editor = CodeMirror(
-          layout.editorHost,
-          {
-            value: embeddedSplashText,
+        var editor =
+          // @ts-ignore
+          CodeMirror(
+            layout.editorHost,
+            {
+              value: embeddedSplashText,
 
-            lineNumbers: true,
-            extraKeys: {
-              'Ctrl-Enter': accept,
-              'Cmd-Enter': accept
-            },
-            lineWrapping: true,
-            autofocus: true
-          });
+              lineNumbers: true,
+              extraKeys: {
+                'Ctrl-Enter': accept,
+                'Cmd-Enter': accept
+              },
+              lineWrapping: true,
+              autofocus: true
+            });
 
         function accept() {
 
         }
       }
 
-      function bindLayout() {        
+      function bindLayout() {
         var shell = /** @type {HTMLElement} */(document.getElementById('shell'));
  
         var leftBar = /** @type {HTMLElement} */(document.getElementById('leftBar'));
  
         var editorHost = /** @type {HTMLElement} */(document.getElementById('editorHost'));
 
-        var pseudoEditor = /** @type {HTMLElement} */(document.getElementById('pseudoEditor'));
+        var pseudoEditor = /** @type {HTMLTextAreaElement} */(document.getElementById('pseudoEditor'));
         var pseudoGutter = /** @type {HTMLElement} */(document.getElementById('pseudoGutter'));
 
         return {
@@ -3576,7 +3582,10 @@ issuing requests, processing data and representing the data in sensible way with
           editorHost: editorHost,
           pseudoEditor: pseudoEditor,
           pseudoGutter: pseudoGutter,
-          allFound: !!shell && !!leftBar && !!editorHost
+          allFound:
+            !!shell &&
+            !!leftBar && !!editorHost &&
+            !!pseudoEditor && /textarea/i.test(pseudoEditor.tagName || '') && !!pseudoGutter
         };
       }
 
@@ -3609,7 +3618,7 @@ issuing requests, processing data and representing the data in sensible way with
           case 1: // element
             var elem = /** @type {HTMLElement} */(nod);
             // for now, just let script and style only
-            if (/^(script|style)$/i.test(elem.tagName || '')) continue;
+            if (/^(script|style)$/i.test(elem.tagName || '') || elem.id === 'shell') continue;
             break;
 
           case 3: // text-node

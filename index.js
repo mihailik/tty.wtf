@@ -469,7 +469,7 @@ function startHARREST() {
           hasReplaceState;
 
         if (allowReplaceState && !preferSearchToPath) {
-          history.replaceState(null, 'unused-string', encoded);
+          history.replaceState(null, 'unused-string', location.protocol + location.hostname + (location.port ? ':' + location.port : '') + '/' + encoded);
         } else if (hasReplaceState && !isFileProtocol && !isAboutProtocol) {
           history.replaceState(null, 'unused-string', location.pathname + '?' + encoded);
         } else {

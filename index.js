@@ -63,6 +63,20 @@ function startHARREST() {
     }
   }
 
+  /** @param text {string} */
+  function encodeText(text) {
+    if (text.length < 1900 && !/^\//.test(text)) return text;
+    if (text.length < 1900) return 'txt~' + text;
+    return 'b~' + convertToCompressed(text);
+  }
+
+  /** @param {string} text */
+  function convertToCompressed(text) {
+    var jsz = JSZipSync();
+    jsz.text('t', text);
+    return jsz.generate();
+  }
+
   /** @param {string} text */
   function convertFromCompressed(text) {
     try {
@@ -238,6 +252,9 @@ function startHARREST() {
     var responseTD = /** @type {HTMLTableCellElement} */(document.getElementById('responseTD'));
     var statusTD = /** @type {HTMLTableCellElement} */(document.getElementById('statusTD'));
     var splitterTD = /** @type {HTMLTableCellElement} */(document.getElementById('splitterTD'));
+
+    var requestCodeMirror;
+    var responseCodeMirror;
     
     splitterTD.onmousedown = splitterTD_onmousedown;
     splitterTD.ontouchstart = splitterTD_onmousedown;
@@ -246,21 +263,12 @@ function startHARREST() {
     window.onmousemove = splitterTD_onmousemove;
     window.ontouchmove = splitterTD_onmousemove;
 
-    if (location.protocol === 'file:') {
-      loadDependenciesFromLocalNodeModules(function (success) {
-        console.log('Dependencies loaded from node_modules.');
-        set(statusTD, 'Loaded');
-        continueWithDependencies();
-        set(statusTD, 'Loaded.');
-      });
-    } else {
-      loadDependenciesFromUnpkg(function (success) {
-        console.log('Dependencies loaded from unpkg.');
-        set(statusTD, 'Loaded');
-        continueWithDependencies();
-        set(statusTD, 'Loaded.');
-      });
-    }
+    loadDependenciesAppropriately(function (source) {
+      console.log('Dependencies loaded from ' + source);
+      set(statusTD, 'Loaded');
+      continueWithDependencies();
+      set(statusTD, 'Loaded.');
+    });
 
     function getLocationSource() {
       if (!location) location = window.location;
@@ -273,84 +281,96 @@ function startHARREST() {
       return source || '';
     }
 
-    /**
-     * @param {(src: string) => string} mapSrc
-     * @param {(success: boolean) => void} callback
-     */
-    function loadDependenciesFrom(mapSrc, callback) {
-      /** @type {(HTMLScriptElement | HTMLLinkElement)[]} */
-      var dependencyElements = [];
-
-      for (var i = 0; i < importedJS.length; i++) {
-        var script = document.createElement('script');
-        script.src = mapSrc(importedJS[i]);
-        dependencyElements.push(script);
-      }
-
-      for (var i = 0; i < importedStyles.length; i++) {
-        var link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = mapSrc(importedStyles[i]);
-        dependencyElements.push(link);
-      }
-
-      loadDependencyElements(dependencyElements, callback);
-    }
-
-    /**
-     * @param {(HTMLScriptElement | HTMLLinkElement)[]} elements
-     * @param {(success: boolean, results: boolean[]) => void} callback
-     */
-    function loadDependencyElements(elements, callback) {
-      process = {
-        env: {}
-      };
-      require = function() {}
-
-      var loadedCount = 0;
-      /** @type {boolean[]} */
-      var results = [];
-
-      for (var i = 0; i < elements.length; i++) {
-        loadWithHandler(elements[i], i);
+    function loadDependenciesAppropriately(callback) {
+      if (location.protocol === 'file:') {
+        loadDependenciesFromLocalNodeModules(function (success) {
+          callback('node_modules');
+        });
+      } else {
+        loadDependenciesFromUnpkg(function (success) {
+          callback('unpkg.com');
+        });
       }
 
       /**
-       * @param {HTMLScriptElement | HTMLLinkElement} element
-       * @param {number} i
+       * @param {(src: string) => string} mapSrc
+       * @param {(success: boolean) => void} callback
        */
-      function loadWithHandler(element, i) {
-        elements[i].onload = onScriptLoaded;
-        document.head.appendChild(elements[i]);
+      function loadDependenciesFrom(mapSrc, callback) {
+        /** @type {(HTMLScriptElement | HTMLLinkElement)[]} */
+        var dependencyElements = [];
 
-        /** @param {Event} evt */
-        function onScriptLoaded(evt) {
-          results[i] = true;
-          loadedCount++;
-          if (loadedCount === elements.length) {
-            callback(true, results);
+        for (var i = 0; i < importedJS.length; i++) {
+          var script = document.createElement('script');
+          script.src = mapSrc(importedJS[i]);
+          dependencyElements.push(script);
+        }
+
+        for (var i = 0; i < importedStyles.length; i++) {
+          var link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = mapSrc(importedStyles[i]);
+          dependencyElements.push(link);
+        }
+
+        loadDependencyElements(dependencyElements, callback);
+      }
+
+      /**
+       * @param {(HTMLScriptElement | HTMLLinkElement)[]} elements
+       * @param {(success: boolean, results: boolean[]) => void} callback
+       */
+      function loadDependencyElements(elements, callback) {
+        process = {
+          env: {}
+        };
+        require = function () { }
+
+        var loadedCount = 0;
+        /** @type {boolean[]} */
+        var results = [];
+
+        for (var i = 0; i < elements.length; i++) {
+          loadWithHandler(elements[i], i);
+        }
+
+        /**
+         * @param {HTMLScriptElement | HTMLLinkElement} element
+         * @param {number} i
+         */
+        function loadWithHandler(element, i) {
+          elements[i].onload = onScriptLoaded;
+          document.head.appendChild(elements[i]);
+
+          /** @param {Event} evt */
+          function onScriptLoaded(evt) {
+            results[i] = true;
+            loadedCount++;
+            if (loadedCount === elements.length) {
+              callback(true, results);
+            }
           }
         }
       }
-    }
 
-    /** @param {(success: boolean) => void} callback */
-    function loadDependenciesFromUnpkg(callback) {
-      loadDependenciesFrom(mapToUnpkg, callback);
+      /** @param {(success: boolean) => void} callback */
+      function loadDependenciesFromUnpkg(callback) {
+        loadDependenciesFrom(mapToUnpkg, callback);
 
-      /** @param {string} src */
-      function mapToUnpkg(src) {
-        return '//unpkg.com/' + src;
+        /** @param {string} src */
+        function mapToUnpkg(src) {
+          return '//unpkg.com/' + src;
+        }
       }
-    }
 
-    /** @param {(success: boolean) => void} callback */
-    function loadDependenciesFromLocalNodeModules(callback) {
-      loadDependenciesFrom(mapToNodeModules, callback);
+      /** @param {(success: boolean) => void} callback */
+      function loadDependenciesFromLocalNodeModules(callback) {
+        loadDependenciesFrom(mapToNodeModules, callback);
 
-      /** @param {string} src */
-      function mapToNodeModules(src) {
-        return './node_modules/' + src.replace(/^([^\/]+)@[^\/]+/, '$1');
+        /** @param {string} src */
+        function mapToNodeModules(src) {
+          return './node_modules/' + src.replace(/^([^\/]+)@[^\/]+/, '$1');
+        }
       }
     }
 
@@ -413,8 +433,51 @@ function startHARREST() {
     function continueWithDependencies() {
       requestTD.innerHTML = '';
       responseTD.innerHTML = '';
-      CodeMirror(requestTD, { lineNumbers: true, value: deriveTextFromLocation() });
-      CodeMirror(responseTD, { lineNumbers: true, readOnly: true });
+      requestCodeMirror = CodeMirror(requestTD, { lineNumbers: true, value: deriveTextFromLocation() });
+      responseCodeMirror = CodeMirror(responseTD, { lineNumbers: true, readOnly: true });
+
+      requestCodeMirror.on('changes', requestTextChanged);
+
+      function requestTextChanged() {
+        var text = requestCodeMirror.getValue();
+        updateLocationWithText(text);
+      }
+
+      /**
+       * @param text {string}
+       * @param location {typeof window.location=}
+       **/
+      function updateLocationWithText(text, location) {
+        if (!location) location = window.location;
+
+        var existingText = deriveTextFromLocation(location);
+        if ((text || '') === (existingText || '')) return false;
+
+        var encoded = mangleForURL(encodeText(text));
+
+        var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
+        var isFileProtocol = /^file:$/i.test(location.protocol || '');
+        var isAboutProtocol = /^about:$/i.test(location.protocol || '');
+        var preferSearchToPath =
+          !!(location.search || '').replace(/^\?/, '') // already has search query, keep it
+          || /^\/api\//.test(location.pathname || '') // path starts with /api, this is azure function call
+          || /^\/404.html/.test(location.pathname || ''); // path starts with /404.html, this is GitHub or CodeSpaces preview
+
+        var allowReplaceState =
+          !/\//.test(encoded) &&
+          !isFileProtocol &&
+          !isAboutProtocol &&
+          hasReplaceState;
+
+        if (allowReplaceState && !preferSearchToPath) {
+          history.replaceState(null, 'unused-string', encoded);
+        } else if (hasReplaceState && !isFileProtocol && !isAboutProtocol) {
+          history.replaceState(null, 'unused-string', location.pathname + '?' + encoded);
+        } else {
+          if (preferSearchToPath) location.search = '';
+          location.href = '#' + encoded;
+        }
+      }
     }
 
     function docHead() {

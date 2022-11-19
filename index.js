@@ -1,6 +1,252 @@
 // @ts-check <script>
 function catchREST() {
 
+  // #region polyfills
+
+  if (typeof Promise === 'undefined') {
+    Promise = /** @type {Partial<typeof Promise>} */(polyfillPromise());
+  }
+
+  if (typeof Object.defineProperty !== 'function') {
+    // @ts-ignore
+    Object.defineProperty = function (obj, key, attr) {
+      obj['_get_' + key] = attr.get;
+      obj[key] = function () {
+        return obj['_get_' + key]();
+      };
+    };
+  }
+
+  if (typeof Object.keys !== 'function') {
+    Object.keys = function (obj) {
+      var keys = [];
+      for (var k in obj) {
+        keys.push(k);
+      }
+      return keys;
+    };
+  }
+  if (typeof [].map !== 'function') {
+    (function () {
+      Array.prototype.map = function map(callback) {
+        var arr = this;
+        var res = [];
+        for (var i = 0; i < this.length; i++) {
+          if (!(String(i) in arr)) continue;
+          var elem = arr[i];
+          var x = callback(elem, i, arr);
+          res[i] = x;
+        }
+        return res;
+      };
+    })();
+  }
+
+  if (typeof [].filter !== 'function') {
+    Array.prototype.filter = function (filt) {
+      var arr = this;
+      var res = [];
+      for (var i = 0; i < this.length; i++) {
+        if (!(String(i) in arr)) continue;
+        var elem = arr[i];
+        if (filt(elem)) {
+          res.push(elem);
+        }
+      }
+      return res;
+    };
+  }
+
+  function polyfillPromise() {
+    var queueCb = [];
+    var queueArg = [];
+
+    return Promise;
+
+    function queueNext(callback, arg) {
+      var set = queueCb.length;
+      queueCb.push(callback);
+      queueArg.push(arg);
+
+      if (!set) {
+        if (typeof setImmediate === 'function') setImmediate(drainQueue);
+        else setTimeout(drainQueue, 0);
+      }
+    }
+
+    function drainQueue() {
+      while (true) {
+        var cb = queueCb.pop();
+        var arg = queueArg.pop();
+        if (!cb) break;
+        cb(arg);
+      }
+    }
+
+    function Promise(resolver) {
+      if (typeof resolver !== 'function') throw new Error('Expected function resolver: ' + typeof resolver);
+
+      if (!(this instanceof Promise))
+        return new Promise(resolver);
+
+      var self = this;
+      /** @type {'pending' | 'resolving' | 'fulfilled' | 'failed'} */
+      var state = self['[[PromiseState]]'] = 'pending';
+      var outcome;
+      var cbOK, cbFail;
+
+      function resolve(value) {
+        if (state !== 'pending') return;
+
+        if (value && typeof value.then === 'function') {
+          self['[[PromiseState]]'] = state = 'resolving';
+          value.then(
+            function (value) {
+              self['[[PromiseState]]'] = state = 'fulfilled';
+              outcome = value;
+              complete();
+            },
+            function (error) {
+              self['[[PromiseState]]'] = state = 'failed';
+              outcome = error;
+              complete();
+            });
+        } else {
+          self['[[PromiseState]]'] = state = 'fulfilled';
+          outcome = value;
+          complete();
+        }
+      }
+
+      function reject(error) {
+        if (state !== 'pending') return;
+        self['[[PromiseState]]'] = state = 'failed';
+        outcome = error;
+        complete();
+      }
+
+      function complete() {
+        var callbacks = state === 'fulfilled' ? cbOK : cbFail;
+        cbOK = null;
+        cbFail = null;
+        if (!callbacks) return;
+
+        for (var i = 0; callbacks && i < callbacks.length; i++) {
+          queueNext(callbacks[i], outcome);
+        }
+      }
+
+      function Then(callback, callbackFail) {
+        if (typeof callback !== 'function') throw new Error('Expected function callback: ' + typeof callback);
+        if (callbackFail != null && typeof callbackFail !== 'function') throw new Error('Expected omitted or function callbackFail: ' + typeof callbackFail);
+
+        return new Promise(function (resolve, reject) {
+          if (state === 'fulfilled') queueNext(withOK, outcome);
+          if (state === 'failed') queueNext(withFail, outcome);
+
+          (cbOK || (cbOK = [])).push(withOK);
+
+          if (typeof callbackFail !== 'function')
+            (cbFail || (cbFail = [])).push(withFail);
+
+          function withOK(value) {
+            handleSettled(value, callback);
+          }
+
+          function withFail(error) {
+            handleSettled(error, callbackFail)
+          }
+
+          function handleSettled(outcome, callback) {
+            try {
+              outcome = callback(outcome);
+              if (outcome && typeof outcome.then === 'function') {
+                outcome.then(resolve, reject);
+              } else {
+                resolve(outcome);
+              }
+
+            } catch (error) {
+              reject(error);
+            }
+          }
+        });
+      }
+
+      function Catch(callback) {
+        return Then(function (value) { return value; }, callback);
+      }
+
+      this.then = Then;
+      this['catch'] = Catch;
+
+      try {
+        resolver(resolve, reject);
+      } catch (error) {
+        reject(error);
+      }
+    }
+
+    Promise.all = all;
+    Promise.race = race;
+    Promise.reject = reject;
+    Promise.resolve = resolve;
+
+    function all(arr) {
+      return new Promise(function (resolve, reject) {
+        if (!arr.length) { resolve([]); }
+        var results = [];
+        var toComplete = arr.length;
+        for (var i = 0; i < arr.length; i++) {
+          arr[i].then(
+            callbackFor(i),
+            fail
+          );
+        }
+
+        function fail(error) {
+          toComplete = 0;
+          results = null;
+          reject(error);
+        }
+
+        function callbackFor(i) {
+          return function (value) {
+            if (!toComplete) return;
+
+            results[i] = value;
+            toComplete--;
+            if (!toComplete) resolve(results);
+          };
+        }
+      });
+    }
+
+    function race(arr) {
+      return new Promise(function (resolve, reject) {
+        if (!arr) return resolve();
+        for (var i = 0; i < arr.length; i++) {
+          arr[i].then(resolve, reject);
+        }
+      });
+    }
+
+    function reject(reason) {
+      return new Promise(function (resolve, reject) {
+        reject(reason);
+      });
+    }
+
+    function resolve(value) {
+      return new Promise(function (resolve, reject) {
+        resolve(value);
+      });
+    }
+
+  }
+
+  // #endregion
+
   // #region SHARED FUNCTIONALITY
 
   /** @param {Function} fn */
@@ -148,7 +394,7 @@ function catchREST() {
     if (!seed) seed = 0;
     var h1 = 0xdeadbeef ^ seed,
       h2 = 0x41c6ce57 ^ seed;
-    for (let i = 0, ch; i < str.length; i++) {
+    for (var i = 0, ch; i < str.length; i++) {
       ch = str.charCodeAt(i);
       h1 = Math.imul(h1 ^ ch, 2654435761);
       h2 = Math.imul(h2 ^ ch, 1597334677);
@@ -525,11 +771,20 @@ issuing requests, processing data and representing the data in sensible way with
       function combineLib(imports) {
         var combined = imports.map(function (importEntry) {
           switch (path.extname(importEntry.importLocalPath).toLowerCase()) {
-            case '.js': return '// #region ' + path.basename(importEntry.importLocalPath).replace(/\.js$/, '') + '\n' + importEntry.content + '\n' + '// #endregion';
+            case '.js':
+              var processedContent = importEntry.content;
+              if (/typescript/.test(importEntry.importLocalPath))
+                processedContent = strictES3(importEntry.importLocalPath, importEntry.content);
+              return '// #region ' + path.basename(importEntry.importLocalPath).replace(/\.js$/, '') + '\n' + processedContent + '\n' + '// #endregion';
             case '.css': return (
               '///// ' + path.basename(importEntry.importLocalPath) + ' /////\n' +
               '(function() { var style = document.createElement("style");\n' +
-              'style.innerHTML = ' + JSON.stringify(importEntry.content) + ';\n' +
+              'if (elem && "styleSheet" in style && "type" in style) {\n' +
+              ' style.type = "text/css";\n' +
+              ' style.styleSheet.cssText = value;\n' +
+              '} else {\n' +
+              ' style.innerHTML = ' + JSON.stringify(importEntry.content) + ';\n' +
+              '}\n' +
               '(document.body || document.getElementsByTagName("head")[0]).appendChild(style); })();\n'
             );
           }
@@ -539,6 +794,121 @@ issuing requests, processing data and representing the data in sensible way with
           '// {build-by-hash:' + catchREST_hash + '}\n' +
           combined.join('\n\n')
         );
+      }
+
+      /** @param {string} filePath @param {string} content */
+      function strictES3(filePath, content) {
+        var jscriptKeywords =
+          ('break,false,in,this,void,continue,for,new,true,while,delete,' +
+            'function,null,typeof,with,else,if,return,var,' +
+            'catch,class,case,const,debugger,finally,declare,do,instanceof,default,extends,export,enum,' +
+            'is,import,interface,super,throw,try,switch').split(',');
+
+        var ts = require('typescript');
+        var ast = ts.createLanguageServiceSourceFile(
+          filePath,
+          ts.ScriptSnapshot.fromString(content),
+          ts.ScriptTarget.ES3,
+          '1',
+          true,
+          ts.ScriptKind.JS);
+
+        var replacements = [];
+        var replacementCount = 0;
+
+        ts.forEachChild(ast, visitNode);
+
+        if (replacements.length) {
+          replacements.sort(function (r1, r2) { return r1.pos - r2.pos });
+          var updatedContent = '';
+          var lastPos = 0;
+          for (var i = 0; i < replacements.length; i++) {
+            var repl = replacements[i];
+            if (repl.pos > lastPos) updatedContent += content.slice(lastPos, repl.pos);
+            updatedContent += repl.text;
+            lastPos = repl.pos + repl.length;
+          }
+
+          if (lastPos < content.length) {
+            updatedContent += content.slice(lastPos);
+            lastPos = content.length;
+          }
+
+          console.log(' handled ' + replacementCount + ' replacements');
+          content = updatedContent;
+        }
+
+        return content;
+
+        /** @param {import('typescript').Node} node */
+        function visitNode(node) {
+          switch (node.kind) {
+            case ts.SyntaxKind.PropertyAccessExpression:
+              var propAccess = /** @type {import('typescript').PropertyAccessExpression} */(node);
+              if (propAccess.name.kind === ts.SyntaxKind.Identifier
+                && jscriptKeywords.indexOf(propAccess.name.text) >= 0) {
+                var kw = propAccess.name;
+                var posDot = content.lastIndexOf('.', kw.pos);
+                replacements.push({ pos: posDot, length: 1, text: '[' });
+                replacements.push({ pos: kw.pos + kw.getLeadingTriviaWidth(), length: kw.text.length, text: '"' + kw.text + '"]' });
+                replacementCount++;
+              }
+              break;
+
+            case ts.SyntaxKind.PropertyAssignment:
+              var propAssig = /** @type {import('typescript').PropertyAssignment} */(node);
+              if (propAssig.name.kind === ts.SyntaxKind.Identifier
+                && jscriptKeywords.indexOf(propAssig.name.text) >= 0) {
+                var kw = propAssig.name;
+                replacements.push({ pos: kw.pos + kw.getLeadingTriviaWidth(), length: kw.text.length, text: '"' + kw.text + '"' });
+                replacementCount++;
+              }
+              break;
+
+            case ts.SyntaxKind.ObjectLiteralExpression:
+              var objLit = /** @type {import('typescript').ObjectLiteralExpression} */(node);
+              if (objLit.properties.hasTrailingComma) {
+                var ln = ast.getLineAndCharacterOfPosition(objLit.pos).line;
+                if (ln > 740 && ln < 760 || true) {
+                  var copy = {};
+                  for (var k in objLit.properties) {
+                    if (String(Number(k)) === k) continue;
+                    copy[k] = objLit.properties[k];
+                  }
+
+                  var lastTok = objLit.getLastToken();
+                  if (lastTok && content.slice(lastTok.pos - 1, lastTok.pos) === ',') {
+                    replacements.push({
+                      pos: lastTok.pos - 1,
+                      length: 1,
+                      text: ''
+                    });
+
+                    replacementCount++;
+                  }
+                }
+              }
+              break;
+
+            case ts.SyntaxKind.GetAccessor:
+            case ts.SyntaxKind.SetAccessor:
+              var getSetAcc = /** @type {import('typescript').GetAccessorDeclaration} */(node);
+              replacements.push({
+                pos: getSetAcc.pos + getSetAcc.getLeadingTriviaWidth(),
+                length: getSetAcc.name.pos - (getSetAcc.pos + getSetAcc.getLeadingTriviaWidth()),
+                text: ''
+              });
+              replacements.push({
+                pos: getSetAcc.name.end,
+                length: 0,
+                text: ': function'
+              });
+              break;
+          }
+
+          ts.forEachChild(node, visitNode);
+        }
+
       }
 
       return detectLocalBuildValid().then(function (valid) {
@@ -624,7 +994,7 @@ issuing requests, processing data and representing the data in sensible way with
 
       return new Promise(function (resolve) { resolve(null); }).then(function () {
         /** @type {ReturnType<typeof listenToPort>} */
-        var listeningServerPromise = listenToPort('', port).catch(function (error) {
+        var listeningServerPromise = listenToPort('', port)['catch'](function (error) {
           // TODO: if port is not available, send shutdown request and in the meantime start retrying...
           throw new Error();
         });
@@ -1064,6 +1434,9 @@ issuing requests, processing data and representing the data in sensible way with
       if (typeof value === 'string') {
         if (elem && 'textContent' in elem) {
           elem.textContent = value;
+        } else if (elem && 'styleSheet' in elem && 'type' in elem) {
+          if ('type' in elem && !elem.type) elem.type = 'text/css';
+          elem.styleSheet.cssText = value;
         } else if (elem && 'innerText' in elem) {
           elem.innerText = value;
         } else {
@@ -1476,7 +1849,7 @@ issuing requests, processing data and representing the data in sensible way with
           }
 
           var nextDrive = /** @type {Drive.Optional[]} */(optionalDrives)[currentOptionalDriveIndex];
-          nextDrive.detect(uniqueKey, (error, detached) => {
+          nextDrive.detect(uniqueKey, function (error, detached) {
             if (detached) {
               bootState.storageName = nextDrive.name;
               shadowDetected(detached);
@@ -1508,7 +1881,7 @@ issuing requests, processing data and representing the data in sensible way with
           else domRecent = true;
 
           if (domRecent) {
-            detached.purge(shad => {
+            detached.purge(function (shad) {
               shadow = shad;
               finishOptionalDetection();
             });
@@ -1562,7 +1935,7 @@ issuing requests, processing data and representing the data in sensible way with
           }
           else {
             if (!toUpdateDOM) toUpdateDOM = {};
-            toUpdateDOM[path] = encoding ? { content, encoding } : content;
+            toUpdateDOM[path] = encoding ? { content: content, encoding: encoding } : content;
             newStorageFileCache[path] = true;
           }
         }
@@ -1735,7 +2108,7 @@ issuing requests, processing data and representing the data in sensible way with
             content === null || typeof content === 'undefined' ? content :
               String(content);
 
-          var encoded = encoding ? { content, encoding } : bestEncode(content);
+          var encoded = encoding ? { content: content, encoding: encoding } : bestEncode(content);
           var protectedText = encoded.content.
             replace(/\-\-(\**)\>/g, '--*$1>').
             replace(/\<(\**)\!/g, '<*$1!');
@@ -2288,9 +2661,9 @@ issuing requests, processing data and representing the data in sensible way with
         }
 
         return {
-          CR, CRLF, LF,
-          base64,
-          json
+          CR: CR, CRLF: CRLF, LF: LF,
+          base64: base64,
+          json: json
         };
 
       })();
@@ -2419,13 +2792,15 @@ issuing requests, processing data and representing the data in sensible way with
         else {
           var result = content.replace(
             /\"\u0000|\u0001|\u0002|\u0003|\u0004|\u0005|\u0006|\u0007|\u0008|\u0009|\u00010|\u00011|\u00012|\u00013|\u00014|\u00015|\u0016|\u0017|\u0018|\u0019|\u0020|\u0021|\u0022|\u0023|\u0024|\u0025|\u0026|\u0027|\u0028|\u0029|\u0030|\u0031/g,
-            (chr) =>
-              chr === '\t' ? '\\t' :
-                chr === '\r' ? '\\r' :
-                  chr === '\n' ? '\\n' :
-                    chr === '\"' ? '\\"' :
-                      chr < '\u0010' ? '\\u000' + chr.charCodeAt(0).toString(16) :
-                        '\\u00' + chr.charCodeAt(0).toString(16));
+            function (chr) {
+              return (
+                chr === '\t' ? '\\t' :
+                  chr === '\r' ? '\\r' :
+                    chr === '\n' ? '\\n' :
+                      chr === '\"' ? '\\"' :
+                        chr < '\u0010' ? '\\u000' + chr.charCodeAt(0).toString(16) :
+                          '\\u00' + chr.charCodeAt(0).toString(16));
+            });
           return result;
         }
       }
@@ -2444,7 +2819,7 @@ issuing requests, processing data and representing the data in sensible way with
         var type = content instanceof Array ? null : content.constructor.name || content.type;
         if (typeof JSON !== 'undefined' && typeof JSON.stringify === 'function') {
           if (type) {
-            var wrapped = { type, content };
+            var wrapped = { type: type, content: content };
             var wrappedJSON = JSON.stringify(wrapped);
             return wrappedJSON;
           }
@@ -2586,8 +2961,8 @@ issuing requests, processing data and representing the data in sensible way with
             function createLocalStorageDetached(access) {
               var detached = {
                 timestamp: 0,
-                applyTo,
-                purge
+                applyTo: applyTo,
+                purge: purge
               };
 
               var timestampStr = access.get('*timestamp');
@@ -2651,9 +3026,9 @@ issuing requests, processing data and representing the data in sensible way with
              */
             function createLocalStorageShadow(access, timestamp) {
               var shadow = {
-                timestamp,
+                timestamp: timestamp,
                 write: write,
-                forget
+                forget: forget
               };
 
               return shadow;
@@ -2674,7 +3049,7 @@ issuing requests, processing data and representing the data in sensible way with
                 access.remove(file);
               }
             }
-                
+
             return {
               name: 'localStorage',
               detect: detectLocalStorage
@@ -2720,12 +3095,12 @@ issuing requests, processing data and representing the data in sensible way with
               var finished = false; // protect against reporting results multiple times
 
               db.readTransaction(
-                transaction => {
+                function (transaction) {
 
                   transaction.executeSql(
                     'SELECT value from "*metadata" WHERE name=\'editedUTC\'',
                     [],
-                    (transaction, result) => {
+                    function (transaction, result) {
                       /** @type {number | undefined} */
                       var editedValue;
                       if (result.rows && result.rows.length === 1) {
@@ -2746,14 +3121,14 @@ issuing requests, processing data and representing the data in sensible way with
                       finished = true;
                       callback(void 0, createWebSQLDetached(db, editedValue || 0, true));
                     },
-                    (transaction, sqlError) => {
+                    function (transaction, sqlError) {
                       if (finished) return;
                       else finished = true;
                       // no data
                       callback(void 0, createWebSQLDetached(db, 0, false));
                     });
                 },
-                sqlError => {
+                function (sqlError) {
                   if (finished) return;
                   else finished = true;
 
@@ -2763,7 +3138,7 @@ issuing requests, processing data and representing the data in sensible way with
                   }
 
                   this._createMetadataTable(
-                    sqlError_creation => {
+                    function (sqlError_creation) {
                       if (finished) return;
                       else finished = true;
 
@@ -2790,17 +3165,19 @@ issuing requests, processing data and representing the data in sensible way with
                */
               function applyTo(mainDrive, callback) {
                 db.readTransaction(
-                  transaction => listAllTables(
-                    transaction,
-                    tables => {
-                      var ftab = getFilenamesFromTables(tables);
-                      applyToWithFiles(transaction, ftab, mainDrive, callback);
-                    },
-                    sqlError => {
-                      reportSQLError('Failed to list tables for the webSQL database.', sqlError);
-                      callback(createWebSQLShadow(db, detached.timestamp, metadataTableIsValid));
-                    }),
-                  sqlError => {
+                  function (transaction) {
+                    return listAllTables(
+                      transaction,
+                      function (tables) {
+                        var ftab = getFilenamesFromTables(tables);
+                        applyToWithFiles(transaction, ftab, mainDrive, callback);
+                      },
+                      function (sqlError) {
+                        reportSQLError('Failed to list tables for the webSQL database.', sqlError);
+                        callback(createWebSQLShadow(db, detached.timestamp, metadataTableIsValid));
+                      });
+                  },
+                  function (sqlError) {
                     reportSQLError('Failed to open read transaction for the webSQL database.', sqlError);
                     callback(createWebSQLShadow(db, detached.timestamp, metadataTableIsValid));
                   });
@@ -2809,16 +3186,18 @@ issuing requests, processing data and representing the data in sensible way with
               /** @param {Drive.Detached.CallbackWithShadow} callback */
               function purge(callback) {
                 db.transaction(
-                  transaction => listAllTables(
-                    transaction,
-                    tables => {
-                      purgeWithTables(transaction, tables, callback);
-                    },
-                    sqlError => {
-                      reportSQLError('Failed to list tables for the webSQL database.', sqlError);
-                      callback(createWebSQLShadow(db, 0, false));
-                    }),
-                  sqlError => {
+                  function (transaction) {
+                    return listAllTables(
+                      transaction,
+                      function (tables) {
+                        purgeWithTables(transaction, tables, callback);
+                      },
+                      function (sqlError) {
+                        reportSQLError('Failed to list tables for the webSQL database.', sqlError);
+                        callback(createWebSQLShadow(db, 0, false));
+                      });
+                  },
+                  function (sqlError) {
                     reportSQLError('Failed to open read-write transaction for the webSQL database.', sqlError);
                     callback(createWebSQLShadow(db, 0, false));
                   });
@@ -2854,7 +3233,7 @@ issuing requests, processing data and representing the data in sensible way with
                   transaction.executeSql(
                     'SELECT * FROM "' + table + '"',
                     [],
-                    (transaction, result) => {
+                    function (transaction, result) {
                       if (result.rows.length) {
                         var row = result.rows.item(0);
                         if (row.value === null)
@@ -2864,7 +3243,7 @@ issuing requests, processing data and representing the data in sensible way with
                       }
                       completeOne();
                     },
-                    sqlError => {
+                    function (sqlError) {
                       completeOne();
                     });
                 }
@@ -2887,10 +3266,10 @@ issuing requests, processing data and representing the data in sensible way with
                   transaction.executeSql(
                     'DROP TABLE "' + tables[i] + '"',
                     [],
-                    (transaction, result) => {
+                    function (transaction, result) {
                       completeOne();
                     },
-                    (transaction, sqlError) => {
+                    function (transaction, sqlError) {
                       reportSQLError('Failed to drop table for the webSQL database.', sqlError);
                       completeOne();
                     });
@@ -2956,16 +3335,16 @@ issuing requests, processing data and representing the data in sensible way with
 
                 var repeatingTransactionErrorCount_unexpected = 0;
                 db.transaction(
-                  transaction => {
+                  function (transaction) {
                     transaction.executeSql(
                       updateSQL,
                       ['content', content, encoding],
                       updateMetadata,
-                      (transaction, sqlError) => {
+                      function (transaction, sqlError) {
                         createTableAndUpdate(transaction, file, tableName, updateSQL, content, encoding)
                       });
                   },
-                  sqlError => {
+                  function (sqlError) {
                     repeatingTransactionErrorCount_unexpected++;
                     if (repeatingTransactionErrorCount_unexpected > 5) {
                       reportSQLError('Transaction failures (' + repeatingTransactionErrorCount_unexpected + ') updating file "' + file + '".', sqlError);
@@ -2975,25 +3354,25 @@ issuing requests, processing data and representing the data in sensible way with
                     // failure might have been due to table absence?
                     // -- redo with a new transaction
                     db.transaction(
-                      transaction => {
+                      function (transaction) {
                         createTableAndUpdate(transaction, file, tableName, updateSQL, content, encoding);
                       },
-                      sqlError_inner => {
+                      function (sqlError_inner) {
                         // failure might have been due to *metadata table ansence
                         // -- redo with a new transaction (last attempt)
                         db.transaction(
-                          transaction => {
+                          function (transaction) {
                             updateMetdata_noMetadataCase(transaction);
                             // OK, once again for extremely confused browsers like Opera
                             transaction.executeSql(
                               updateSQL,
                               ['content', content, encoding],
                               updateMetadata,
-                              (transaction, sqlError) => {
+                              function (transaction, sqlError) {
                                 createTableAndUpdate(transaction, file, tableName, updateSQL, content, encoding)
                               });
                           },
-                          sqlError_ever_inner => {
+                          function (sqlError_ever_inner) {
                             reportSQLError(
                               'Transaction failure updating file "' + file + '" ' +
                               '(after ' +
@@ -3021,16 +3400,16 @@ issuing requests, processing data and representing the data in sensible way with
                 transaction.executeSql(
                   'CREATE TABLE "' + tableName + '" (name PRIMARY KEY, value, encoding)',
                   [],
-                  (transaction, result) => {
+                  function (transaction, result) {
                     transaction.executeSql(
                       updateSQL,
                       ['content', content, encoding],
                       this._closures.updateMetadata,
-                      (transaction, sqlError) => {
+                      function (transaction, sqlError) {
                         reportSQLError('Failed to update table "' + tableName + '" for file "' + file + '" after creation.', sqlError);
                       });
                   },
-                  (transaction, sqlError) => {
+                  function (transaction, sqlError) {
                     reportSQLError('Failed to create a table "' + tableName + '" for file "' + file + '".', sqlError);
                   });
               }
@@ -3039,16 +3418,16 @@ issuing requests, processing data and representing the data in sensible way with
               function deleteAllFromTable(file) {
                 var tableName = mangleDatabaseObjectName(file);
                 db.transaction(
-                  transaction => {
+                  function (transaction) {
                     transaction.executeSql(
                       'DELETE FROM TABLE "' + tableName + '"',
                       [],
                       updateMetadata,
-                      (transaction, sqlError) => {
+                      function (transaction, sqlError) {
                         reportSQLError('Failed to delete all from table "' + tableName + '" for file "' + file + '".', sqlError);
                       });
                   },
-                  sqlError => {
+                  function (sqlError) {
                     reportSQLError('Transaction failure deleting all from table "' + tableName + '" for file "' + file + '".', sqlError);
                   });
               }
@@ -3057,16 +3436,16 @@ issuing requests, processing data and representing the data in sensible way with
               function dropFileTable(file) {
                 var tableName = mangleDatabaseObjectName(file);
                 db.transaction(
-                  transaction => {
+                  function (transaction) {
                     transaction.executeSql(
                       'DROP TABLE "' + tableName + '"',
                       [],
                       updateMetadata,
-                      (transaction, sqlError) => {
+                      function (transaction, sqlError) {
                         reportSQLError('Failed to drop table "' + tableName + '" for file "' + file + '".', sqlError);
                       });
                   },
-                  sqlError => {
+                  function (sqlError) {
                     reportSQLError('Transaction failure dropping table "' + tableName + '" for file "' + file + '".', sqlError);
                   });
               }
@@ -3086,7 +3465,7 @@ issuing requests, processing data and representing the data in sensible way with
               function updateMetdata_noMetadataCase(transaction) {
                 createMetadataTable(
                   transaction,
-                  sqlerr => {
+                  function (sqlerr) {
                     if (sqlerr) {
                       reportSQLError('Failed create metadata table.', sqlerr);
                       return;
@@ -3095,10 +3474,10 @@ issuing requests, processing data and representing the data in sensible way with
                     transaction.executeSql(
                       'INSERT OR REPLACE INTO "*metadata" VALUES (?,?)',
                       ['editedUTC', this.timestamp],
-                      (tr, result) => {
+                      function (tr, result) {
                         // OK
                       },
-                      (tr, sqlerr) => {
+                      function (tr, sqlerr) {
                         reportSQLError('Failed to update metadata table after creation.', sqlerr);
                       });
                   });
@@ -3113,10 +3492,12 @@ issuing requests, processing data and representing the data in sensible way with
                 transaction.executeSql(
                   'CREATE TABLE "*metadata" (name PRIMARY KEY, value)',
                   [],
-                  (transaction, result) =>
-                    callback(),
-                  (transaction, sqlError) =>
-                    callback(sqlError));
+                  function (transaction, result) {
+                    return callback();
+                  },
+                  function (transaction, sqlError) {
+                    return callback(sqlError);
+                  });
               }
 
               /**
@@ -3166,7 +3547,7 @@ issuing requests, processing data and representing the data in sensible way with
               transaction.executeSql(
                 'SELECT tbl_name  from sqlite_master WHERE type=\'table\'',
                 [],
-                (transaction, result) => {
+                function (transaction, result) {
                   /** @type {string[]} */
                   var tables = [];
                   for (var i = 0; i < result.rows.length; i++) {
@@ -3177,7 +3558,7 @@ issuing requests, processing data and representing the data in sensible way with
                   }
                   callback(tables);
                 },
-                (transaction, sqlError) => errorCallback(sqlError));
+                function (transaction, sqlError) { return errorCallback(sqlError); });
             }
 
             /** @param {string[]} tables */
@@ -3288,11 +3669,11 @@ issuing requests, processing data and representing the data in sensible way with
 
               var openRequest = indexedDBInstance.open(dbName, 1);
 
-              openRequest.onerror = (errorEvent) => callback('Opening database error: ' + getErrorMessage(errorEvent));
+              openRequest.onerror = function (errorEvent) { callback('Opening database error: ' + getErrorMessage(errorEvent)); };
 
               openRequest.onupgradeneeded = createDBAndTables;
 
-              openRequest.onsuccess = (event) => {
+              openRequest.onsuccess = function (event) {
                 var db = openRequest.result;
 
                 try {
@@ -3300,7 +3681,7 @@ issuing requests, processing data and representing the data in sensible way with
                   // files mentioned here, but not really used to detect
                   // broken multi-store transaction implementation in Safari
 
-                  transaction.onerror = (errorEvent) => callback('Transaction error: ' + getErrorMessage(errorEvent));
+                  transaction.onerror = function (errorEvent) { return callback('Transaction error: ' + getErrorMessage(errorEvent)); };
 
                   var metadataStore = transaction.objectStore('metadata');
                   var filesStore = transaction.objectStore('files');
@@ -3316,12 +3697,12 @@ issuing requests, processing data and representing the data in sensible way with
                   return;
                 }
 
-                editedUTCRequest.onerror = (errorEvent) => {
+                editedUTCRequest.onerror = function (errorEvent) {
                   var detached = createIndexedDBDetached(db, transaction, void 0);
                   callback(void 0, detached);
                 };
 
-                editedUTCRequest.onsuccess = (event) => {
+                editedUTCRequest.onsuccess = function (event) {
                   /** @type {MetadataData} */
                   var result = editedUTCRequest.result;
                   var detached = createIndexedDBDetached(db, transaction, result && typeof result.value === 'number' ? result.value : void 0);
@@ -3366,7 +3747,7 @@ issuing requests, processing data and representing the data in sensible way with
               // ensure the same transaction is used for applyTo/purge if possible
               // -- but not if it's completed
               if (transaction) {
-                transaction.oncomplete = () => {
+                transaction.oncomplete = function () {
                   transaction = void 0;
                 };
               }
@@ -3388,7 +3769,7 @@ issuing requests, processing data and representing the data in sensible way with
                 var metadataStore = applyTransaction.objectStore('metadata');
                 var filesStore = applyTransaction.objectStore('files');
 
-                var onerror = (errorEvent) => {
+                var onerror = function (errorEvent) {
                   if (typeof console !== 'undefined' && console && typeof console.error === 'function')
                     console.error('Could not count files store: ', errorEvent);
                   callback(createIndexedDBShadow(db, detached.timestamp));
@@ -3412,14 +3793,12 @@ issuing requests, processing data and representing the data in sensible way with
 
                 countRequest.onerror = onerror;
 
-                countRequest.onsuccess = (event) => {
-
+                countRequest.onsuccess = function (event) {
                   try {
-
                     var storeCount = countRequest.result;
 
                     var cursorRequest = filesStore.openCursor();
-                    cursorRequest.onerror = (errorEvent) => {
+                    cursorRequest.onerror = function (errorEvent) {
                       if (typeof console !== 'undefined' && console && typeof console.error === 'function')
                         console.error('Could not open cursor: ', errorEvent);
                       callback(createIndexedDBShadow(db, detached.timestamp));
@@ -3427,7 +3806,7 @@ issuing requests, processing data and representing the data in sensible way with
 
                     var processedCount = 0;
 
-                    cursorRequest.onsuccess = (event) => {
+                    cursorRequest.onsuccess = function (event) {
 
                       try {
                         var cursor = cursorRequest.result;
@@ -3444,7 +3823,7 @@ issuing requests, processing data and representing the data in sensible way with
                         /** @type {FileData} */
                         var result = cursor.value;
                         if (result && result.path) {
-                          mainDrive.timestamp = this.timestamp;
+                          mainDrive.timestamp = timestamp;
                           mainDrive.write(result.path, result.content, result.encoding);
                         }
 
@@ -3462,7 +3841,7 @@ issuing requests, processing data and representing the data in sensible way with
 
                         if (typeof console !== 'undefined' && console && typeof console.error === 'function')
                           console.error(message, cursorContinueSuccessHandlingError);
-                        callback(createIndexedDBShadow(this._db, this.timestamp));
+                        callback(createIndexedDBShadow(db, timestamp));
                       }
 
                     }; // cursorRequest.onsuccess
@@ -3491,7 +3870,7 @@ issuing requests, processing data and representing the data in sensible way with
               function purge(callback) {
                 if (transaction) {
                   transaction = void 0;
-                  setTimeout(() => { // avoid being in the original transaction
+                  setTimeout(function () { // avoid being in the original transaction
                     purgeCore(callback);
                   }, 1);
                 }
@@ -3541,17 +3920,17 @@ issuing requests, processing data and representing the data in sensible way with
                 if (conflatedWrites || now - lastWrite < 10) {
                   if (!conflatedWrites) {
                     conflatedWrites = {};
-                    setTimeout(() => {
+                    setTimeout(function () {
                       var writes = conflatedWrites;
                       conflatedWrites = null;
                       writeCore(writes);
                     }, 0);
                   }
-                  conflatedWrites[file] = { content, encoding };
+                  conflatedWrites[file] = { content: content, encoding: encoding };
                 }
                 else {
                   var entry = {};
-                  entry[file] = { content, encoding };
+                  entry[file] = { content: content, encoding: encoding };
                   writeCore(entry);
                 }
               }
@@ -3628,7 +4007,7 @@ issuing requests, processing data and representing the data in sensible way with
       injectStyle();
       var layout = bindLayout();
       if (!layout.allFound) {
-        if (layout.shell) layout.shell.parentElement?.removeChild(layout.shell);
+        if (layout.shell && layout.shell.parentElement) layout.shell.parentElement.removeChild(layout.shell);
         layout = injectShellHTML();
       }
 
@@ -3640,8 +4019,8 @@ issuing requests, processing data and representing the data in sensible way with
       console.log('Loading..');
 
       return {
-        loadingTakesTime,
-        loadingComplete
+        loadingTakesTime: loadingTakesTime,
+        loadingComplete: loadingComplete
       };
 
       function triggerVSCodeTypings() {
@@ -3716,6 +4095,46 @@ issuing requests, processing data and representing the data in sensible way with
           }
         }
 
+        function fetchXHR(url, opts) {
+          if (typeof XMLHttpRequest === 'function') {
+            var xhr = new XMLHttpRequest();
+          } else if (typeof ActiveXObject === 'function') {
+            var xhr = /** @type {XMLHttpRequest} */(new ActiveXObject('Microsoft.XMLHTTP'));
+          } else {
+            return fetch(url, opts).then(function (response) {
+              return response.text().then(function (text) {
+                return {
+                  headers: response.headers,
+                  body: text
+                };
+              });
+            });
+          }
+
+          return new Promise(function (resolve, reject) {
+            xhr.open(opts.method, url);
+            xhr.onreadystatechange = function () {
+              if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                  resolve({
+                    headers: {},
+                    body: xhr.response
+                  });
+                } else {
+                  reject(xhr.status + ' ' + xhr.statusText);
+                  // xhr.abort();
+                }
+              }
+            };
+
+            if (opts.body) {
+              xhr.send(opts.body);
+            } else {
+              xhr.send();
+            }
+          });
+        }
+
         function accept() {
           var pars = parseTextRequest(editor.getValue());
           if (pars && pars.firstLine) {
@@ -3723,25 +4142,19 @@ issuing requests, processing data and representing the data in sensible way with
 
             if (parsFirst && parsFirst.url) {
               editor.setOption('readOnly', true);
-              var ftc = fetch(parsFirst.url, {
+              var ftc = fetchXHR(parsFirst.url, {
                 method: parsFirst.verb,
                 body: parsFirst.verb === 'GET' || !pars.body ? undefined :
                   pars.body
               });
               ftc.then(
                 function (response) {
-                  response.text().then(
-                    function (text) {
-                      editor.setOption('readOnly', false);
-                      editor.setValue(
-                        editor.getValue() + '\n\n' +
-                        text);
-                    },
-                    function (err) {
-                      alert(err.message);
-                      editor.setOption('readOnly', false);
-                    }
-                  )
+                  var headers = response.headers;
+                  var text = response.body;
+                  editor.setOption('readOnly', false);
+                  editor.setValue(
+                    editor.getValue() + '\n\n' +
+                    text);
                 }, function (err) {
                   alert(err.message);
                   editor.setOption('readOnly', false);

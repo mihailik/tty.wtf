@@ -1,6 +1,15 @@
 // @ts-check <script>
 function catchREST() {
 
+// Debug! Temporary!
+window.onerror = function() {
+var txt = '';
+for (var i=0;i<arguments.length;i++)
+  txt+=(i+1)+' '+arguments[I]+'\n';
+alert(txt);
+};
+
+
   // #region polyfills
 
   if (typeof document !== 'undefined' && document && !document.defaultView && typeof window !== 'undefined' && window) {

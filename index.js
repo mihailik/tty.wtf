@@ -555,9 +555,9 @@ body {
 
   <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 3em;">
     <table style="width: 100%; height: 100%; position: relative; z-index: 100000;" cellspacing=0 cellpadding=0>
-    <tr><td valign=top id=leftTop>^</td></tr>
-    <tr><td id=leftMiddle> - </td></tr>
-    <tr><td valign=bottom id=leftBottom> v </td></tr></table>
+    <tr><td valign=top id=leftTop>        </td></tr>
+    <tr><td id=leftMiddle>       </td></tr>
+    <tr><td valign=bottom id=leftBottom>          </td></tr></table>
   </div>
 
   <div style="position: relative; width: 100%; height: 100%;">

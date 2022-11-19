@@ -7,25 +7,175 @@
 <meta property="og:description" content="Catch Rest 🍹!">
 <meta name="twitter:image:alt" content="Catch Rest 🍹!">
 <meta name="twitter:card" content="summary_large_image">
-<script src="/index.js"></script>
-<script src="//unpkg.com/codemirror@5.64.0/lib/codemirror.js"></script>
-<script src="//unpkg.com/typescript@4.7.3/lib/typescript.js"></script>
-<script src="//unpkg.com/ts-jsonp@4.7.3/index.js"></script>
-<script src="//unpkg.com/xlsx@0.17.4/xlsx.js"></script>
-<script src="//unpkg.com/xlsx@0.17.4/jszip.js"></script>
 
-<link rel=stylesheet href="//unpkg.com/codemirror@5.64.0/lib/codemirror.css">
+<script>
+(function() {
+  if (location.protocol.indexOf('file') >= 0) return;
+  var posMatch = /\/(get|post|put|head|delete|option|connect|trace)(\/?)$/i.exec(location.pathname+'');
+  if (!posMatch) return;
+    
+  document.write('<base href="' + location.protocol + '//' +location.hostname + '/' + location.pathname.slice(0, posMatch.index)+'">');
+})()
+</script>
 
 <style>
 html {
- box-sizing: border-box;
- background: white; color: black;
- font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  box-sizing: border-box;
+  margin:0;padding:0;
+  width:100%;height:100%;
+
+  background: white; color: black;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 *, *:before, *:after {
- box-sizing: inherit;
+  box-sizing: inherit;
+}
+.catchREST-marker{}
+
+body {
+  margin:0;padding:0;
+  width:100%;height:100%;
+  overflow:hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+#layoutTABLE {
+  margin: 0;
+  width: 100%; height: 100%;
+}
+
+#splitterTD {
+  background: #fff0f3;
+  border: solid 1px #fed4dc;
+  border-left: none;
+  cursor: ns-resize;
+  padding: 0.3em;
+  transition: background-color 200ms;
+}
+
+@keyframes fade {
+  from { opacity: 1 }
+  50% { opacity: 0.8 }
+  to { opacity: 1 }
+}
+
+#splitterTD.sending {
+  background: #fcdbe2;
+  animation: 2s infinite alternate fade;
+}
+
+#splitterTD.down {
+  background: #ffe8ed;
+}
+
+#leftTD {
+  background: #fff0f3;
+  padding: 1em;
+}
+
+#sendBUTTON {
+  background: #75424c;
+  border: solid 1px #ebb2c1;
+  border-radius: 0.15em;
+  font-size: 200%;
+  padding: 0.25em;
+  padding-left: 0.45em;
+  padding-right: 0.45em;
+  box-shadow: 2px 2px 8px #a97d89;
+  color: #ffe8ee;
+  cursor: pointer;
+}
+
+#sendBUTTON:disabled {
+  background: #d9a9b2;
+  border: solid 1px #8b7d81;
+  border-radius: 0.15em;
+  font-size: 200%;
+  padding: 0.25em;
+  padding-left: 0.45em;
+  padding-right: 0.45em;
+  color: #ffffff;
+  cursor: default;
+  text-shadow: 0px 0px 5px #140004;
+  box-shadow: none;
+}
+
+#sendBUTTON #sendLabel {
+  transform: scaleX(0.95);
+}
+
+#statusTD {
+  background: #ffa4b4;
+  padding-left: 0.5em;
+  padding-bottom: 0.1em;
+  padding-top: 0.1em;
+}
+
+#requestTD {
+  position: relative;
+  border-left: solid 1px #ffcfd6;
+}
+
+#responseTD {
+  position: relative;
+  border-left: solid 1px #ffcfd6;
+}
+
+td .CodeMirror {
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  font: inherit;
+}
+
+td .CodeMirror-gutters {
+  border-right: solid 1px #e4e4e4;
+}
+
+td .CodeMirror-gutter.CodeMirror-linenumbers {
+  background: #fbfbfb;
 }
 </style>
 <title>Catch Rest 🍹</title>
 </head><body>
+
+  <table id=layoutTABLE cellspacing=0 cellpadding=0>
+    <tr>
+      <td height=100%>
+        <table cellspacing=0 cellpadding=0 height=100% width=100%>
+          <tr>
+            <td id=leftTD width=20% valign=top>
+              <button id=sendBUTTON><span id=sendLabel><span style="filter: blur(2.5px)">GET</span></span></button>
+            </td>
+            <td width=80%>
+              <table cellspacing=0 cellpadding=0 height=100% width=100%>
+                <tr>
+                  <td height=50% id=requestTD>
+                  </td>
+                </tr>
+                <tr>
+                  <td height=1 id=splitterTD>
+                    <span id=splitterLabel>output</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td height=50% id=responseTD>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td height=1 id=statusTD>
+        Loading...
+      </td>
+    </tr>
+  </table>
+
+<script src="main.js"></script>
+<script src="lib/combined.js"></script>
+
 </body></html>

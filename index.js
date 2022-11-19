@@ -280,6 +280,12 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
   </td></tr></table>
   */});
 
+  var embeddedShellLayoutHTML = getFunctionCommentContent(function () { /*
+<div style="position: fixed; left: 0; top: 0; width: 100%; height: 100%">
+shell layout
+</div>
+  */});
+
   var embeddedMetaBlockHTML = getFunctionCommentContent(function () {/*
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -1022,7 +1028,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
        *  newStorageFiles?: string[];
        *  read(path: string): any;
        *  continueLoading();
-       *  finishParsing(completion: (drive: Drive.Detached.DOMDrive) => void);
+       *  finishParsing(): Drive.Detached.DOMDrive;
        *  ondomnode?: (node: any, recognizedKind?: 'file' | 'totals', recognizedEntity?: any) => void;
        * }} BootState */
 
@@ -1051,11 +1057,11 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 
       /** @typedef {{
        *  name: string;
-       *  detect(uniqueKey: string, callback: (error: string, detached: Drive.Detached) => void): void;
+       *  detect(uniqueKey: string, callback: (error?: string, detached?: Drive.Detached) => void): void;
        * }} Drive.Optional */
 
       /** @typedef {{
-       *  timestamp: number;
+       *  timestamp: number | undefined;
        *  totalSize?: number;
        *  applyTo(mainDrive: Drive.Detached.DOMUpdater, callback: Drive.Detached.CallbackWithShadow): void;
        *  purge(callback: Drive.Detached.CallbackWithShadow): void;
@@ -1156,8 +1162,8 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
           newStorageFileCache = {};
         }
 
-        /** @param {(drive: Drive) => void} completion */
-        function finishParsing(completion) {
+        /** @returns {Drive} */
+        function finishParsing() {
           if (domFinished) {
             try {
               // when debugging, break on any error will hit here too
@@ -1169,8 +1175,15 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
             }
           }
 
-          completionCallback = completion;
+          /** @type {Drive | undefined} */
+          var resultDrive;
+          completionCallback = function (drive) {
+            resultDrive = drive;
+          };
+
           continueParsingDOM(true /* toCompletion */);
+
+          return /** @type {Drive} */(resultDrive);
         }
 
         // THESE FUNCTIONS ARE NOT EXPOSED FROM BootState
@@ -1450,7 +1463,7 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
               },
               function (shad) {
                 shadow = shad;
-                this._finishOptionalDetection();
+                finishOptionalDetection();
               });
           }
         }
@@ -1543,6 +1556,8 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
             completionCallback(mountDrive);
           } 
         }
+
+        return bootState;
       }
 
       /**
@@ -3141,8 +3156,390 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
             }
 
             return {
+              name: 'webSQL',
               detect: detectWebSQL
             };
+          })(), // WEBSQL
+
+          indexedDB: (function () {
+
+            /**
+             * @param {string} uniqueKey
+             * @param {(error?: string, detached?: Drive.Detached) => void} callback 
+             */
+            function detectIndexedDB(uniqueKey, callback) {
+              try {
+                // Firefox fires global window.onerror
+                // when indexedDB.open is called in private mode
+                // (even though it still reports failure in request.onerror and DOES NOT throw anything)
+                var needsFirefoxPrivateModeOnerrorWorkaround =
+                  typeof document !== 'undefined' && document.documentElement && document.documentElement.style
+                  && 'MozAppearance' in document.documentElement.style;
+
+                if (needsFirefoxPrivateModeOnerrorWorkaround) {
+                  try {
+                    detectIndexedDBCore(uniqueKey, function (error, detached) {
+                      callback(error, detached);
+
+                      // the global window.onerror will fire AFTER request.onerror,
+                      // so here we temporarily install a dummy handler for it
+                      var tmp_onerror = onerror;
+                      onerror = function () { };
+                      setTimeout(function () {
+                        // restore on the next 'beat'
+                        onerror = tmp_onerror;
+                      }, 1);
+
+                    });
+
+                  }
+                  catch (err) {
+                    callback(err.message);
+                  }
+                }
+                else {
+
+                  detectIndexedDBCore(uniqueKey, callback);
+                }
+
+              }
+              catch (error) {
+                callback(error.message);
+              }
+            }
+
+            function _getIndexedDB() {
+              return typeof indexedDB === 'undefined' || typeof indexedDB.open !== 'function' ? null : indexedDB;
+            }
+
+            /**
+             * @param {string} uniqueKey
+             * @param {(error?: string, detached?: Drive.Detached) => void} callback 
+             */
+            function detectIndexedDBCore(uniqueKey, callback) {
+
+              var indexedDBInstance = _getIndexedDB();
+              if (!indexedDBInstance) {
+                callback('Variable indexedDB is not available.');
+                return;
+              }
+
+              var dbName = uniqueKey || 'portabled';
+
+              var openRequest = indexedDBInstance.open(dbName, 1);
+
+              openRequest.onerror = (errorEvent) => callback('Opening database error: ' + getErrorMessage(errorEvent));
+
+              openRequest.onupgradeneeded = createDBAndTables;
+
+              openRequest.onsuccess = (event) => {
+                var db = openRequest.result;
+
+                try {
+                  var transaction = db.transaction(['files', 'metadata']);
+                  // files mentioned here, but not really used to detect
+                  // broken multi-store transaction implementation in Safari
+
+                  transaction.onerror = (errorEvent) => callback('Transaction error: ' + getErrorMessage(errorEvent));
+
+                  var metadataStore = transaction.objectStore('metadata');
+                  var filesStore = transaction.objectStore('files');
+                  var editedUTCRequest = metadataStore.get('editedUTC');
+                }
+                catch (getStoreError) {
+                  callback('Cannot open database: ' + getStoreError.message);
+                  return;
+                }
+
+                if (!editedUTCRequest) {
+                  callback('Request for editedUTC was not created.');
+                  return;
+                }
+
+                editedUTCRequest.onerror = (errorEvent) => {
+                  var detached = createIndexedDBDetached(db, transaction, void 0);
+                  callback(void 0, detached);
+                };
+
+                editedUTCRequest.onsuccess = (event) => {
+                  /** @type {MetadataData} */
+                  var result = editedUTCRequest.result;
+                  var detached = createIndexedDBDetached(db, transaction, result && typeof result.value === 'number' ? result.value : void 0);
+                  callback(void 0, detached);
+                };
+              }
+
+
+              function createDBAndTables() {
+                var db = openRequest.result;
+                var filesStore = db.createObjectStore('files', { keyPath: 'path' });
+                var metadataStore = db.createObjectStore('metadata', { keyPath: 'property' })
+              }
+            }
+
+            function getErrorMessage(event) {
+              if (event.message) return event.message;
+              else if (event.target) return event.target.errorCode;
+              return event + '';
+            }
+
+            /** @typedef {{
+             *  path: string;
+             *  content: string;
+             *  encoding: string;
+             *  state: string | null;
+             * }} FileData
+             */
+
+            /** @typedef {{
+             *  property: string;
+             *  value: any;
+             * }} MetadataData */
+
+            /**
+             * @param {IDBDatabase} db
+             * @param {IDBTransaction | undefined} transaction
+             * @param {number | undefined} timestamp
+             */
+            function createIndexedDBDetached(db, transaction, timestamp) {
+
+              // ensure the same transaction is used for applyTo/purge if possible
+              // -- but not if it's completed
+              if (transaction) {
+                transaction.oncomplete = () => {
+                  transaction = void 0;
+                };
+              }
+
+              var detached = {
+                timestamp: timestamp,
+                applyTo: applyTo,
+                purge: purge
+              };
+
+              return detached;
+
+              /**
+               * @param {Drive.Detached.DOMUpdater} mainDrive
+               * @param {Drive.Detached.CallbackWithShadow} callback
+               */
+              function applyTo(mainDrive, callback) {
+                var applyTransaction = transaction || db.transaction(['files', 'metadata']); // try to reuse the original opening _transaction
+                var metadataStore = applyTransaction.objectStore('metadata');
+                var filesStore = applyTransaction.objectStore('files');
+
+                var onerror = (errorEvent) => {
+                  if (typeof console !== 'undefined' && console && typeof console.error === 'function')
+                    console.error('Could not count files store: ', errorEvent);
+                  callback(createIndexedDBShadow(db, detached.timestamp));
+                };
+
+                try {
+                  var countRequest = filesStore.count();
+                }
+                catch (error) {
+                  try {
+                    applyTransaction = db.transaction(['files', 'metadata']); // try to reuse the original opening _transaction
+                    metadataStore = applyTransaction.objectStore('metadata');
+                    filesStore = applyTransaction.objectStore('files');
+                    countRequest = filesStore.count();
+                  }
+                  catch (error) {
+                    onerror(error);
+                    return;
+                  }
+                }
+
+                countRequest.onerror = onerror;
+
+                countRequest.onsuccess = (event) => {
+
+                  try {
+
+                    var storeCount = countRequest.result;
+
+                    var cursorRequest = filesStore.openCursor();
+                    cursorRequest.onerror = (errorEvent) => {
+                      if (typeof console !== 'undefined' && console && typeof console.error === 'function')
+                        console.error('Could not open cursor: ', errorEvent);
+                      callback(createIndexedDBShadow(db, detached.timestamp));
+                    };
+
+                    var processedCount = 0;
+
+                    cursorRequest.onsuccess = (event) => {
+
+                      try {
+                        var cursor = cursorRequest.result;
+
+                        if (!cursor) {
+                          callback(createIndexedDBShadow(db, detached.timestamp));
+                          return;
+                        }
+
+                        if (callback.progress)
+                          callback.progress(processedCount, storeCount);
+                        processedCount++;
+
+                        /** @type {FileData} */
+                        var result = cursor.value;
+                        if (result && result.path) {
+                          mainDrive.timestamp = this.timestamp;
+                          mainDrive.write(result.path, result.content, result.encoding);
+                        }
+
+                        cursor['continue']();
+
+                      }
+                      catch (cursorContinueSuccessHandlingError) {
+                        var message = 'Failing to process cursor continue';
+                        try {
+                          message += ' (' + processedCount + ' of ' + storeCount + '): ';
+                        }
+                        catch (ignoreDiagError) {
+                          message += ': ';
+                        }
+
+                        if (typeof console !== 'undefined' && console && typeof console.error === 'function')
+                          console.error(message, cursorContinueSuccessHandlingError);
+                        callback(createIndexedDBShadow(this._db, this.timestamp));
+                      }
+
+                    }; // cursorRequest.onsuccess
+
+                  }
+                  catch (cursorCountSuccessHandlingError) {
+
+                    var message = 'Failing to process cursor count';
+                    try {
+                      message += ' (' + countRequest.result + '): ';
+                    }
+                    catch (ignoreDiagError) {
+                      message += ': ';
+                    }
+
+                    if (typeof console !== 'undefined' && console && typeof console.error === 'function')
+                      console.error(message, cursorCountSuccessHandlingError);
+                    callback(createIndexedDBShadow(db, detached.timestamp));
+                  }
+
+                }; // countRequest.onsuccess
+
+              }
+
+              /** @param {Drive.Detached.CallbackWithShadow} callback */
+              function purge(callback) {
+                if (transaction) {
+                  transaction = void 0;
+                  setTimeout(() => { // avoid being in the original transaction
+                    purgeCore(callback);
+                  }, 1);
+                }
+                else {
+                  purgeCore(callback);
+                }
+              }
+
+              /** @param {Drive.Detached.CallbackWithShadow} callback */
+              function purgeCore(callback) {
+                var purgeTransaction = db.transaction(['files', 'metadata'], 'readwrite');
+
+                var filesStore = purgeTransaction.objectStore('files');
+                filesStore.clear();
+
+                var metadataStore = purgeTransaction.objectStore('metadata');
+                metadataStore.clear();
+
+                callback(createIndexedDBShadow(db, -1));
+              }
+
+            }
+
+            /**
+             * @param {IDBDatabase} db
+             * @param {number | undefined} timestamp
+             */
+            function createIndexedDBShadow(db, timestamp) {
+              var lastWrite = 0;
+              var conflatedWrites;
+
+              var shadow = {
+                timestamp: timestamp,
+                write: write,
+                forget: forget
+              };
+
+              return shadow;
+
+              /**
+               * @param {string} file
+               * @param {string | null} content
+               * @param {string} encoding
+               */
+              function write(file, content, encoding) {
+                var now = getTimeNow();
+                if (conflatedWrites || now - lastWrite < 10) {
+                  if (!conflatedWrites) {
+                    conflatedWrites = {};
+                    setTimeout(() => {
+                      var writes = conflatedWrites;
+                      conflatedWrites = null;
+                      writeCore(writes);
+                    }, 0);
+                  }
+                  conflatedWrites[file] = { content, encoding };
+                }
+                else {
+                  var entry = {};
+                  entry[file] = { content, encoding };
+                  writeCore(entry);
+                }
+              }
+
+              function writeCore(writes) {
+                lastWrite = getTimeNow();
+                var writeTransaction = db.transaction(['files', 'metadata'], 'readwrite');
+                var filesStore = writeTransaction.objectStore('files');
+                var metadataStore = writeTransaction.objectStore('metadata');
+
+                for (var file in writes) if (writes.hasOwnProperty(file)) {
+
+                  var entry = writes[file];
+
+                  // no file deletion here: we need to keep account of deletions too!
+                  /** @type {FileData} */
+                  var fileData = {
+                    path: file,
+                    content: entry.content,
+                    encoding: entry.encoding,
+                    state: null
+                  };
+
+                  var putFile = filesStore.put(fileData);
+                }
+
+                /** @type {MetadataData} */
+                var md = {
+                  property: 'editedUTC',
+                  value: Date.now()
+                };
+
+                metadataStore.put(md);
+              }
+
+              /** @param {string} file */
+              function forget(file) {
+                var forgetTransaction = db.transaction(['files'], 'readwrite');
+                var filesStore = forgetTransaction.objectStore('files');
+                filesStore['delete'](file);
+              }
+
+            }
+
+            return {
+              name: 'indexedDB',
+              detect: detectIndexedDB
+            }
           })()
         };
       })();
@@ -3164,7 +3561,13 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
 
     })();
 
-    // #enregion PERSISTENCE
+    // #endregion PERSISTENCE
+
+    function createShell() {
+      var host = document.createElement('div');
+      host.style.cssText = 'position: absolute; left: 0; top: 0; width: 100%; height: 100%;';
+      document.body.appendChild(host);
+    }
 
     // local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:
     function loadVerb(verb) {
@@ -3174,12 +3577,50 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     function bootUrlEncoded() {
       var verbMatch = getVerb(location.pathname);
       if (verbMatch) {
-        boot
       }
+
+      createShell();
     }
 
     function bootBacked(uniquenessSource) {
 
+      createShell();
+      loadAsync().then(function (drive) {
+        console.log('drive loaded ', drive);
+      });
+
+      /** @param {((progress: { loadedSize: number, anticipatedTotalSize: number | undefined, fileCount: number }) => void)=} progressCallback */
+      function loadAsync(progressCallback) {
+        return new Promise(function (resolve, reject) {
+          var persist = persistence(document, uniquenessSource);
+
+          var reportedSize = persist.domLoadedSize;
+          var reportedTotalSize = persist.domTotalSize;
+          var continueLoadingTimeout;
+          continueLoading();
+
+          function continueLoading() {
+            if (document.readyState === 'complete')
+              return resolve(persist.finishParsing());
+
+            if (typeof progressCallback === 'function') {
+              if ((persist.domLoadedSize || 0) > (reportedSize || 0) ||
+                (persist.domTotalSize || 0) > (reportedTotalSize || 0)) {
+                progressCallback({
+                  loadedSize: persist.domLoadedSize || 0,
+                  anticipatedTotalSize: persist.domTotalSize,
+                  fileCount: persist.loadedFileCount || 0
+                });
+              }
+
+              reportedSize = persist.domLoadedSize;
+              reportedTotalSize = persist.domTotalSize;
+            }
+            continueLoadingTimeout = setTimeout(continueLoading, 400)
+          }
+        });
+
+      }
     }
 
     /**

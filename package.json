@@ -2,23 +2,23 @@
   "name": "har-rest",
   "version": "1.0.0",
   "description": "HAR Rest Tool",
-  "main": "index.html",
+  "main": "index.js",
   "private": true,
   "scripts": {
-    "start": "node 404.html",
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/har-rest/har-rest.git"
+    "url": "git+https://github.com/har-rest/catch-rest.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/har-rest/har-rest/issues"
+    "url": "https://github.com/har-rest/catch-rest/issues"
   },
-  "homepage": "http://har.rest/",
+  "homepage": "http://catch.rest/",
   "devDependencies": {
     "codemirror": "^5.64.0",
     "ts-jsonp": "^4.7.3",

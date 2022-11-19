@@ -1,9 +1,6 @@
 // @ts-check <script>
+status = 'script start...';
 function catchREST() {
-
-  function getSelfScript() {
-    return '// @ts-check <' + 'script' +'>\n' + (catchREST + '').replace(/\r\n/mg, '\n') + '\ncatchREST(); //</' + 'script' + '>\n';
-  }
 
   /** @param {Function} fn */
   function getFunctionCommentContent(fn) {
@@ -72,9 +69,8 @@ function catchREST() {
     return +new Date();
   }
 
-  // TODO: run polyfills?
-
   function runBrowser() {
+    status = 'runBrowser...';
     // TODO: remove spurious injected scripts
 
     var layout = bindLayout();
@@ -93,6 +89,8 @@ function catchREST() {
     }
 
     function withDependenciesLoaded() {
+      catchREST.withDependenciesLoaded = null;
+      status = 'withDependenciesLoaded...';
       createCodeMirrors();
 
       function createCodeMirrors() {
@@ -264,7 +262,167 @@ function catchREST() {
 
     }
 
+    function build() {
+      var fs = require('fs');
+      var path = require('path');
+
+      var imports = [
+        'codemirror/lib/codemirror.js',
+        'codemirror/lib/codemirror.css',
+
+        'typescript/lib/typescript.js',
+        // include lib.d.ts here? probably no
+
+        'xlsx/dist/xlsx.full.min.js',
+        //'xlsx/jszip.js'
+      ];
+
+      var combinedJS = '';
+
+      for (var im of imports) {
+        var scriptFilePath = path.resolve(__dirname, 'node_modules', im);
+        var content = fs.readFileSync(scriptFilePath, 'utf8');
+        console.log(im + ' [' + content.length + ']');
+        switch (path.extname(im).toLowerCase()) {
+          case ".js": {
+            content = strictES3(scriptFilePath, content);
+            combinedJS += (combinedJS ? '\n' : '') + '// #region ' + path.basename(im).replace(/\.js$/, '') + '\n' + content + '\n' + '// #endregion';
+            break;
+          }
+          case '.css': {
+            combinedJS += (combinedJS ? '\n' : '') + '///// ' + path.basename(im) + ' /////\n' +
+              '(function() { var style = document.createElement("style");\n' +
+              'style.innerHTML = ' + JSON.stringify(content) + ';\n' +
+              '(document.body || document.getElementsByTagName("head")[0]).appendChild(style); })();\n';
+          }
+        }
+      }
+
+      combinedJS += '\n\nif (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function") catchREST.withDependenciesLoaded();\n';
+
+      console.log('combined[' + combinedJS.length + ']');
+      fs.writeFileSync(path.resolve(__dirname, 'lib/combined.js'), combinedJS);
+      console.log('written [' + combinedJS.length + '] to ' + path.resolve(__dirname, 'lib/combined.js'));
+
+      /** @param {string} filePath @param {string} content */
+      function strictES3(filePath, content) {
+        var jscriptKeywords =
+          ('break,false,in,this,void,continue,for,new,true,while,delete,' +
+            'function,null,typeof,with,else,if,return,var,' +
+            'catch,class,case,const,debugger,finally,declare,do,instanceof,default,extends,export,enum,' +
+            'is,import,interface,super,throw,try,switch').split(',');
+
+        var ts = require('typescript');
+        var ast = ts.createLanguageServiceSourceFile(
+          filePath,
+          ts.ScriptSnapshot.fromString(content),
+          ts.ScriptTarget.ES3,
+          '1',
+          true,
+          ts.ScriptKind.JS);
+
+        var replacements = [];
+        var replacementCount = 0;
+
+        ts.forEachChild(ast, visitNode);
+
+        if (replacements.length) {
+          replacements.sort(function (r1, r2) { return r1.pos - r2.pos });
+          var updatedContent = '';
+          var lastPos = 0;
+          for (let i = 0; i < replacements.length; i++) {
+            var repl = replacements[i];
+            if (repl.pos > lastPos) updatedContent += content.slice(lastPos, repl.pos);
+            updatedContent += repl.text;
+            lastPos = repl.pos + repl.length;
+          }
+
+          if (lastPos < content.length) {
+            updatedContent += content.slice(lastPos);
+            lastPos = content.length;
+          }
+
+          console.log(' handled ' + replacementCount + ' replacements');
+          content = updatedContent;
+        }
+
+        return content;
+
+        /** @param {import('typescript').Node} node */
+        function visitNode(node) {
+          switch (node.kind) {
+            case ts.SyntaxKind.PropertyAccessExpression:
+              var propAccess = /** @type {import('typescript').PropertyAccessExpression} */(node);
+              if (propAccess.name.kind === ts.SyntaxKind.Identifier
+                && jscriptKeywords.indexOf(propAccess.name.text) >= 0) {
+                var kw = propAccess.name;
+                var posDot = content.lastIndexOf('.', kw.pos);
+                replacements.push({ pos: posDot, length: 1, text: '[' });
+                replacements.push({ pos: kw.pos + kw.getLeadingTriviaWidth(), length: kw.text.length, text: '"' + kw.text + '"]' });
+                replacementCount++;
+              }
+              break;
+
+            case ts.SyntaxKind.PropertyAssignment:
+              var propAssig = /** @type {import('typescript').PropertyAssignment} */(node);
+              if (propAssig.name.kind === ts.SyntaxKind.Identifier
+                && jscriptKeywords.indexOf(propAssig.name.text) >= 0) {
+                var kw = propAssig.name;
+                replacements.push({ pos: kw.pos + kw.getLeadingTriviaWidth(), length: kw.text.length, text: '"' + kw.text + '"' });
+                replacementCount++;
+              }
+              break;
+
+            case ts.SyntaxKind.ObjectLiteralExpression:
+              var objLit = /** @type {import('typescript').ObjectLiteralExpression} */(node);
+              if (objLit.properties.hasTrailingComma) {
+                var ln = ast.getLineAndCharacterOfPosition(objLit.pos).line;
+                if (ln > 740 && ln < 760 || true) {
+                  var copy = {};
+                  for (var k in objLit.properties) {
+                    if (String(Number(k)) === k) continue;
+                    copy[k] = objLit.properties[k];
+                  }
+
+                  var lastTok = objLit.getLastToken();
+                  if (lastTok && content.slice(lastTok.pos - 1, lastTok.pos) === ',') {
+                    replacements.push({
+                      pos: lastTok.pos - 1,
+                      length: 1,
+                      text: ''
+                    });
+
+                    replacementCount++;
+                  }
+                }
+              }
+              break;
+            
+            case ts.SyntaxKind.GetAccessor:
+            case ts.SyntaxKind.SetAccessor:
+              var getSetAcc = /** @type {import('typescript').GetAccessorDeclaration} */(node);
+              replacements.push({
+                pos: getSetAcc.pos + getSetAcc.getLeadingTriviaWidth(),
+                length: getSetAcc.name.pos - (getSetAcc.pos + getSetAcc.getLeadingTriviaWidth()),
+                text: ''
+              });
+              replacements.push({
+                pos: getSetAcc.name.end,
+                length: 0,
+                text: ': function'
+              });
+              break;
+          }
+
+          ts.forEachChild(node, visitNode);
+        }
+
+      }
+    }
+
     function runAsServer() {
+      build();
+
       var catchREST_secret_variable_name = 'catchREST_secret';
 
       /** @typedef {import("http").IncomingMessage} HTTPRequest */
@@ -366,7 +524,7 @@ function catchREST() {
 
         function checkAndTriggerRestart() {
           var currentContent = fs.readFileSync(__filename, "utf8");
-          if (currentContent !== getSelfScript()) {
+          if (currentContent.indexOf(catchREST + '') < 0) {
             // TODO: log stdio restart due to file change
             startNewInstance();
           }
@@ -388,31 +546,37 @@ function catchREST() {
         switch (url.pathname?.toLowerCase()) {
           case '/':
           case '/index.html':
-            return handleHTMLRequest(req, res);
+            return handleLocalFileRequest(__dirname + '/index.html', res);
 
           case 'favicon.ico':
             return handleFaviconRequest(req, res);
-
-          case '/index.js':
-          case '/main.js':
-            return handleJSRequest(req, res);
 
           case '/control':
             return handleControlRequest(req, res, url);
 
           default:
-            return handle404Request(req, res);
+            return handleLocalFileRequest(__dirname + '/' + (req.url || '').replace(/^\/+/, '') , res);
         }
       }
 
       /**
-       * @param {HTTPRequest} req
+       * @param {string} filePath
        * @param {HTTPResponse} res
        */
-      function handleHTMLRequest(req, res) {
+      function handleLocalFileRequest(filePath, res) {
         // TODO: inject ETag for caching
         res.setHeader('Content-type', 'text/html');
-        res.end(wholeHTML);
+        var fs = require('fs');
+        fs.readFile(filePath, function (err, data) {
+          if (err) {
+            res.statusCode = 404;
+            console.log(' ' + (res.statusMessage = err.code || err.message || String(err)));
+            res.end();
+          } else {
+            res.end(data);
+            console.log(' [' + data.length + ']');
+          }
+        });
       }
 
       /**
@@ -422,16 +586,7 @@ function catchREST() {
       function handleFaviconRequest(req, res) {
         // for now just skip
         res.end();
-      }
-
-      /**
-       * @param {HTTPRequest} req
-       * @param {HTTPResponse} res
-       */
-      function handleJSRequest(req, res) {
-        // TODO: inject ETag for caching
-        res.setHeader('Content-type', 'application/javascript');
-        res.end(getSelfScript());
+        console.log(' []');
       }
 
       /**
@@ -603,13 +758,6 @@ function catchREST() {
      * @param {(name: string, body: Function) => void} it
      */
     function nodeTests(describe, it) {
-      describe('getSelfScript', function () {
-        it('same as __filename', function () {
-          var fs = require('fs');
-          var selfContent = fs.readFileSync(__filename, 'utf8');
-          if (selfContent !== getSelfScript()) throw new Error('Different!');
-        });
-      });
     }
 
     if (asModule) return runAsModule();
@@ -690,6 +838,8 @@ very important
   }
 
   function detectEnvironmentAndStart() {
+    status = 'detectEnvironmentAndStart...';
+    status = 'detectEnvironmentAndStart: ' + detectEnvironment() + '...';
 
     switch (detectEnvironment()) {
       case 'browser': return runBrowser();
@@ -722,6 +872,8 @@ very important
   }
 
 
+  status = 'catchREST...';
   detectEnvironmentAndStart();
 }
+status = 'nearly catchREST()...';
 catchREST(); //</script>

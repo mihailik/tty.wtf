@@ -810,7 +810,7 @@ issuing requests, processing data and representing the data in sensible way with
         });
 
         return (
-          '// {build-by-hash:' + catchREST_hash + '}\n' +
+          '// {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' with  ' + process.platform + '/' + process.arch + '}\n' +
           combined.join('\n\n')
         );
       }
@@ -1461,6 +1461,80 @@ issuing requests, processing data and representing the data in sensible way with
         } else {
           elem.text = value;
         }
+      }
+    }
+
+    function fetchXHR(url, opts) {
+      if (typeof XMLHttpRequest === 'function') {
+        var xhr = new XMLHttpRequest();
+      } else if (typeof ActiveXObject === 'function') {
+        var xhr = /** @type {XMLHttpRequest} */(new ActiveXObject('Microsoft.XMLHTTP'));
+      } else {
+        return fetch(url, opts).then(function (response) {
+          return response.text().then(function (text) {
+            return {
+              headers: response.headers,
+              body: text
+            };
+          });
+        });
+      }
+
+      return new Promise(function (resolve, reject) {
+        xhr.open(opts.method, url);
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+              console.log(xhr);
+              resolve({
+                headers: {},
+                body: typeof xhr.response === 'string' || xhr.response ? xhr.response : xhr.responseText
+              });
+            } else {
+              reject(xhr.status + ' ' + xhr.statusText);
+              // xhr.abort();
+            }
+          }
+        };
+
+        if (opts.body) {
+          xhr.send(opts.body);
+        } else {
+          xhr.send();
+        }
+      });
+    }
+
+    /**
+     * @template Func
+     * @param {Func} func
+     * @param {number} time
+     * @param {number=} longest
+     * @returns {Func}
+     */
+    function debounce(func, time, longest) {
+      var timeout;
+      var longestTimeout;
+      var self;
+      var args;
+      return /** @type {Func} */(queue);
+      function queue() {
+        self = this;
+        args = [];
+        for (var i = 0; i < arguments.length; i++) { args.push(arguments[i]); }
+
+        if (!longestTimeout && /** @type {number} */(longest) > 0) longestTimeout = setTimeout(invoke, longest);
+
+        clearTimeout(timeout);
+        timeout = setTimeout(invoke, time || 100);
+      };
+
+      function invoke() {
+        clearTimeout(timeout);
+        clearTimeout(longestTimeout);
+        timeout = null;
+        longestTimeout = null;
+            /** @type {Function} */(func).apply(self, args);
       }
     }
     // #endregion COMMON BROWSER UTILS
@@ -4054,40 +4128,27 @@ issuing requests, processing data and representing the data in sensible way with
 
       function loadingComplete() {
         layout.requestEditorHost.innerHTML = '';
+        var editor = createCodeMirrorWithFirstClickChange(
+          layout.requestEditorHost,
+          {
+            value: embeddedSplashText,
 
-        /** @type {import('codemirror').Editor} */
-        var editor =
-          // @ts-ignore
-          CodeMirror(
-            layout.requestEditorHost,
-            {
-              value: embeddedSplashText,
+            lineNumbers: true,
+            extraKeys: {
+              'Ctrl-Enter': accept,
+              'Cmd-Enter': accept
+            },
+            lineWrapping: true,
+            autofocus: true
+          },
+          function () {
+            editor.setValue('GET https://api.github.com/repos/microsoft/typescript/languages');
+          });
 
-              lineNumbers: true,
-              extraKeys: {
-                'Ctrl-Enter': accept,
-                'Cmd-Enter': accept
-              },
-              lineWrapping: true,
-              autofocus: true
-            });
+        editor.on('changes', debounce(updateVerbButton, 200, 900));
 
-        var leftClickKeyMap = {
-          LeftClick: updateTextFirst
-        };
-        editor.addKeyMap(leftClickKeyMap);
-
-        var timeoutChangesDebounce;
-        editor.on('changes', function () {
-          timeoutChangesDebounce = setTimeout(updateVerbButton, 200);
-        });
-
-        function updateTextFirst() {
-          editor.removeKeyMap(leftClickKeyMap);
-          console.log('removed keymap');
-
-          editor.setValue('GET https://api.github.com/repos/microsoft/typescript/languages');
-        }
+        /** @type {ReturnType<typeof requireSplitter>} */
+        var withSplitter;
 
         function updateVerbButton() {
           var pars = parseTextRequest(editor.getValue());
@@ -4114,54 +4175,87 @@ issuing requests, processing data and representing the data in sensible way with
           }
         }
 
-        function fetchXHR(url, opts) {
-          if (typeof XMLHttpRequest === 'function') {
-            var xhr = new XMLHttpRequest();
-          } else if (typeof ActiveXObject === 'function') {
-            var xhr = /** @type {XMLHttpRequest} */(new ActiveXObject('Microsoft.XMLHTTP'));
-          } else {
-            return fetch(url, opts).then(function (response) {
-              return response.text().then(function (text) {
-                return {
-                  headers: response.headers,
-                  body: text
-                };
-              });
-            });
+        /**
+         * @param {HTMLElement} host
+         * @param {import('codemirror').EditorConfiguration} options
+         * @param {Function} firstClickCallback
+         */
+        function createCodeMirrorWithFirstClickChange(host, options, firstClickCallback) {
+          /** @type {import('codemirror').Editor} */
+          var editor =
+            // @ts-ignore
+            CodeMirror(
+              host, options);
+
+          var leftClickKeyMap = { LeftClick: onFirstClick };
+          editor.addKeyMap(leftClickKeyMap);
+
+          return editor;
+
+          function onFirstClick(args) {
+            editor.removeKeyMap(leftClickKeyMap);
+            return firstClickCallback(args);
           }
 
-          return new Promise(function (resolve, reject) {
-            xhr.open(opts.method, url);
-            xhr.onreadystatechange = function () {
-              if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                  console.log(xhr);
-                  resolve({
-                    headers: {},
-                    body: typeof xhr.response === 'string' || xhr.response ? xhr.response : xhr.responseText
-                  });
-                } else {
-                  reject(xhr.status + ' ' + xhr.statusText);
-                  // xhr.abort();
-                }
-              }
-            };
+        }
 
-            if (opts.body) {
-              xhr.send(opts.body);
-            } else {
-              xhr.send();
-            }
-          });
+        function requireSplitter() {
+          var textStart = editor.charCoords({ ch: 1, line: 0 });
+          var textEnd = editor.charCoords({ ch: 1, line: editor.getDoc().lineCount() + 1 });
+          var wholeHeight =
+            layout.contentPageHost.offsetHeight ||
+            (layout.contentPageHost.getBoundingClientRect ? layout.contentPageHost.getBoundingClientRect().height :
+              window.innerHeight);
+
+          var wholeTextHeight = textEnd.bottom - Math.min(textStart.top, 0);
+          var addPaddingUnderText = 30;
+          var initialSplitterRatio = wholeTextHeight + addPaddingUnderText < wholeHeight / 2 ? (wholeTextHeight + addPaddingUnderText) / wholeHeight : 0.5;
+          // TODO: apply this with delay for animated entry
+          layout.requestEditorHost.style.height = (initialSplitterRatio * 100).toFixed(2) + '%';
+
+          var splitterHeight = '3em';
+
+          var bottomContainer = document.createElement('div');
+          bottomContainer.style.cssText =
+            'position: absolute; left: 0;' +
+            ' top: ' +(initialSplitterRatio * 100).toFixed(2) + '%;' +
+            ' width: 100%;' +
+            ' height: ' + (100 - initialSplitterRatio * 100).toFixed(2) + '%;' +
+            ' padding-top: ' + splitterHeight;
+          var bottomHost = document.createElement('div');
+          bottomHost.style.cssText =
+            'position: relative; width: 100%; height: 100%;';
+          bottomContainer.appendChild(bottomHost);
+          layout.contentPageHost.appendChild(bottomContainer);
+
+          var splitterContainer = document.createElement('div');
+          splitterContainer.style.cssText =
+            'position: absolute; left: 0; top: 0;' +
+            ' width: 100%;' +
+            ' height: ' + splitterHeight + ';';
+          bottomContainer.appendChild(splitterContainer);
+
+          bottomHost.style.background = 'silver';
+          splitterContainer.style.background = 'cornflowerblue';
+
+          return {
+            bottomContainer: bottomContainer,
+            bottomHost: bottomHost,
+            splitterContainer: splitterContainer
+          };
         }
 
         function accept() {
           var pars = parseTextRequest(editor.getValue());
+
           if (pars && pars.firstLine) {
             var parsFirst = parseFirstLine(pars.firstLine);
 
             if (parsFirst && parsFirst.url) {
               editor.setOption('readOnly', true);
+              if (!withSplitter) withSplitter = requireSplitter();
+              set(withSplitter.splitterContainer, 'fetching...');
+
               var ftc = fetchXHR(parsFirst.url, {
                 method: parsFirst.verb,
                 body: parsFirst.verb === 'GET' || !pars.body ? undefined :
@@ -4172,12 +4266,19 @@ issuing requests, processing data and representing the data in sensible way with
                   var headers = response.headers;
                   var text = response.body;
                   editor.setOption('readOnly', false);
-                  editor.setValue(
-                    editor.getValue() + '\n\n' +
-                    text);
+                  set(withSplitter.splitterContainer, 'Done.');
+                  set(withSplitter.bottomHost, '');
+                  var injectPre = document.createElement('pre');
+                  set(injectPre, text);
+                  withSplitter.bottomHost.appendChild(injectPre);
                 }, function (err) {
-                  alert(err.message);
                   editor.setOption('readOnly', false);
+                  set(withSplitter.splitterContainer, 'Failed.');
+                  set(withSplitter.bottomHost, '');
+                  var injectErrorPre = document.createElement('pre');
+                  injectErrorPre.style.color = 'firebrick';
+                  set(injectErrorPre, err.message);
+                  withSplitter.bottomHost.appendChild(injectErrorPre);
                 }
               )
             }

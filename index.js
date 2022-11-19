@@ -497,8 +497,8 @@ function startCatchREST() {
     function getCurrentJS() {
       var jsText =
         '// @ts-check\n' +
-        startCatchREST + '\n' +
-        'statCatchREST()\n';
+        startCatchREST + '\n\n' +
+        'startCatchREST();\n';
       return jsText;
     }
 

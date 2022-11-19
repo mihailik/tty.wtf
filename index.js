@@ -165,6 +165,30 @@ body {
 
 #shell .CodeMirror-gutter.CodeMirror-linenumbers {
   background: #fbfbfb;
+  color: #999;
+}
+
+#shell #pseudoGutter {
+  border-right: solid 1px #e4e4e4;
+  background: #fbfbfb;
+  color: #999;
+
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%; width: 2.3em;
+  text-align: right;
+  padding-top: 0.25em;
+  padding-right: 0.2em;
+}
+
+#shell #pseudoEditor {
+  font: inherit;
+  width: 100%; height: 100%;
+  border: none;
+  padding: 0.25em;
+  padding-left: 0.6em;
+  margin-left: 2em;
+  outline: none;
 }
 
 #shell #leftBar {
@@ -180,6 +204,9 @@ body {
 
   <div style="position: relative; width: 100%; height: 100%;">
     <div id=editorHost style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+      <div id="pseudoGutter">1</div>
+      <textarea id="pseudoEditor">
+      </textarea>
     </div>
   </div>
 
@@ -3468,7 +3495,7 @@ body {
       injectStyle();
       var layout = injectShellHTML();
 
-      set(layout.editorHost, 'Loading..');
+      layout.pseudoEditor.value = 'Loading..';
       console.log('Loading..');
 
       return {
@@ -3477,11 +3504,14 @@ body {
       };
 
       function loadingTakesTime() {
-        set(layout.editorHost, 'Loading...');
+        layout.pseudoEditor.value = 'Loading...';
         // TODO: whatever progress...
       }
 
       function loadingComplete() {
+        layout.pseudoEditor.onclick = () => {
+          layout.editorHost.innerHTML = '';
+
         /** @type {import('codemirror').Editor} */
         var editor = CodeMirror(
           layout.editorHost,
@@ -3502,6 +3532,8 @@ body {
         console.log('getInputField ', ef);
         editor.setValue(editor.getValue() + '\n\n' + (!ef ? '-' : ef.outerHTML.slice(0, ef.outerHTML.indexOf('>') + 1)));
 
+        };
+
         function accept() {
 
         }
@@ -3514,10 +3546,16 @@ body {
  
         var editorHost = /** @type {HTMLElement} */(document.getElementById('editorHost'));
 
+        var pseudoEditor = /** @type {HTMLElement} */(document.getElementById('pseudoEditor'));
+        var pseudoGutter = /** @type {HTMLElement} */(document.getElementById('pseudoGutter'));
+
         return {
           shell: shell,
           leftBar: leftBar,
-          editorHost: editorHost
+          editorHost: editorHost,
+          pseudoEditor: pseudoEditor,
+          pseudoGutter: pseudoGutter,
+          allFound: !!shell && !!leftBar && !!editorHost
         };
       }
 

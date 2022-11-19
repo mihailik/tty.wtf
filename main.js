@@ -476,7 +476,7 @@ function catchREST() {
     }
 
     function runAsServer() {
-      //build();
+      build();
 
       var catchREST_secret_variable_name = 'catchREST_secret';
 

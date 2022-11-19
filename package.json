@@ -2,10 +2,10 @@
   "name": "har-rest",
   "version": "1.0.0",
   "description": "HAR Rest Tool",
-  "main": "index.js",
+  "main": "main.js",
   "private": true,
   "scripts": {
-    "start": "node index.js",
+    "start": "node main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

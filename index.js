@@ -597,24 +597,17 @@ issuing requests, processing data and representing the data in sensible way with
             var alreadyMatchesPromise = readFileAsync(filePath).then(
               function (oldContent) {
                 var markerRegexp = /\{build-by-hash:([^}]+)\}/g;
-                if (oldContent.replace(markerRegexp, '') === content.replace(markerRegexp, '')) {
-                  return true;
-                }
-
-                var oldReduc = oldContent.replace(markerRegexp, '');
-                var newReduc = content.replace(markerRegexp, '');
-
-                var oldOffset = oldReduc.indexOf(newReduc);
-                var newOffset = newReduc.indexOf(oldReduc);
-                console.log(' ' + filePath + ' ' + oldOffset + '-' + newOffset);
+                if (oldContent.replace(markerRegexp, '') === content.replace(markerRegexp, '')) return true;
               },
               function () {// failed to read old file -- fine, just write then
               }
             );
 
-            return alreadyMatchesPromise.then(function (alreadyMatches) {
-              return alreadyMatches || writeFileAsync(filePath, content);
-            });
+            return alreadyMatchesPromise.then(
+              // @ts-ignore
+              function (alreadyMatches) {
+                return alreadyMatches || writeFileAsync(filePath, content);
+              });
           }
         }
       });

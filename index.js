@@ -83,9 +83,11 @@ function catchREST() {
     if (firstLineEnd < 0) firstLineEnd = requestText.length;
     var firstLine = requestText.slice(firstLineStart, firstLineEnd);
     var body = firstLineEnd < requestText.length ? requestText.slice(firstLineEnd + 1) : '';
+    var bodySeparator = firstLineEnd < requestText.length ? requestText.slice(firstLineEnd, firstLineEnd + 1) : '';
     return {
       leadEmptyLines: leadEmptyLines,
       firstLine: firstLine,
+      bodySeparator: bodySeparator,
       body: body
     };
   }
@@ -93,6 +95,44 @@ function catchREST() {
   /** @param {string} firstLine */
   function parseFirstLine(firstLine) {
     // TODO: detect verb, then URL, potentially infer HTTP/S protocol
+
+    var verbMatch = /^(\*)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace)(\s+|$)/i.exec(firstLine + '');
+    if (!verbMatch) {
+      var url = firstLine.replace(/^\s+/, '');
+      var urlPos = firstLine.length - url.length;
+      if (url.indexOf('http:') === 0 || url.indexOf('https:') === 0) {
+        url = url.replace(/\s+$/, '');
+        if (!url || /\s/.test(url)) return; // do not allow whitespace inside implied verb-less URL
+
+        return {
+          verb: 'GET',
+          url: url,
+          verbPos: -1,
+          urlPos: urlPos
+        };
+      }
+    }
+
+    var leadWhitespace = verbMatch[1] || '';
+    var verb = verbMatch[2];
+    var trailWhitespace = verbMatch[3];
+
+    // capitalised verb (first word) is a strong sign of just normal text
+    if (verb.charAt(0).toUpperCase() + verb.slice(1).toLowerCase() === verb) return;
+
+    var urlRest = firstLine.slice(leadWhitespace.length + verb.length);
+    var url = urlRest.replace(/^\s+/, '');
+    var urlPos = leadWhitespace + urlRest.length - url.length;
+    url = url.replace(/\s+$/, '');
+
+    if (!url) return; // empty URL is not good
+
+    return {
+      verb: verb,
+      url: url,
+      verbPos: leadWhitespace,
+      urlPos: urlPos
+    };
   }
 
   /** @param {string | null | undefined} path */

@@ -3,6 +3,11 @@ function catchREST() {
 
   // #region polyfills
 
+  if (typeof document !== 'undefined' && document && !document.defaultView && typeof window !== 'undefined' && window) {
+    // @ts-ignore
+    document.defaultView = window;
+  }
+
   if (typeof Promise === 'undefined') {
     Promise = /** @type {Partial<typeof Promise>} */(polyfillPromise());
   }
@@ -24,6 +29,15 @@ function catchREST() {
         keys.push(k);
       }
       return keys;
+    };
+  }
+  if (typeof Object.entries !== 'function') {
+    Object.entries = function (obj) {
+      var entries = [];
+      for (var k in obj) {
+        entries.push([k, obj[k]]);
+      }
+      return entries;
     };
   }
   if (typeof [].map !== 'function') {
@@ -773,19 +787,24 @@ issuing requests, processing data and representing the data in sensible way with
           switch (path.extname(importEntry.importLocalPath).toLowerCase()) {
             case '.js':
               var processedContent = importEntry.content;
-              if (/typescript/.test(importEntry.importLocalPath))
+              if (/typescript/.test(importEntry.importLocalPath)) {
                 processedContent = strictES3(importEntry.importLocalPath, importEntry.content);
+                // concatenate most TypeScript namespaces
+                processedContent = processedContent.replace(/\}\)\(ts\s*\|\|\s*\(ts\s*=\s*\{\}\)\);\s*(((\s*\/\/[^\n]*\n)|(\s*\/\*+[^\*]*\*\/))*)\s*var\s*ts;\s*\(function\s*\(ts\)\s*\{/g, '\n\n$1\n');
+                // exclude 'ts.' prefix to refer to values within ts namespace directly
+                processedContent = processedContent.replace(/([^.])\bts\./g, '$1');
+              }
               return '// #region ' + path.basename(importEntry.importLocalPath).replace(/\.js$/, '') + '\n' + processedContent + '\n' + '// #endregion';
             case '.css': return (
               '///// ' + path.basename(importEntry.importLocalPath) + ' /////\n' +
-              '(function() { var style = document.createElement("style");\n' +
-              'if (elem && "styleSheet" in style && "type" in style) {\n' +
+              '(function(value) { var style = document.createElement("style");\n' +
+              'if ("styleSheet" in style && "type" in style) {\n' +
               ' style.type = "text/css";\n' +
               ' style.styleSheet.cssText = value;\n' +
               '} else {\n' +
-              ' style.innerHTML = ' + JSON.stringify(importEntry.content) + ';\n' +
+              ' style.innerHTML = value;\n' +
               '}\n' +
-              '(document.body || document.getElementsByTagName("head")[0]).appendChild(style); })();\n'
+              '(document.body || document.getElementsByTagName("head")[0]).appendChild(style); })(' + JSON.stringify(importEntry.content) + ');\n'
             );
           }
         });
@@ -2370,7 +2389,7 @@ issuing requests, processing data and representing the data in sensible way with
           files: files,
           read: read,
           write: write,
-          storedSize: storedSize,
+          storedSize: storedSize
         };
 
         for (var i = 0; i < fileList.length; i++) {
@@ -4082,7 +4101,7 @@ issuing requests, processing data and representing the data in sensible way with
           if (parsFirst && parsFirst.verb) {
             layout.leftTop.innerHTML = '<button class=goButton>' + parsFirst.verb.toUpperCase() + '</button>';
 
-            var goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByClassName('goButton')[0]);
+            var goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByTagName('button')[0]);
             goButton.onclick = function () {
               accept();
             };
@@ -4116,9 +4135,10 @@ issuing requests, processing data and representing the data in sensible way with
             xhr.onreadystatechange = function () {
               if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
+                  console.log(xhr);
                   resolve({
                     headers: {},
-                    body: xhr.response
+                    body: typeof xhr.response === 'string' || xhr.response ? xhr.response : xhr.responseText
                   });
                 } else {
                   reject(xhr.status + ' ' + xhr.statusText);

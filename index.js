@@ -311,6 +311,7 @@ function catchREST() {
     var encodedStr = url.slice(verbMatch.index);
     var posEndVerbSlash = encodedStr.indexOf('/');
     var verb;
+    var verbImplied;
     if (posEndVerbSlash >= 0) {
       verb = encodedStr.slice(0, posEndVerbSlash);
       encodedStr = encodedStr.slice(posEndVerbSlash + 1);
@@ -321,7 +322,8 @@ function catchREST() {
 
     if (verb === 'http:' || verb === 'https:') {
       encodedStr = verb + encodedStr;
-      verb = 'get';
+      verb = 'GET';
+      verbImplied = true;
     }
 
     var addr;
@@ -338,11 +340,14 @@ function catchREST() {
 
     var body = encodedStr;
 
-    return {
+    var result = {
       verb: verb,
+      verbImplied: verbImplied,
       addr: addr,
       body: body
     };
+
+    return result;
   }
 
   /** @param {string | undefined | null} requestText */
@@ -4512,11 +4517,15 @@ issuing requests, processing data and representing the data in sensible way with
       } else {
         var encodedUrl = parseEncodedURL(location.search + '');
       }
+
       if (!encodedUrl) {
         var text = 'GET https://api.github.com/repos/microsoft/typescript/languages';
         var mode = 'splash';
       } else {
-        var text = encodedUrl.verb + (encodedUrl.addr ? ' ' + encodedUrl.addr : '') +
+        var skipVerb = encodedUrl.verbImplied && /^http/i.test(encodedUrl.addr || '');
+
+        var text =
+          (skipVerb ? '' : encodedUrl.verb) + (encodedUrl.addr ? (skipVerb ? '' : ' ') + encodedUrl.addr : '') +
           (encodedUrl.body ? '\n' + encodedUrl.body : '');
         var mode = 'javascript';
       }

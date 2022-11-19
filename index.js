@@ -4269,6 +4269,7 @@ issuing requests, processing data and representing the data in sensible way with
                   set(withSplitter.splitterContainer, 'Done.');
                   set(withSplitter.bottomHost, '');
                   var injectPre = document.createElement('pre');
+                  injectPre.style.margin = '0';
                   set(injectPre, text);
                   withSplitter.bottomHost.appendChild(injectPre);
                 }, function (err) {

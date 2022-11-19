@@ -654,7 +654,7 @@ body {
                 function (result) {
                   if (!entry.res.headersSent) {
                     if (result && (typeof result === 'string' || /** @type {Buffer} */(result).length > 0 && typeof /** @type {Buffer} */(result)[0] === 'number')) {
-                      var mime = mimeByExt[entry.ext] || mimeByExt['html'];
+                      var mime = mimeByExt[entry.ext.replace(/^\./, '')] || mimeByExt['html'];
                       if (mime) entry.res.setHeader('Content-type', mime);
                       console.log(' [' + entry.path + ':' + /** @type {*} */(result).length + ']');
                       entry.res.end(result);

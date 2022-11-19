@@ -4,15 +4,15 @@ function startHARREST() {
 
   var importedJS = [
     'codemirror@5.64.0/lib/codemirror.js',
-    'typescript@4.5.4/lib/typescript.js',
-    'ts-jsonp@4.7.4/index.js',
+    'typescript@4.7.3/lib/typescript.js',
+    'ts-jsonp@4.7.3/index.js',
     // 'xlsx@0.17.4/dist/xlsx.full.min.js'
     'xlsx@0.17.4/xlsx.js',
     'xlsx@0.17.4/jszip.js'
   ];
 
   var importedStyles = [
-    'codemirror/lib/codemirror.css'
+    'codemirror@5.64.0/lib/codemirror.css'
   ];
   
   function detectEnvironmentAndStart() {
@@ -142,8 +142,6 @@ function startHARREST() {
         startHARREST + '\n' +
         '\n' +
         'startHARREST(); \n' +
-        '// </' + 'script' + '><' + 'script' + '> \n' +
-        allImports + '\n' +
         '// </' + 'script' + '>\n'
       );
     }
@@ -279,7 +277,7 @@ function startHARREST() {
 
       /** @param {string} src */
       function mapToUnpkg(src) {
-        return ':/unpkg.com/' + src;
+        return '//unpkg.com/' + src;
       }
     }
 

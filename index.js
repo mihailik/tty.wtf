@@ -343,7 +343,7 @@ function catchREST() {
         encodedStr = '';
       }
 
-      var body = encodedStr;
+      var body = decodeURIComponent(encodedStr.replace(/^(\/+)/, function (str) { return str.replace(/\//g, '\n'); }));
     }
 
     var result = {
@@ -4610,7 +4610,7 @@ issuing requests, processing data and representing the data in sensible way with
         } else {
           if (firstLine.verbPos >= 0) slashSeparated.push(firstLine.verb);
           slashSeparated.push(firstLine.url);
-          if (parsed.body) slashSeparated.push('/' + parsed.body);
+          if (parsed.body) slashSeparated.push('/' + parsed.body.replace(/^(\n+)/, function (str) { return str.replace(/\n/g, '/'); }));
         }
 
         switch (enc && enc.source) {

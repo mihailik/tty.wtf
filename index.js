@@ -4230,6 +4230,7 @@ issuing requests, processing data and representing the data in sensible way with
               value: embeddedSplashText,
 
               mode: 'markdown',
+              inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
 
               lineNumbers: true,
               extraKeys: {
@@ -4256,6 +4257,7 @@ issuing requests, processing data and representing the data in sensible way with
               {
                 value: text,
                 mode: mode,
+                inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
                 lineNumbers: true,
                 extraKeys: {
                   'Ctrl-Enter': accept,

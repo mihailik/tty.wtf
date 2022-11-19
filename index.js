@@ -301,32 +301,39 @@ td .CodeMirror-gutter.CodeMirror-linenumbers {
     getVerbOffset + '\n' +
     '})()';
 
-  var embeddedWholeHTML =
-    '<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:' + catchREST_hash + '} ' + new Date() + ' with  ' + process.platform + '/' + process.arch + ' -->\n' +
-    embeddedMetaBlockHTML + '\n' +
-    '<title>Catch Rest 🍹</title>\n' +
 
-    '<' + 'script' + '>\n' +
-    embeddedAdjustBaseURL + '\n' +
-    '</' + 'script' + '>\n' +
+  var embeddedWholeHTML = (function () {
+    /** @type {Partial<typeof process>} */
+    var pr = typeof process !== 'undefined' && process || {};
+    var html =
+      '<!DOCTYPE html><html lang="en"><head><!-- {build-by-hash:' + catchREST_hash + '} ' + new Date() + ' with  ' + pr.platform + '/' + pr.arch + ' -->\n' +
+      embeddedMetaBlockHTML + '\n' +
+      '<title>Catch Rest 🍹</title>\n' +
 
-    '<style>\n' +
-    embeddedCSS + '\n' +
-    '</style>\n' +
+      '<' + 'script' + '>\n' +
+      embeddedAdjustBaseURL + '\n' +
+      '</' + 'script' + '>\n' +
 
-    '</head><body>' +
+      '<style>\n' +
+      embeddedCSS + '\n' +
+      '</style>\n' +
 
-    embeddedBodyLayoutHTML + '\n' +
+      '</head><body>' +
 
-    '<' + 'script' + ' src="index.js"></' + 'script' + '>\n' +
-    '<' + 'script' + ' src="lib.js"></' + 'script' + '>\n' +
+      embeddedBodyLayoutHTML + '\n' +
 
-    '<' + 'script' + '>\n' +
-    'if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function")\n' +
-    ' catchREST.withDependenciesLoaded();\n' +
-    '</' + 'script' + '>\n' +
+      '<' + 'script' + ' src="index.js"></' + 'script' + '>\n' +
+      '<' + 'script' + ' src="lib.js"></' + 'script' + '>\n' +
 
-    '</body></html>'
+      '<' + 'script' + '>\n' +
+      'if (typeof catchREST !== "undefined" && catchREST && typeof catchREST.withDependenciesLoaded === "function")\n' +
+      ' catchREST.withDependenciesLoaded();\n' +
+      '</' + 'script' + '>\n' +
+
+      '</body></html>';
+    
+    return html;
+  })();
 ;
   // #endregion EMBEDDED RESOURCES
 

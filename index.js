@@ -4508,7 +4508,7 @@ issuing requests, processing data and representing the data in sensible way with
 
     function bootUrlEncoded() {
       if (/http/.test(location.protocol)) {
-        var encodedUrl = parseEncodedURL(location.pathname + '');
+        var encodedUrl = getVerb(location.pathname) ? parseEncodedURL(location.pathname + '') : parseEncodedURL(location.search);
       } else {
         var encodedUrl = parseEncodedURL(location.search + '');
       }

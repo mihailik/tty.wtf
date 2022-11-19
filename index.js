@@ -1,7 +1,7 @@
 // @ts-check
 function startCatchREST() {
 
-  var unicodeTitle = 'Catch Rest ' + String.fromCharCode(55356) + String.fromCharCode(57209);
+  var unicodeTitle = 'Catch REST ' + String.fromCharCode(55356) + String.fromCharCode(57209);
   var disableTypeScript = true;
 
   var importedJS = [
@@ -895,9 +895,10 @@ function startCatchREST() {
       // except where double-slash is preceded with colon, which is preserved too
       // also, leading line-breaks (interceded with spaces?) are converted simply to slashes
 
-      var whitespaceLead = firstLineSeparatedMatch[1];
-      var firstLine = firstLineSeparatedMatch[2];
-      var otherLines = firstLineSeparatedMatch[3];
+      var whitespaceLead = firstLineSeparatedMatch[1] || '';
+      var firstLine = firstLineSeparatedMatch[2] ||'';
+      var otherLines = firstLineSeparatedMatch[3] || '';
+      if (!firstLine && !otherLines) return;
 
       var verbSeparatedMatch = regex_verbSeparated.exec(firstLine);
 
@@ -1234,7 +1235,7 @@ function startCatchREST() {
             req.url,
             {
               method: req.verb,
-              body: req.body
+              body: req.body || void 0
             });
 
           return fetchPromise.then(fetchHandleResponse);
@@ -1332,7 +1333,8 @@ function startCatchREST() {
           extraKeys: {
             'Ctrl-Enter': sendRequestInteractively,
             'Cmd-Enter': sendRequestInteractively,
-          }
+          },
+          autofocus: true
         });
       responseCodeMirror = CodeMirrorCtor(responseTD, { lineNumbers: true, readOnly: true });
 

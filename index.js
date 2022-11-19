@@ -25,7 +25,7 @@ function startCatchREST() {
     if (typeof Date.now === 'function') return Date.now();
     return +new Date();
   }
-  
+
   function detectEnvironmentAndStart() {
 
     switch (detectEnvironment()) {
@@ -363,7 +363,7 @@ function startCatchREST() {
               }
 
               if (!retryCount) {
-                retryCount = (retryCount || 0) +1;
+                retryCount = (retryCount || 0) + 1;
 
                 // first try failed, request shutdown and keep retrying
                 process.stdout.write(' handover..');
@@ -457,7 +457,7 @@ function startCatchREST() {
           } else {
             reject(res);
           }
-        }        
+        }
       });
     }
 
@@ -528,7 +528,7 @@ function startCatchREST() {
       }
 
       console.log(req.method + ' ' + req.url + ' --> initiating restart... ');
-      initiateRestart(' ' + req.method + ':' +req.url + ' ');
+      initiateRestart(' ' + req.method + ':' + req.url + ' ');
       res.end('RESTART INITIATED');
     }
 
@@ -624,7 +624,7 @@ function startCatchREST() {
             path: parsedURL.path,
             method: verb || 'GET',
           }, handleRequestResponse);
-        
+
         requestObj.on('error', handleRequestError);
         requestObj.on('timeout', handleRequestTimeout);
         requestObj.end(String(process.pid));
@@ -868,7 +868,7 @@ function startCatchREST() {
           initiateRestart(message.restart);
           return;
         }
-        
+
         if (message && message.server) ghostProcess = true;
 
         proc.send({ scriptParent: process.pid, platform: process.platform, cwd: process.cwd });
@@ -878,7 +878,7 @@ function startCatchREST() {
   }
 
   var parseAsRequest = (function () {
-   
+
     var regex_firstLineSeparated = /^([ \n]+)?([^\n]+)?\n?([\s\S]+)?$/;
     var regex_verbSeparated = /^\s*([A-Z]+)\s+(\S[\s\S]+)\s*$/i;
     var regex_schemeSet = /^[a-z]+:/i;
@@ -910,7 +910,7 @@ function startCatchREST() {
       }
 
       var schemeSetMatch = regex_schemeSet.exec(url);
-      if (!schemeSetMatch || schemeSetMatch[0].toLowerCase()==='localhost:') {
+      if (!schemeSetMatch || schemeSetMatch[0].toLowerCase() === 'localhost:') {
         var deriveScheme = typeof location !== 'undefined' && /https/i.test(location.protocol || '') ? 'https' : 'http';
         url = deriveScheme + '://' + url.replace(/^\/+/, '');
       }
@@ -947,7 +947,7 @@ function startCatchREST() {
     var requestCodeMirror;
     /** @type {CodeMirror.Editor} */
     var responseCodeMirror;
-    
+
     splitterTD.onmousedown = splitterTD_onmousedown;
     splitterTD.ontouchstart = splitterTD_onmousedown;
     splitterTD.onmouseup = splitterTD_onmouseup;
@@ -994,7 +994,7 @@ function startCatchREST() {
       set(statusTD, 'Loaded');
       continueWithDependencies();
       set(statusTD, 'Loaded.');
-      
+
     }
 
     function getLocationSource() {
@@ -1137,7 +1137,7 @@ function startCatchREST() {
         var y =
           /** @type {MouseEvent} */(evt).pageY ||
           /** @type {MouseEvent} */(evt).y;
-        
+
         if (!y) {
           var touches = /** @type {TouchEvent} */(evt).touches;
           if (touches && touches.length === 1)
@@ -1293,7 +1293,7 @@ function startCatchREST() {
     })();
 
     sendRequestAsync.sendUsingXMLHttpRequest = (function () {
-      
+
       /**
        * @param {{ verb: string; url: string; body?: string; }} req
        * @returns {Promise<CommonResponseData | undefined>}
@@ -1785,7 +1785,7 @@ function startCatchREST() {
   }
 
   detectEnvironmentAndStart();
-  
+
 }
 
 startCatchREST();

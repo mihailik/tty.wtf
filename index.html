@@ -34,6 +34,10 @@ body {
   background: #fff0f3;
   border-right: solid 1px #ffe4e8;
 }
+
+#statusTD {
+  background: #ffa4b4;
+}
 </style>
 </head>
 <body>
@@ -58,12 +62,51 @@ body {
 </tr>
 <tr>
   <td height=1 colspan=2 id=statusTD>
-
+    Loading...
   </td>
 </tr>
 </table>
 <script>
-  alert('ok loaded!');
+  function startHARREST() {
+    function detectEnvironmentAndStart() {
+
+      switch (detectEnvironment()) {
+        case 'browser': return runBrowser();
+      }
+
+      throw new Error('Running in an unsupported environment.');
+
+      function detectEnvironment() {
+        if (typeof window !== 'undefined' && window && typeof window.alert === 'function'
+            && typeof document !== 'undefined' && document && typeof document.createElement === 'function')
+          return 'browser';
+      }
+    }
+
+    function runBrowser() {
+      var layoutTABLE = document.getElementById('layoutTABLE');
+      var leftTD = document.getElementById('leftTD');
+      var requestTD = document.getElementById('requestTD');
+      var statusTD = document.getElementById('statusTD');
+
+      set(statusTD, 'Loaded.');
+
+
+      function set(elem, value) {
+        if (typeof value === 'string') {
+          if (elem && 'textContent' in elem) {
+            elem.textContent = value;
+          } else if (elem && 'innerText' in elem) {
+            elem.innerText = value;
+          } else {
+            elem.text = value;
+          }
+        }
+      }
+    }
+  }
+
+  startHARREST();
 </script>
 </body>
 </html>

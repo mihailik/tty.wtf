@@ -4504,6 +4504,7 @@ I hope it works — firstly for me, and hopefully helps others.
           on(splitterContainer, 'mouseup', splitter_mouseup);
           on(splitterContainer, 'mousemove', splitter_mousemove);
           on(splitterContainer, 'touchstart', splitter_touchstart);
+          on(splitterContainer, 'touchmove', splitter_touchmove);
           on(splitterContainer, 'touchend', splitter_touchend);
 
           return {
@@ -4512,7 +4513,7 @@ I hope it works — firstly for me, and hopefully helps others.
             splitterContainer: splitterContainer
           };
 
-          var dragStart, overlayElem;
+          var dragStart, overlayElem, latestDragY;
 
           function createOverlay(pageY, offsetY) {
             if (overlayElem) return;
@@ -4536,6 +4537,7 @@ I hope it works — firstly for me, and hopefully helps others.
           }
 
           function dragTo(pageY) {
+            latestDragY = pageY;
             var wholeSize = layout.contentPageHost.offsetHeight;
             var newSplitterRatio = (pageY - dragStart.offCenterY) / wholeSize;
 
@@ -4577,6 +4579,7 @@ I hope it works — firstly for me, and hopefully helps others.
               document.body.removeChild(overlayElem);
             dragStart = void 0;
             overlayElem = void 0;
+            latestDragY = void 0;
           }
 
           /** @param {MouseEvent} */
@@ -4607,14 +4610,36 @@ I hope it works — firstly for me, and hopefully helps others.
           /** @param {MouseEvent} */
           function splitter_touchstart(e) {
             if (!e) e = window.event;
-            // createOverlay();
+            if (e.preventDefault) e.preventDefault();
+            var touches = e.changedTouches || e.touches;
+            var tch = touches && touches[0];
+            if (tch && tch.pageY > 0) {
+              createOverlay(tch.pageY, tch.pageY - layout.requestEditorHost.offsetHeight);
+            }
           }
 
           /** @param {MouseEvent} */
           function splitter_touchend(e) {
-            
+            if (!e) e = window.event;
+            if (e.preventDefault) e.preventDefault();
+            dropOverlay();
           }
-        }
+
+          /** @param {MouseEvent} */
+          function splitter_touchmove(e) {
+            if (!e) e = window.event;
+            if (e.preventDefault) e.preventDefault();
+            var touches = e.touches || e.changedTouches;
+            var tch = touches && touches[0];
+            for (var i = 0; touches && i < touches.length; i++) {
+              if (Math.abs(touches[i].pageY - latestDragY) < Math.abs(tch.pageY - latestDragY))
+                tch = touches[i];
+            }
+
+            if (tch && tch.pageY > 0)
+              dragTo(tch.pageY);
+          }
+}
 
         function accept() {
           var pars = parseTextRequest(editor.getValue());

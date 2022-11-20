@@ -522,6 +522,7 @@ body {
   background: linear-gradient(to right, #fbfbfb, #eee);
   box-shadow: 40px 0px 10px rgba(0, 0, 0, 0.23);
   padding-left: 2em;
+  cursor: ns-resize;
 }
 
 #shell #pseudoGutter {
@@ -4468,6 +4469,9 @@ I hope it works — firstly for me, and hopefully helps others.
           var wholeTextHeight = textEnd.bottom - Math.min(textStart.top, 0);
           var addPaddingUnderText = 30;
           var initialSplitterRatio = wholeTextHeight + addPaddingUnderText < wholeHeight / 2 ? (wholeTextHeight + addPaddingUnderText) / wholeHeight : 0.5;
+
+          var splitterRatio = initialSplitterRatio;
+
           // TODO: apply this with delay for animated entry
           layout.requestEditorHost.style.height = (initialSplitterRatio * 100).toFixed(2) + '%';
 
@@ -4496,11 +4500,120 @@ I hope it works — firstly for me, and hopefully helps others.
           bottomHost.style.background = 'silver';
           splitterContainer.id = 'splitter';
 
+          on(splitterContainer, 'mousedown', splitter_mousedown);
+          on(splitterContainer, 'mouseup', splitter_mouseup);
+          on(splitterContainer, 'mousemove', splitter_mousemove);
+          on(splitterContainer, 'touchstart', splitter_touchstart);
+          on(splitterContainer, 'touchend', splitter_touchend);
+
           return {
             bottomContainer: bottomContainer,
             bottomHost: bottomHost,
             splitterContainer: splitterContainer
           };
+
+          var dragStart, overlayElem;
+
+          function createOverlay(pageY, offsetY) {
+            if (overlayElem) return;
+            // overlay whole window, nothing works until resizing complete
+            overlayElem = document.createElement('div');
+            overlayElem.style.cssText =
+              'position: absolute; position: fixed; ' +
+              'left: 0; top: 0; width: 100%; height: 100%; ' +
+              'z-index: 1000; ' +
+              'cursor: ns-resize;';
+            document.body.appendChild(overlayElem);
+            on(overlayElem, 'mouseup', splitter_mouseup);
+            on(overlayElem, 'mousemove', splitter_mousemove);
+            on(overlayElem, 'touchend', splitter_touchend);
+            var splitterHeight = splitterContainer.offsetHeight;
+            dragStart = {
+              centerY: pageY - (offsetY - splitterHeight / 2),
+              offCenterY: offsetY - splitterHeight / 2,
+              splitterRatio: splitterRatio
+            };
+          }
+
+          function dragTo(pageY) {
+            var wholeSize = layout.contentPageHost.offsetHeight;
+            var newSplitterRatio = (pageY - dragStart.offCenterY) / wholeSize;
+
+            var newTopHeight = (newSplitterRatio * 100).toFixed(2) + '%';
+            var newBottomTop = (newSplitterRatio * 100).toFixed(2) + '%';
+            var newBottomHeight = (100 - newSplitterRatio * 100).toFixed(2) + '%';
+
+            if (layout.requestEditorHost.style.height !== newTopHeight ||
+              bottomContainer.style.top !== newBottomTop ||
+              bottomContainer.style.height !== newBottomHeight) {
+              var logmousemove = {
+                topHeight: layout.requestEditorHost.style.height + ' --> ' + newTopHeight,
+                requestEditorHost: layout.requestEditorHost,
+                bottomTop: bottomContainer.style.top + '-->' + newBottomTop,
+                bottomHeight: bottomContainer.style.height + '-->' + newBottomHeight,
+                bottomContainer: bottomContainer
+              };
+
+              if (layout.requestEditorHost.style.height !== newTopHeight) {
+                layout.requestEditorHost.style.height = newTopHeight;
+                logmousemove.topHeight += ' (' + layout.requestEditorHost.style.height + ')';
+              }
+              if (bottomContainer.style.top !== newBottomTop) {
+                bottomContainer.style.top = newBottomTop;
+                logmousemove.bottomTop += ' (' + bottomContainer.style.top + ')';
+              }
+              if (bottomContainer.style.height !== newBottomHeight) {
+                bottomContainer.style.height = newBottomHeight;
+                logmousemove.bottomHeight += ' (' + bottomContainer.style.height + ')';
+              }
+
+              console.log('mousemove ', logmousemove);
+            }
+
+          }
+
+          function dropOverlay() {
+            if (overlayElem)
+              document.body.removeChild(overlayElem);
+            dragStart = void 0;
+            overlayElem = void 0;
+          }
+
+          /** @param {MouseEvent} */
+          function splitter_mousedown(e) {
+            if (!e) e = window.event;
+            if (e.preventDefault) e.preventDefault();
+            createOverlay(e.pageY, e.offsetY);
+            console.log('mousedown ', dragStart);
+          }
+
+          /** @param {MouseEvent} */
+          function splitter_mouseup(e) {
+            if (!e) e = window.event;
+            if (e.preventDefault) e.preventDefault();
+            console.log('mouseup ', dragStart);
+            dropOverlay();
+          }
+
+          /** @param {MouseEvent} */
+          function splitter_mousemove(e) {
+            if (!e) e = window.event;
+            if (e.preventDefault) e.preventDefault();
+            if (!dragStart) return;
+
+            dragTo(e.pageY);
+          }
+
+          /** @param {MouseEvent} */
+          function splitter_touchstart(e) {
+            if (!e) e = window.event;
+            // createOverlay();
+          }
+
+          /** @param {MouseEvent} */
+          function splitter_touchend(e) {
+            
+          }
         }
 
         function accept() {

@@ -980,8 +980,9 @@ I hope it works — firstly for me, and hopefully helps others.
               var processedContent = importEntry.content;
               if (/typescript/.test(importEntry.importLocalPath)) {
                 processedContent = strictES3(importEntry.importLocalPath, importEntry.content);
-                // concatenate most TypeScript namespaces
-                processedContent = processedContent.replace(/\}\)\(ts\s*\|\|\s*\(ts\s*=\s*\{\}\)\);\s*(((\s*\/\/[^\n]*\n)|(\s*\/\*+[^\*]*\*\/))*)\s*var\s*ts;\s*\(function\s*\(ts\)\s*\{/g, '\n\n$1\n');
+
+                // Disabling as it may destabilise TS: concatenate most TypeScript namespaces
+                // processedContent = processedContent.replace(/\}\)\(ts\s*\|\|\s*\(ts\s*=\s*\{\}\)\);\s*(((\s*\/\/[^\n]*\n)|(\s*\/\*+[^\*]*\*\/))*)\s*var\s*ts;\s*\(function\s*\(ts\)\s*\{/g, '\n\n$1\n');
 
                 // This causes errors:  exclude 'ts.' prefix to refer to values within ts namespace directly
                 // processedContent = processedContent.replace(/([^.])\bts\./g, '$1');
@@ -4758,7 +4759,7 @@ I hope it works — firstly for me, and hopefully helps others.
           if (parsed.body) slashSeparated.push('/' + parsed.body.replace(/^(\n+)/, function (str) { return str.replace(/\n/g, '/'); }));
         }
 
-        switch (enc && enc.source) {
+        switch (source) {
           case 'pathname':
 
             history.replaceState(
@@ -4776,7 +4777,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
           case 'hash':
           default: // update hash
-            location.href = slashSeparated.join('/');
+            location.hash = slashSeparated.join('/');
             break;
         }
       }

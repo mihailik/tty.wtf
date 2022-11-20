@@ -4738,7 +4738,7 @@ I hope it works — firstly for me, and hopefully helps others.
         if (enc && enc.encodedUrl && enc.encodedUrl.verbPos > 0) {
           var injectLeadPath =
             location.pathname.slice(0, enc.encodedUrl.verbPos)
-              .replace(/^\//, '');
+              .replace(/^\/+/, '').replace(/\/+$/, '');
           if (injectLeadPath)
             slashSeparated.push(injectLeadPath);
         }

@@ -595,6 +595,9 @@ A tool in some ways similar to Postman or Fiddler, letting you to prepare and fi
 You will type your request in text area at the top, press a button and see resuls appear at the bottom. In many ways
 Catch REST &#x1F379; is much simpler, and much more powerful than existing REST tools.
 
+![HTTP POST request and reply](post-request-reply-screen.png)
+
+
 ### Simple text
 
 Your request is plain text. Whole of it!
@@ -612,6 +615,8 @@ Your request is reflected in the address bar. Whole of it!
 
 That means you can take the URL and paste it in the chat to support. You can stick it in the Wiki as a verification.
 You can store it in the comments.
+
+![HTTP POST request and reply](post-request-reply.png)
 
 ### Formats auto-detection
 

@@ -28,12 +28,18 @@ function catchREST() {
 
   if (typeof Object.defineProperty !== 'function') {
     // @ts-ignore
-    Object.defineProperty = function (obj, key, attr) {
-      obj['_get_' + key] = attr.get;
-      obj[key] = function () {
-        return obj['_get_' + key]();
+    Object.defineProperty =
+      /**
+       * @param {*} obj 
+       * @param {*} key 
+       * @param {*} attr 
+       */
+      function (obj, key, attr) {
+        obj['_get_' + key] = attr.get;
+        obj[key] = function () {
+          return obj['_get_' + key]();
+        };
       };
-    };
   }
 
   if (typeof Object.keys !== 'function') {
@@ -46,13 +52,15 @@ function catchREST() {
     };
   }
   if (typeof Object.entries !== 'function') {
-    Object.entries = function (obj) {
-      var entries = [];
-      for (var k in obj) {
-        entries.push([k, obj[k]]);
-      }
-      return entries;
-    };
+    Object.entries =
+      /** @param {*} obj @returns {*} */
+      function (obj) {
+        var entries = [];
+        for (var k in obj) {
+          entries.push([k, obj[k]]);
+        }
+        return entries;
+      };
   }
   if (typeof [].map !== 'function') {
     (function () {
@@ -234,7 +242,7 @@ function catchREST() {
 
         function fail(error) {
           toComplete = 0;
-          results = null;
+          results = /** @type {*} */(void 0);
           reject(error);
         }
 
@@ -575,12 +583,12 @@ body {
 </div>
   */});
 
-  var embeddedSplashText = getFunctionCommentContent(function() {/*
+  var embeddedSplashMarkdown = getFunctionCommentContent(function () {/*
 # This is a prototype project code name Catch REST &#x1F379;
 
 
 
-## What it is now
+## What is Catch REST &#x1F379; now
 
 A tool in some ways similar to Postman or Fiddler, letting you to prepare and fire HTTP requests and investigate results.
 
@@ -686,7 +694,9 @@ I hope it works — firstly for me, and hopefully helps others.
 
 *Ka chi fo!*
 
-  */}).replace(/&#x1F379;/g, drinkChar);
+  */});
+  
+  var embeddedSplashText = embeddedSplashMarkdown.replace(/&#x1F379;/g, drinkChar);
 
   var embeddedMetaBlockHTML = getFunctionCommentContent(function () {/*
 <meta charset="UTF-8">
@@ -870,6 +880,7 @@ I hope it works — firstly for me, and hopefully helps others.
       var indexHTML_path = path.resolve(__dirname, 'index.html');
       var index404HTML_path = path.resolve(__dirname, '404.html');
       var libJS_path = path.resolve(__dirname, 'lib.js');
+      var readme_path = path.resolve(__dirname, 'README.md');
 
       function detectLocalBuildValid() {
         return new Promise(function (resolve) {
@@ -877,15 +888,18 @@ I hope it works — firstly for me, and hopefully helps others.
           var indexHTMLPromise = readFileAsync(indexHTML_path);
           var index404HTMLPromise = readFileAsync(index404HTML_path);
           var libJSPromise = readFileAsync(libJS_path);
-          Promise.all([indexHTMLPromise, index404HTMLPromise, libJSPromise]).then(
+          var readmePromise = readFileAsync(readme_path);
+          Promise.all([indexHTMLPromise, index404HTMLPromise, libJSPromise, readmePromise]).then(
             function (result) {
               var indexHTML_content = result[0];
               var index404HTML_content = result[1];
               var libJS_content = result[2];
+              var readme_content = result[3];
               resolve(
                 markerRegexp.test(indexHTML_content) &&
                 markerRegexp.test(index404HTML_content) &&
-                markerRegexp.test(libJS_content));
+                markerRegexp.test(libJS_content) &&
+                markerRegexp.test(readme_content));
             },
             function () {
               // failed to read
@@ -1129,6 +1143,9 @@ I hope it works — firstly for me, and hopefully helps others.
 
           var builtHTML = getEmbeddedWholeHTML(true /* urlencoded */);
 
+          var builtReadme = embeddedSplashMarkdown +
+            '\n<' + '!--' + ' {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' ' + process.platform + '/' + process.arch + '} ' + '--' + '>\n'; 
+
           var skipIndexHTML = skipUnlessUpdated(
             indexHTML_path,
             builtHTML
@@ -1141,21 +1158,26 @@ I hope it works — firstly for me, and hopefully helps others.
             libJS_path,
             combinedLib
           );
+          var skipReadme = skipUnlessUpdated(
+            readme_path,
+            builtReadme
+          );
 
-          return Promise.all([skipIndexHTML, skipIndex404HTML, skipLib]).then(
+          return Promise.all([skipIndexHTML, skipIndex404HTML, skipLib, skipReadme]).then(
             function (skipped) {
-              var skippedIndexHTML = skipped[0], skippedIndex404HTML = skipped[1], skippedLib = skipped[2];
+              var skippedIndexHTML = skipped[0], skippedIndex404HTML = skipped[1], skippedLib = skipped[2], skippedReadme = skipped[3];
 
-              if (skippedIndexHTML && skippedIndex404HTML && skippedLib)
+              if (skippedIndexHTML && skippedIndex404HTML && skippedLib && skippedReadme)
                 return 'Build already matches files.';
 
-              if (!skippedIndexHTML && !skippedIndex404HTML && !skippedLib)
-                return 'Build updated index.html, 404.html and lib.js with hash ' + catchREST_hash;
+              if (!skippedIndexHTML && !skippedIndex404HTML && !skippedLib && !skippedReadme)
+                return 'Build updated index.html, 404.html, lib.js and README.md with hash ' + catchREST_hash;
 
               return 'Build only updated ' +
                 (skippedIndexHTML ? '' : 'index.html ') +
                 (skippedIndex404HTML ? '' : '404.html ') +
                 (skippedLib ? '' : 'lib.js ') +
+                (skippedReadme ? '' : 'README.md ') +
                 'with hash ' + catchREST_hash;
             });
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<!-- {build-by-hash:2h4sjw5s82 Sun Nov 20 2022 15:20:48 GMT+0000 (Greenwich Mean Time) with  win32/x64} -->
+<!-- {build-by-hash:1wihcfrabss Mon Nov 21 2022 19:26:24 GMT+0000 (Greenwich Mean Time) with  darwin/x64} -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,7 +36,10 @@ html {
   width:100%;height:100%;
 
   background: white; color: black;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans",
+    "Arial Unicode";
 }
 *, *:before, *:after {
   box-sizing: inherit;
@@ -46,9 +49,11 @@ body {
   margin:0;padding:0;
   width:100%;height:100%;
   overflow:hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans",
+    "Arial Unicode";
 }
-.cssAuthenticityMarker{/* {build-by-hash:2h4sjw5s82} */}
 #shell .CodeMirror {
   position: absolute;
   left: 0; top: 0;
@@ -63,6 +68,9 @@ body {
 #shell .CodeMirror-gutter.CodeMirror-linenumber {
   color: #ddd;
 }
+#shell .CodeMirror-linenumber {
+  min-width: 5em;
+}
 
 #shell #contentPageHost {
   position: absolute;
@@ -76,11 +84,22 @@ body {
   width: 100%; height: 100%;
 }
 
-#shell #contentPageHost #splitter {
+#shell #contentPageHost #splitterOuter {
   background: linear-gradient(to right, #fbfbfb, #eee);
-  box-shadow: 40px 0px 10px rgba(0, 0, 0, 0.23);
-  padding-left: 2em;
+}
+
+#shell #contentPageHost #splitter {
+  box-shadow: 1em -0.3em 0.7em rgba(0,0,0, 0.11);
+  padding-left: 0.6em;
   cursor: ns-resize;
+}
+
+#shell #contentPageHost #splitterBorderTop {
+  background: linear-gradient(to right, transparent 5.4em, #f3f3f3 6.5em, #e6e6e6);
+}
+
+#shell #contentPageHost #splitterBorderBottom {
+  background: linear-gradient(to right, transparent 0.4em, #dedada 0.5em, #d2d2d2);
 }
 
 #shell #pseudoGutter {
@@ -110,6 +129,10 @@ body {
   background: #fbfbfb;
 }
 
+#shell #leftBar #leftTop * {
+  pointer-events: auto;
+}
+
 #shell .goButton {
   border-radius: 100%;
   width: 4em;
@@ -117,14 +140,28 @@ body {
   margin-top: 3em;
   margin-left: 0.6em;
 }
+.cssAuthenticityMarker{/* {hex:1wkry72oywf} */}
 </style>
-</head><body><div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 3em;">
+</head><body><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Emoji">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols 2">
 
-  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 3em;">
-    <table style="width: 100%; height: 100%; position: relative; z-index: 100000;" cellspacing=0 cellpadding=0>
-    <tr><td valign=top id=leftTop>        </td></tr>
-    <tr><td id=leftMiddle>       </td></tr>
-    <tr><td valign=bottom id=leftBottom>          </td></tr></table>
+<div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 0.2em;">
+
+  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 0.2em;">
+    <table style="width: 100%; height: 100%; position: absolute; z-index: 100000; pointer-events: none;" cellspacing=0 cellpadding=0>
+    <tr><td valign=top id=leftTop>
+      <!-- top sidebar -->
+    </td></tr>
+    <tr><td id=leftMiddle>
+      <!-- middle sidebar -->
+    </td></tr>
+    <tr><td valign=bottom id=leftBottom>
+      <!-- bottom sidebar -->
+      &#x1F379; Loading...
+    </td></tr></table>
   </div>
 
   <div style="position: relative; width: 100%; height: 100%;">

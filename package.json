@@ -20,6 +20,7 @@
   },
   "homepage": "http://catch.rest/",
   "devDependencies": {
+    "@types/codemirror": "^5.60.5",
     "codemirror": "5",
     "typescript": "^4.9.3",
     "xlsx": "*"

@@ -1,6 +1,7 @@
 // @ts-check <script>
-/// <reference path="./webslq.d.ts" />
+/// <reference path="./websql.d.ts" />
 /// <reference types="codemirror" />
+
 function catchREST() {
 
   // Debug! Temporary!
@@ -529,7 +530,7 @@ body {
 }
 
 #shell #contentPageHost #splitterOuter {
-  background: linear-gradient(to right, #fbfbfb, #eee);
+  background: linear-gradient(to right, #fbfbfb 5em, #eee);
 }
 
 #shell #contentPageHost #splitter {
@@ -4658,34 +4659,34 @@ I hope it works — firstly for me, and hopefully helps others.
             latestDragY = void 0;
           }
 
-          /** @param {MouseEvent} */
+          /** @param {MouseEvent} e */
           function splitter_mousedown(e) {
-            if (!e) e = window.event;
+            if (!e) e = /** @type {MouseEvent} e */(window.event);
             if (e.preventDefault) e.preventDefault();
             createOverlay(e.pageY, e.offsetY);
             console.log('mousedown ', dragStart);
           }
 
-          /** @param {MouseEvent} */
+          /** @param {MouseEvent} e */
           function splitter_mouseup(e) {
-            if (!e) e = window.event;
+            if (!e) e = /** @type {MouseEvent} e */(window.event);
             if (e.preventDefault) e.preventDefault();
             console.log('mouseup ', dragStart);
             dropOverlay();
           }
 
-          /** @param {MouseEvent} */
+          /** @param {MouseEvent} e */
           function splitter_mousemove(e) {
-            if (!e) e = window.event;
+            if (!e) e = /** @type {MouseEvent} e */(window.event);
             if (e.preventDefault) e.preventDefault();
             if (!dragStart) return;
 
             dragTo(e.pageY);
           }
 
-          /** @param {MouseEvent} */
+          /** @param {TouchEvent} e */
           function splitter_touchstart(e) {
-            if (!e) e = window.event;
+            if (!e) e = /** @type {TouchEvent} e */(window.event);
             if (e.preventDefault) e.preventDefault();
             var touches = e.changedTouches || e.touches;
             var tch = touches && touches[0];
@@ -4694,16 +4695,16 @@ I hope it works — firstly for me, and hopefully helps others.
             }
           }
 
-          /** @param {MouseEvent} */
+          /** @param {TouchEvent} e */
           function splitter_touchend(e) {
-            if (!e) e = window.event;
+            if (!e) e = /** @type {TouchEvent} e */(window.event);
             if (e.preventDefault) e.preventDefault();
             dropOverlay();
           }
 
-          /** @param {MouseEvent} */
+          /** @param {TouchEvent} e */
           function splitter_touchmove(e) {
-            if (!e) e = window.event;
+            if (!e) e = /** @type {TouchEvent} e */(window.event);
             if (e.preventDefault) e.preventDefault();
             var touches = e.touches || e.changedTouches;
             var tch = touches && touches[0];

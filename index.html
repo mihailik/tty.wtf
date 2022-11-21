@@ -36,7 +36,10 @@ html {
   width:100%;height:100%;
 
   background: white; color: black;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans",
+    "Arial Unicode";
 }
 *, *:before, *:after {
   box-sizing: inherit;
@@ -46,7 +49,10 @@ body {
   margin:0;padding:0;
   width:100%;height:100%;
   overflow:hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans",
+    "Arial Unicode";
 }
 .cssAuthenticityMarker{/* {build-by-hash:1hlqr0jpqx9} */}
 #shell .CodeMirror {
@@ -107,7 +113,6 @@ body {
 }
 
 #shell #leftBar {
-  background: #fbfbfb;
 }
 
 #shell .goButton {
@@ -118,13 +123,16 @@ body {
   margin-left: 0.6em;
 }
 </style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Emoji">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols 2">
+
 </head><body><div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 3em;">
 
   <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 3em;">
-    <table style="width: 100%; height: 100%; position: relative; z-index: 100000;" cellspacing=0 cellpadding=0>
-    <tr><td valign=top id=leftTop>        </td></tr>
-    <tr><td id=leftMiddle>       </td></tr>
-    <tr><td valign=bottom id=leftBottom>          </td></tr></table>
   </div>
 
   <div style="position: relative; width: 100%; height: 100%;">

@@ -1,4 +1,6 @@
 // @ts-check <script>
+/// <reference path="./webslq.d.ts" />
+/// <reference types="codemirror" />
 function catchREST() {
 
   // Debug! Temporary!
@@ -469,14 +471,19 @@ function catchREST() {
 
   var catchREST_hash = calcHash(catchREST + '').toString(36);
 
-  var embeddedMinCSS = getFunctionCommentContent(function () {/*
+  var embeddedMinCSS_authenticityMarker;
+  var embeddedMinCSS = (function () {
+    var embeddedMinCSS = getFunctionCommentContent(function () {/*
 html {
   box-sizing: border-box;
   margin:0;padding:0;
   width:100%;height:100%;
 
   background: white; color: black;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans",
+    "Arial Unicode";
 }
 *, *:before, *:after {
   box-sizing: inherit;
@@ -486,11 +493,11 @@ body {
   margin:0;padding:0;
   width:100%;height:100%;
   overflow:hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans",
+    "Arial Unicode";
 }
-  */}) + '\n.cssAuthenticityMarker{/' + '* {build-by-hash:' + catchREST_hash + '} *' + '/}';
-
-  var embeddedShellCSS = getFunctionCommentContent(function() { /*
 #shell .CodeMirror {
   position: absolute;
   left: 0; top: 0;
@@ -505,6 +512,9 @@ body {
 #shell .CodeMirror-gutter.CodeMirror-linenumber {
   color: #ddd;
 }
+#shell .CodeMirror-linenumber {
+  min-width: 5em;
+}
 
 #shell #contentPageHost {
   position: absolute;
@@ -518,11 +528,22 @@ body {
   width: 100%; height: 100%;
 }
 
-#shell #contentPageHost #splitter {
+#shell #contentPageHost #splitterOuter {
   background: linear-gradient(to right, #fbfbfb, #eee);
-  box-shadow: 40px 0px 10px rgba(0, 0, 0, 0.23);
-  padding-left: 2em;
+}
+
+#shell #contentPageHost #splitter {
+  box-shadow: 1em -0.3em 0.7em rgba(0,0,0, 0.11);
+  padding-left: 0.6em;
   cursor: ns-resize;
+}
+
+#shell #contentPageHost #splitterBorderTop {
+  background: linear-gradient(to right, transparent 5.4em, #f3f3f3 6.5em, #e6e6e6);
+}
+
+#shell #contentPageHost #splitterBorderBottom {
+  background: linear-gradient(to right, transparent 0.4em, #dedada 0.5em, #d2d2d2);
 }
 
 #shell #pseudoGutter {
@@ -552,6 +573,10 @@ body {
   background: #fbfbfb;
 }
 
+#shell #leftBar #leftTop * {
+  pointer-events: auto;
+}
+
 #shell .goButton {
   border-radius: 100%;
   width: 4em;
@@ -559,16 +584,35 @@ body {
   margin-top: 3em;
   margin-left: 0.6em;
 }
-*/});
+
+  */});
+    embeddedMinCSS_authenticityMarker = calcHash(embeddedMinCSS).toString(36);
+    embeddedMinCSS += '\n.cssAuthenticityMarker{/' + '* {hex:' + embeddedMinCSS_authenticityMarker + '} *' + '/}';
+    return embeddedMinCSS;
+  })();
 
   var embeddedShellLayoutHTML = getFunctionCommentContent(function () { /*
-<div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 3em;">
 
-  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 3em;">
-    <table style="width: 100%; height: 100%; position: relative; z-index: 100000;" cellspacing=0 cellpadding=0>
-    <tr><td valign=top id=leftTop>        </td></tr>
-    <tr><td id=leftMiddle>       </td></tr>
-    <tr><td valign=bottom id=leftBottom>          </td></tr></table>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Emoji">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols 2">
+
+<div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 0.2em;">
+
+  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 0.2em;">
+    <table style="width: 100%; height: 100%; position: absolute; z-index: 100000; pointer-events: none;" cellspacing=0 cellpadding=0>
+    <tr><td valign=top id=leftTop>
+      <!-- top sidebar -->
+    </td></tr>
+    <tr><td id=leftMiddle>
+      <!-- middle sidebar -->
+    </td></tr>
+    <tr><td valign=bottom id=leftBottom>
+      <!-- bottom sidebar -->
+      &#x1F379; Loading...
+    </td></tr></table>
   </div>
 
   <div style="position: relative; width: 100%; height: 100%;">
@@ -753,7 +797,6 @@ I hope it works — firstly for me, and hopefully helps others.
 
       '<style>\n' +
       embeddedMinCSS + '\n' +
-      embeddedShellCSS + '\n' +
       '</style>\n' +
 
       '</' + 'head' + '><' + 'body' + '>' +
@@ -4321,6 +4364,8 @@ I hope it works — firstly for me, and hopefully helps others.
         .join(',').split(',')
         .map(function(_,index) {return index+1; }).join('<br>');
       console.log('Loading..');
+      layout.leftBottom.style.whiteSpace = 'nowrap';
+      layout.leftBottom.textContent = drinkChar + ' Loading..';
 
       return {
         loadingTakesTime: loadingTakesTime,
@@ -4334,6 +4379,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
       function loadingTakesTime() {
         layout.pseudoEditor.value = (layout.pseudoEditor.value || '').replace(/^Loading\.\./, 'Loading...');
+        layout.leftBottom.textContent = drinkChar + ' Loading...';
         // TODO: whatever progress...
       }
 
@@ -4345,6 +4391,8 @@ I hope it works — firstly for me, and hopefully helps others.
       function loadingComplete(persist, textOverride, modeOverride) {
         if (typeof textOverride !== 'undefined') text = textOverride;
         if (typeof modeOverride !== 'undefined') mode = modeOverride;
+        layout.leftBottom.textContent = drinkChar + ' OK';
+
         layout.requestEditorHost.innerHTML = '';
         if (mode === 'splash') {
           var editor = createCodeMirrorWithFirstClickChange(
@@ -4490,27 +4538,53 @@ I hope it works — firstly for me, and hopefully helps others.
           bottomContainer.appendChild(bottomHost);
           layout.contentPageHost.appendChild(bottomContainer);
 
+          var splitterOuter = document.createElement('div');
+          splitterOuter.id = 'splitterOuter';
+          splitterOuter.style.cssText =
+            'position: absolute; left: 0; top: 0; ' +
+            ' width: 100%; ' +
+            'padding-left: 6em; ' +
+            ' height: ' + splitterHeight + ';';
+          
+          var splitterBorderTop = document.createElement('div');
+          splitterBorderTop.style.cssText =
+            'position: absolute; left: 0; top: -1px; width: 100%; height: 1px;';
+          splitterBorderTop.id = 'splitterBorderTop';
+          splitterOuter.appendChild(splitterBorderTop);
+
           var splitterContainer = document.createElement('div');
           splitterContainer.style.cssText =
-            'position: absolute; left: 0; top: 0;' +
-            ' width: 100%;' +
-            ' height: ' + splitterHeight + ';';
-          bottomContainer.appendChild(splitterContainer);
-
-          bottomHost.style.background = 'silver';
+            'position: relative; width: 100%; height: 100%;';
           splitterContainer.id = 'splitter';
+          splitterOuter.appendChild(splitterContainer);
 
-          on(splitterContainer, 'mousedown', splitter_mousedown);
-          on(splitterContainer, 'mouseup', splitter_mouseup);
-          on(splitterContainer, 'mousemove', splitter_mousemove);
-          on(splitterContainer, 'touchstart', splitter_touchstart);
-          on(splitterContainer, 'touchmove', splitter_touchmove);
-          on(splitterContainer, 'touchend', splitter_touchend);
+          splitterContainer.innerHTML =
+            '<table style="width: 100%; height: 100%; position: absolute;" cellspacing=0 cellpadding=0> ' +
+            '<tr><td><td></td></table>';
+          var splitterMainPanel = splitterContainer.getElementsByTagName('td')[0];
+
+          var splitterBorderBottom = document.createElement('div');
+          splitterBorderBottom.style.cssText =
+            'position: relative; width: 100%; height: 1px;';
+          splitterBorderBottom.id = 'splitterBorderBottom';
+          splitterOuter.appendChild(splitterBorderBottom);
+
+          bottomContainer.appendChild(splitterOuter);
+
+          //bottomHost.style.background = 'silver';
+
+          on(splitterOuter, 'mousedown', splitter_mousedown);
+          on(splitterOuter, 'mouseup', splitter_mouseup);
+          on(splitterOuter, 'mousemove', splitter_mousemove);
+          on(splitterOuter, 'touchstart', splitter_touchstart);
+          on(splitterOuter, 'touchmove', splitter_touchmove);
+          on(splitterOuter, 'touchend', splitter_touchend);
 
           return {
             bottomContainer: bottomContainer,
             bottomHost: bottomHost,
-            splitterContainer: splitterContainer
+            splitterContainer: splitterContainer,
+            splitterMainPanel: splitterMainPanel
           };
 
           var dragStart, overlayElem, latestDragY;
@@ -4530,16 +4604,18 @@ I hope it works — firstly for me, and hopefully helps others.
             on(overlayElem, 'touchend', splitter_touchend);
             var splitterHeight = splitterContainer.offsetHeight;
             dragStart = {
-              centerY: pageY - (offsetY - splitterHeight / 2),
-              offCenterY: offsetY - splitterHeight / 2,
+              centerY: pageY - offsetY,
+              offCenterY: offsetY,
               splitterRatio: splitterRatio
             };
           }
 
           function dragTo(pageY) {
+            if (!overlayElem) return;
             latestDragY = pageY;
             var wholeSize = layout.contentPageHost.offsetHeight;
-            var newSplitterRatio = (pageY - dragStart.offCenterY) / wholeSize;
+            var newSplitterRatio = Math.min(0.9, Math.max(0.05,
+              (pageY - dragStart.offCenterY) / wholeSize));
 
             var newTopHeight = (newSplitterRatio * 100).toFixed(2) + '%';
             var newBottomTop = (newSplitterRatio * 100).toFixed(2) + '%';
@@ -4650,7 +4726,7 @@ I hope it works — firstly for me, and hopefully helps others.
             if (parsFirst && parsFirst.url) {
               editor.setOption('readOnly', true);
               if (!withSplitter) withSplitter = requireSplitter();
-              set(withSplitter.splitterContainer, 'fetching...');
+              set(withSplitter.splitterMainPanel, 'fetching...');
 
               var ftc = fetchXHR(parsFirst.url, {
                 method: parsFirst.verb,
@@ -4662,7 +4738,7 @@ I hope it works — firstly for me, and hopefully helps others.
                   var headers = response.headers;
                   var text = response.body;
                   editor.setOption('readOnly', false);
-                  set(withSplitter.splitterContainer, 'Done.');
+                  set(withSplitter.splitterMainPanel, 'Done.');
 
                   if (!replyEditor) {
                     replyEditor = createReplyCodeMirror(
@@ -4675,11 +4751,11 @@ I hope it works — firstly for me, and hopefully helps others.
 
                 }, function (err) {
                   editor.setOption('readOnly', false);
-                  set(withSplitter.splitterContainer, 'Failed.');
+                  set(withSplitter.splitterMainPanel, 'Failed.');
                   if (!replyEditor) {
                     replyEditor = createReplyCodeMirror(
                       withSplitter.bottomHost,
-                      err.message
+                      err.message || String(err)
                     );
                   } else {
                     replyEditor.setValue(err.message);
@@ -4750,8 +4826,17 @@ I hope it works — firstly for me, and hopefully helps others.
       function injectShellHTML() {
         var virt = document.createElement('div');
         virt.innerHTML = embeddedShellLayoutHTML;
-        var content = virt.getElementsByTagName('div')[0];
-        document.body.appendChild(content);
+
+        var lastAdded;
+        for (var i = virt.childNodes.length - 1; i >= 0; i--) {
+          var nod = virt.childNodes[i] || virt.childNodes.item(i);
+          if (nod.nodeType === 1) {
+            virt.removeChild(nod);
+            if (lastAdded) document.body.insertBefore(nod, lastAdded);
+            else document.body.appendChild(nod);
+            lastAdded = nod;
+          }
+        }
 
         return bindLayout();
       }
@@ -4760,7 +4845,7 @@ I hope it works — firstly for me, and hopefully helps others.
         if (verifyAuthenticStylesPresent()) return;
 
         var style = document.createElement('style');
-        set(style, embeddedShellCSS);
+        set(style, embeddedMinCSS);
         var head = document.head || document.getElementsByTagName('head')[0];
         if (!head) {
           head = document.createElement('head');
@@ -4772,7 +4857,7 @@ I hope it works — firstly for me, and hopefully helps others.
           var allStyles = document.getElementsByTagName('style');
           for (var i = 0; i < allStyles.length; i++) {
             var sty = allStyles[i];
-            if ((sty.innerHTML || '').indexOf(catchREST_hash) >= 0) return true;
+            if ((sty.innerHTML || '').indexOf(embeddedMinCSS_authenticityMarker) >= 0) return true;
           }
         }
       }
@@ -4798,7 +4883,7 @@ I hope it works — firstly for me, and hopefully helps others.
       }
     }
 
-    // local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|mailto:|http:|https:
+    // local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|http:|https:
     function loadVerb(verb) {
 
     }

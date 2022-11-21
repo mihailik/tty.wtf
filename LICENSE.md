@@ -1,4 +1,4 @@
-<sub>MIT License</sub>
+MIT License
 
 ## Copyright (c) 1975 Oleg Mihailik
 

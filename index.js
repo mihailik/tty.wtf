@@ -506,6 +506,11 @@ body {
   font: inherit;
 }
 
+#shell .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
+  text-indent: -3em;
+  padding-left: 3.3em;
+}
+
 #shell .CodeMirror-gutters {
   background: #fbfbfb;
 }

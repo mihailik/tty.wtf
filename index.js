@@ -1803,7 +1803,7 @@ I hope it works — firstly for me, and hopefully helps others.
  *  newStorageFiles?: string[];
  *  read(path: string): any;
  *  continueLoading();
- *  finishParsing(): Drive.Detached.DOMDrive;
+ *  finishParsing(callback?: (drive: Drive.Detached.DOMDrive) => void);
  *  ondomnode?: (node: any, recognizedKind?: 'file' | 'totals', recognizedEntity?: any) => void;
  * }} BootState */
 
@@ -1939,8 +1939,11 @@ I hope it works — firstly for me, and hopefully helps others.
           newStorageFileCache = {};
         }
 
-        /** @returns {Drive} */
-        function finishParsing() {
+        /**
+         * @param {(drive: Drive.Detached.DOMDrive) => void} callback
+         * @returns {void}
+         */
+        function finishParsing(callback) {
           if (domFinished) {
             try {
               // when debugging, break on any error will hit here too
@@ -1952,15 +1955,13 @@ I hope it works — firstly for me, and hopefully helps others.
             }
           }
 
-          /** @type {Drive | undefined} */
-          var resultDrive;
-          completionCallback = function (drive) {
-            resultDrive = drive;
-          };
+          if (typeof callback === 'function') {
+            completionCallback = function (drive) {
+              callback(drive);
+            };
+          }
 
           continueParsingDOM(true /* toCompletion */);
-
-          return /** @type {Drive} */(resultDrive);
         }
 
         // THESE FUNCTIONS ARE NOT EXPOSED FROM BootState
@@ -4827,14 +4828,28 @@ I hope it works — firstly for me, and hopefully helps others.
       function injectShellHTML() {
         var virt = document.createElement('div');
         virt.innerHTML = embeddedShellLayoutHTML;
+        var body = document.body;
+
+        if (!body) {
+          body = document.createElement('body');
+          var docElement = document.documentElement;
+          if (!docElement) {
+            docElement =
+              (document.head ? document.head.parentElement : null) ||
+              document.getElementsByTagName('html')[0] ||
+              (document.getElementsByTagName('head')[0] ? document.getElementsByTagName('head')[0].parentElement : null);
+          }
+
+          docElement.appendChild(body);
+        }
 
         var lastAdded;
         for (var i = virt.childNodes.length - 1; i >= 0; i--) {
           var nod = virt.childNodes[i] || virt.childNodes.item(i);
           if (nod.nodeType === 1) {
             virt.removeChild(nod);
-            if (lastAdded) document.body.insertBefore(nod, lastAdded);
-            else document.body.appendChild(nod);
+            if (lastAdded) body.insertBefore(nod, lastAdded);
+            else body.appendChild(nod);
             lastAdded = nod;
           }
         }
@@ -5018,11 +5033,24 @@ I hope it works — firstly for me, and hopefully helps others.
           /** @type {*} */(catchREST)['continue'] = function () {
             complete();
           };
+          on(window, 'load', complete);
+          setTimeout(function () {
+            if (document.readyState === 'complete')
+              complete();
+          }, 100);
         }
 
-          console.log('drive loaded ', drive);
+        console.log('drive loaded ', drive);
+        var completed = false;
 
         function complete() {
+          if (completed) return;
+          completed = true;
+          if (/** @type {*} */(catchREST)['continue']) {
+            /** @type {*} */(catchREST)['continue'] = function () { };
+          }
+          off(window, 'load', complete);
+
           var allFiles = drive.files();
           var bestFile = findBestFile();
 
@@ -5068,7 +5096,9 @@ I hope it works — firstly for me, and hopefully helps others.
 
           function continueLoading() {
             if (document.readyState === 'complete')
-              return resolve(persist.finishParsing());
+              return persist.finishParsing(function(drive) {
+                resolve(drive);
+              });
 
             if (typeof progressCallback === 'function') {
               if ((persist.domLoadedSize || 0) > (reportedSize || 0) ||

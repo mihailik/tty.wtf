@@ -539,12 +539,16 @@ body {
   cursor: ns-resize;
 }
 
+#shell #contentPageHost #splitterLabel {
+  padding-left: 1em;
+}
+
 #shell #contentPageHost #splitterBorderTop {
   background: linear-gradient(to right, transparent 5.4em, #f3f3f3 6.5em, #e6e6e6);
 }
 
 #shell #contentPageHost #splitterBorderBottom {
-  background: linear-gradient(to right, transparent 0.4em, #dedada 0.5em, #d2d2d2);
+  background: linear-gradient(to right, transparent 1.2em, #dedada 1.5em, #d2d2d2);
 }
 
 #shell #pseudoGutter {
@@ -4545,7 +4549,7 @@ I hope it works — firstly for me, and hopefully helps others.
           splitterOuter.style.cssText =
             'position: absolute; left: 0; top: 0; ' +
             ' width: 100%; ' +
-            'padding-left: 6em; ' +
+            'padding-left: 5em; ' +
             ' height: ' + splitterHeight + ';';
           
           var splitterBorderTop = document.createElement('div');
@@ -4562,7 +4566,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
           splitterContainer.innerHTML =
             '<table style="width: 100%; height: 100%; position: absolute;" cellspacing=0 cellpadding=0> ' +
-            '<tr><td><td></td></table>';
+            '<tr><td id=splitterLabel></td></tr></table>';
           var splitterMainPanel = splitterContainer.getElementsByTagName('td')[0];
 
           var splitterBorderBottom = document.createElement('div');

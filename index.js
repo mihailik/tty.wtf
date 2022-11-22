@@ -4732,9 +4732,25 @@ I hope it works — firstly for me, and hopefully helps others.
             if (parsFirst && parsFirst.url) {
               editor.setOption('readOnly', true);
               if (!withSplitter) withSplitter = requireSplitter();
-              set(withSplitter.splitterMainPanel, 'fetching...');
 
-              var ftc = fetchXHR(parsFirst.url, {
+              var normalizedUrl = parsFirst.url;
+              if (!/^(http|https):/i.test(normalizedUrl))
+                normalizedUrl = 'http://' + normalizedUrl;
+
+              var verbContinuous =
+                parsFirst.verb.charAt(0).toUpperCase() + parsFirst.verb.slice(1).toLowerCase();
+              verbContinuous +=
+                (
+                  // getTing - duplicate last consonant if precedet by vowel
+                  'eyuioa'.indexOf(verbContinuous.charAt(verbContinuous.length - 2)) >= 0 &&
+                  'eyuioa'.indexOf(verbContinuous.charAt(verbContinuous.length - 1)) < 0 ?
+                  verbContinuous.charAt(verbContinuous.length - 1) :
+                  ''
+                ) + 'ing';
+
+              set(withSplitter.splitterMainPanel, verbContinuous + '...');
+
+              var ftc = fetchXHR(normalizedUrl, {
                 method: parsFirst.verb,
                 body: parsFirst.verb === 'GET' || !pars.body ? undefined :
                   pars.body

@@ -4452,6 +4452,206 @@ I hope it works — firstly for me, and hopefully helps others.
     // #endregion PERSISTENCE
 
     /**
+     * @param {{
+     *  parentElement: HTMLElement;
+     *  topChild: HTMLElement;
+     *  splitterHeight: string;
+     *  initialSplitterRatio: number;
+     * }} options
+     */
+    function addHorizontalSplitterForBottom(options) {
+      var parentElement = options.parentElement,
+        topChild = options.topChild,
+        splitterHeight = options.splitterHeight,
+        initialSplitterRatio = options.initialSplitterRatio;
+
+      var splitterRatio = initialSplitterRatio;
+
+      // TODO: apply this with delay for animated entry
+      topChild.style.height = (initialSplitterRatio * 100).toFixed(2) + '%';
+
+      var splitterHeight = '3em';
+
+      var bottomContainer = document.createElement('div');
+      bottomContainer.style.cssText =
+        'position: absolute; left: 0;' +
+        ' top: ' + (initialSplitterRatio * 100).toFixed(2) + '%;' +
+        ' width: 100%;' +
+        ' height: ' + (100 - initialSplitterRatio * 100).toFixed(2) + '%;' +
+        ' padding-top: ' + splitterHeight;
+      var bottomHost = document.createElement('div');
+      bottomHost.style.cssText =
+        'position: relative; width: 100%; height: 100%;';
+      bottomContainer.appendChild(bottomHost);
+      parentElement.appendChild(bottomContainer);
+
+      var splitterOuter = document.createElement('div');
+      splitterOuter.id = 'splitterOuter';
+      splitterOuter.style.cssText =
+        'position: absolute; left: 0; top: 0; ' +
+        ' width: 100%; ' +
+        'padding-left: 5em; ' +
+        ' height: ' + splitterHeight + ';';
+
+      bottomContainer.appendChild(splitterOuter);
+
+      on(splitterOuter, 'mousedown', splitter_mousedown);
+      on(splitterOuter, 'mouseup', splitter_mouseup);
+      on(splitterOuter, 'mousemove', splitter_mousemove);
+      on(splitterOuter, 'touchstart', splitter_touchstart);
+      on(splitterOuter, 'touchmove', splitter_touchmove);
+      on(splitterOuter, 'touchend', splitter_touchend);
+
+      return {
+        bottomHost: bottomHost,
+        splitterOuter: splitterOuter
+      };
+
+      /** @type {{
+       *  centerY: number;
+       *  offCenterY: number;
+       *  splitterRatio: number;
+       *  overlayElem: HTMLElement;
+       *  latestDragY: number;
+       * } | undefined} */
+      var dragStart;
+
+      /**
+       * @param {number} pageY
+       * @param {number} offsetY
+       */
+      function createDragOverlay(pageY, offsetY) {
+        if (dragStart) return;
+        // overlay whole window, nothing works until resizing complete
+        var overlayElem = document.createElement('div');
+        overlayElem.style.cssText =
+          'position: absolute; position: fixed; ' +
+          'left: 0; top: 0; width: 100%; height: 100%; ' +
+          'z-index: 1000; ' +
+          'cursor: ns-resize;';
+        document.body.appendChild(overlayElem);
+        on(overlayElem, 'mouseup', splitter_mouseup);
+        on(overlayElem, 'mousemove', splitter_mousemove);
+        on(overlayElem, 'touchend', splitter_touchend);
+        dragStart = {
+          centerY: pageY - offsetY,
+          offCenterY: offsetY,
+          splitterRatio: splitterRatio,
+          overlayElem: overlayElem,
+          latestDragY: pageY
+        };
+      }
+
+      /**
+       * @param {number} pageY
+       */
+      function dragTo(pageY) {
+        if (!dragStart || pageY === dragStart.latestDragY) return;
+        dragStart.latestDragY = pageY;
+        var wholeSize = parentElement.offsetHeight;
+        var newSplitterRatio = Math.min(0.9, Math.max(0.05,
+          (pageY - dragStart.offCenterY) / wholeSize));
+
+        var newTopHeight = (newSplitterRatio * 100).toFixed(2) + '%';
+        var newBottomTop = (newSplitterRatio * 100).toFixed(2) + '%';
+        var newBottomHeight = (100 - newSplitterRatio * 100).toFixed(2) + '%';
+
+        if (topChild.style.height !== newTopHeight ||
+          bottomContainer.style.top !== newBottomTop ||
+          bottomContainer.style.height !== newBottomHeight) {
+          var logmousemove = {
+            topHeight: topChild.style.height + ' --> ' + newTopHeight,
+            requestEditorHost: topChild,
+            bottomTop: bottomContainer.style.top + '-->' + newBottomTop,
+            bottomHeight: bottomContainer.style.height + '-->' + newBottomHeight,
+            bottomContainer: bottomContainer
+          };
+
+          if (topChild.style.height !== newTopHeight) {
+            topChild.style.height = newTopHeight;
+            logmousemove.topHeight += ' (' + topChild.style.height + ')';
+          }
+          if (bottomContainer.style.top !== newBottomTop) {
+            bottomContainer.style.top = newBottomTop;
+            logmousemove.bottomTop += ' (' + bottomContainer.style.top + ')';
+          }
+          if (bottomContainer.style.height !== newBottomHeight) {
+            bottomContainer.style.height = newBottomHeight;
+            logmousemove.bottomHeight += ' (' + bottomContainer.style.height + ')';
+          }
+
+          console.log('mousemove ', logmousemove);
+        }
+
+      }
+
+      function dropOverlay() {
+        if (dragStart)
+          document.body.removeChild(dragStart.overlayElem);
+        dragStart = void 0;
+      }
+
+      /** @param {MouseEvent} e */
+      function splitter_mousedown(e) {
+        if (!e) e = /** @type {MouseEvent} e */(window.event);
+        if (e.preventDefault) e.preventDefault();
+        createDragOverlay(e.pageY, e.offsetY);
+        console.log('mousedown ', dragStart);
+      }
+
+      /** @param {MouseEvent} e */
+      function splitter_mouseup(e) {
+        if (!e) e = /** @type {MouseEvent} e */(window.event);
+        if (e.preventDefault) e.preventDefault();
+        console.log('mouseup ', dragStart);
+        dropOverlay();
+      }
+
+      /** @param {MouseEvent} e */
+      function splitter_mousemove(e) {
+        if (!e) e = /** @type {MouseEvent} e */(window.event);
+        if (e.preventDefault) e.preventDefault();
+        if (!dragStart) return;
+
+        dragTo(e.pageY);
+      }
+
+      /** @param {TouchEvent} e */
+      function splitter_touchstart(e) {
+        if (!e) e = /** @type {TouchEvent} e */(window.event);
+        if (e.preventDefault) e.preventDefault();
+        var touches = e.changedTouches || e.touches;
+        var tch = touches && touches[0];
+        if (tch && tch.pageY > 0) {
+          createDragOverlay(tch.pageY, tch.pageY - topChild.offsetHeight);
+        }
+      }
+
+      /** @param {TouchEvent} e */
+      function splitter_touchend(e) {
+        if (!e) e = /** @type {TouchEvent} e */(window.event);
+        if (e.preventDefault) e.preventDefault();
+        dropOverlay();
+      }
+
+      /** @param {TouchEvent} e */
+      function splitter_touchmove(e) {
+        if (!dragStart) return;
+        if (!e) e = /** @type {TouchEvent} e */(window.event);
+        if (e.preventDefault) e.preventDefault();
+        var touches = e.touches || e.changedTouches;
+        var tch = touches && touches[0];
+        for (var i = 0; touches && i < touches.length; i++) {
+          if (Math.abs(touches[i].pageY - dragStart.latestDragY) < Math.abs(tch.pageY - dragStart.latestDragY))
+            tch = touches[i];
+        }
+
+        if (tch && tch.pageY > 0)
+          dragTo(tch.pageY);
+      }
+    }
+
+    /**
      * @param {string} text
      * @param {string} verb
      */
@@ -4520,7 +4720,9 @@ I hope it works — firstly for me, and hopefully helps others.
             function () {
               editor.setOption('mode', isPlainTextVerb(verb) ? 'markdown' : 'javascript');
               editor.setValue(text);
-              editor.on('changes', debounce(updateVerbAutoDetect, 200, 900));
+              editor.on('changes', debounce(function () {
+                updateVerbAutoDetect();
+              }, 200, 900));
               updateVerbAutoDetect();
             });
         } else {
@@ -4576,6 +4778,9 @@ I hope it works — firstly for me, and hopefully helps others.
           }
         }
 
+        /**
+         * @param {boolean=} shouldPersist
+         */
         function updateVerbAutoDetect(shouldPersist) {
           var value = editor.getValue();
           var pars = parseTextRequest(value);
@@ -4863,6 +5068,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
               set(withSplitter.splitterMainPanel, verbContinuous + '...');
 
+              var startTime = getTimeNow();
               var ftc = fetchXHR(normalizedUrl, {
                 method: parsFirst.verb,
                 withCredentials: true,
@@ -4871,10 +5077,11 @@ I hope it works — firstly for me, and hopefully helps others.
               });
               ftc.then(
                 function (response) {
+                  var replyTime = getTimeNow() - startTime;
                   var headers = response.headers;
                   var text = response.body;
                   editor.setOption('readOnly', false);
-                  set(withSplitter.splitterMainPanel, 'Done.');
+                  set(withSplitter.splitterMainPanel, 'Done: ' + (replyTime / 1000) + 's.');
 
                   if (!replyEditor) {
                     replyEditor = createReplyCodeMirror(
@@ -4886,8 +5093,10 @@ I hope it works — firstly for me, and hopefully helps others.
                   }
 
                 }, function (err) {
+                  var replyTime = getTimeNow() - startTime;
+
                   editor.setOption('readOnly', false);
-                  set(withSplitter.splitterMainPanel, 'Failed.');
+                  set(withSplitter.splitterMainPanel, 'Failed: ' + (replyTime / 1000) + 's.');
                   if (!replyEditor) {
                     replyEditor = createReplyCodeMirror(
                       withSplitter.bottomHost,

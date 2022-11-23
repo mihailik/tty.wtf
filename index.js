@@ -339,9 +339,9 @@ function catchREST() {
       verbPos = -1;
     }
 
-    if (verb === 'edit' || verb === 'view') {
+    if (isPlainTextVerb(verb)) {
       addr = '';
-      var body = decodeURIComponent(encodedStr);
+      var body = parseEncodedURL.decodeBody(encodedStr);
     } else {
 
       var addr;
@@ -356,7 +356,7 @@ function catchREST() {
         encodedStr = '';
       }
 
-      var body = decodeURIComponent(encodedStr.replace(/^(\/+)/, function (str) { return str.replace(/\//g, '\n'); }));
+      var body = parseEncodedURL.decodeBody(encodedStr);
     }
 
     var result = {
@@ -366,6 +366,80 @@ function catchREST() {
       body: body
     };
 
+    return result;
+  }
+  parseEncodedURL.decodeBody = (function () {
+
+    /**
+     * @param {string} bodyRaw
+     * @returns {string}
+     */
+    function decodeBody(bodyRaw) {
+      var body = bodyRaw.replace(
+        /([^\/\+]*)((\/)|(\+))?/gi,
+        function (whole, plain, remain, slash, plus) {
+          return decodeURIComponent(plain || '') + (
+            slash ? '\n' :
+              plus ? ' ' :
+                (remain || '')
+          );
+        }
+      );
+
+      return body;
+    }
+
+    return decodeBody;
+  })();
+
+  /**
+   * @param {string} verb
+   */
+  function isPlainTextVerb(verb) {
+    return verb === 'edit' || verb === 'view';
+  }
+
+  /**
+   * @param {string} verb
+   * * @param {string} url
+   * @param {string} body
+   */
+  function makeEncodedURL(verb, url, body) {
+    if (!verb) {
+      if (url) verb = 'GET';
+      else verb = 'edit';
+    }
+
+    var normalizedUrl = !url ? '' :
+      encodeURI(url)
+        .replace(
+          /(^http:)|(^https:)|(\/\/)|(#)|(\?)/gi,
+          function (whole, httpPrefix, httpSecurePrefix, slash, hash, question) {
+            return (
+              slash ? '/%2F' :
+                hash ? '%23' :
+                  question ? '%3F' :
+                    whole
+            );
+          });
+
+    var normalizedBody = body
+      .replace(
+        /([^\n\/ \+\#\?]*)((\n)|(\/)|(\+)|( )|(#)|(\?))/gi,
+        function (whole, plain, remain, newLine, slash, plus, space, hash, question) {
+          return encodeURI(plain || '') + (
+            newLine ? '/' :
+              slash ? '%2F' :
+                plus ? '%2B' :
+                  space ? '+' :
+                    hash ? '%23' :
+                      question ? '%3F' :
+                        (remain || '')
+          );
+        }
+      );
+
+    var result = verb + (normalizedUrl ? '/' + normalizedUrl : '') + (normalizedBody ? '//' + normalizedBody : '');
     return result;
   }
 
@@ -559,14 +633,14 @@ body {
 #shell #pseudoGutter {
   border-right: solid 1px #e4e4e4;
   background: #fbfbfb;
-  color: #ddd;
+  color: #999;
 
   position: absolute;
   left: 0; top: 0;
-  height: 100%; width: 2.3em;
+  height: 100%; width: 6.3em;
   text-align: right;
   padding-top: 0.25em;
-  padding-right: 0.2em;
+  padding-right: 0.8em;
 }
 
 #shell #pseudoEditor {
@@ -574,7 +648,7 @@ body {
   width: 100%; height: 100%;
   border: none;
   padding: 0.25em;
-  padding-left: 0.6em;
+  padding-left: 4.6em;
   margin-left: 2em;
   outline: none;
 }
@@ -1750,7 +1824,7 @@ I hope it works — firstly for me, and hopefully helps others.
                 body: typeof xhr.response === 'string' || xhr.response ? xhr.response : xhr.responseText
               });
             } else {
-              reject(xhr.status + ' ' + xhr.statusText);
+              reject('HTTP/' + xhr.status + ' ' + xhr.statusText);
               // xhr.abort();
             }
           }
@@ -4368,10 +4442,11 @@ I hope it works — firstly for me, and hopefully helps others.
         layout = injectShellHTML();
       }
 
-      layout.pseudoEditor.value =
+      var useText =
         mode === 'splash' ? embeddedSplashText : text;
+      layout.pseudoEditor.value = useText;
       layout.pseudoGutter.innerHTML =
-        Array(text.split('\n').length + 1)
+        Array(useText.split('\n').length + 1)
         .join(',').split(',')
         .map(function(_,index) {return index+1; }).join('<br>');
       console.log('Loading..');
@@ -4382,11 +4457,6 @@ I hope it works — firstly for me, and hopefully helps others.
         loadingTakesTime: loadingTakesTime,
         loadingComplete: loadingComplete
       };
-
-      function triggerVSCodeTypings() {
-        var cm = require('codemirror');
-        return cm;
-      }
 
       function loadingTakesTime() {
         layout.pseudoEditor.value = (layout.pseudoEditor.value || '').replace(/^Loading\.\./, 'Loading...');
@@ -4505,7 +4575,7 @@ I hope it works — firstly for me, and hopefully helps others.
             CodeMirror(
               host, options);
 
-          var leftClickKeyMap = { LeftClick: onFirstClick };
+          var leftClickKeyMap = { LeftClick: onFirstClick, LeftDoubleClick: onFirstClick };
           editor.addKeyMap(leftClickKeyMap);
 
           return editor;
@@ -4785,7 +4855,7 @@ I hope it works — firstly for me, and hopefully helps others.
                       err.message || String(err)
                     );
                   } else {
-                    replyEditor.setValue(err.message);
+                    replyEditor.setValue(String(err.message || err));
                   }
                 }
               )
@@ -4935,7 +5005,7 @@ I hope it works — firstly for me, and hopefully helps others.
     }
 
     function bootUrlEncoded() {
-      var initialTmod = getTextModeFromUrlEncoded();
+      var initialTmod = getTextAndModeFromUrlEncoded();
       var text = initialTmod.text;
       var mode = initialTmod.mode;
 
@@ -4950,20 +5020,22 @@ I hope it works — firstly for me, and hopefully helps others.
         };
       }
 
-      function getTextModeFromUrlEncoded() {
+      function getTextAndModeFromUrlEncoded() {
         var enc = detectCurrentUrlEncoded(location);
         if (!enc) {
-          var text = 'GET https://api.github.com/repos/microsoft/typescript/languages';
+          var text = 'post httpbin.org/post\n' + embeddedSplashText;
           var mode = 'splash';
         } else {
           var skipVerb = enc.encodedUrl.verbPos < 0 && /^http/i.test(enc.encodedUrl.addr || '');
-          if (enc.encodedUrl.verb === 'edit' || enc.encodedUrl.verb === 'view')
+          if (isPlainTextVerb(enc.encodedUrl.verb))
             skipVerb = true;
 
-          var text =
+          var firstLine =
             skipVerb && !enc.encodedUrl.addr ? enc.encodedUrl.body :
-              (skipVerb ? '' : enc.encodedUrl.verb) + (enc.encodedUrl.addr ? (skipVerb ? '' : ' ') + enc.encodedUrl.addr : '') +
-              (enc.encodedUrl.body ? '\n' + enc.encodedUrl.body : '');
+              (skipVerb ? '' : enc.encodedUrl.verb) + (enc.encodedUrl.addr ? (skipVerb ? '' : ' ') + enc.encodedUrl.addr : '');
+          var text =
+            firstLine +
+              (enc.encodedUrl.body ? (firstLine ? '\n' : '') + enc.encodedUrl.body : '');
           var mode = 'javascript';
         }
 
@@ -5001,7 +5073,16 @@ I hope it works — firstly for me, and hopefully helps others.
         var parsed = parseTextRequest(text);
 
         var enc = detectCurrentUrlEncoded(location);
-        var source = enc && enc.source;
+        var source =
+          enc ? enc.source :
+            /http/.test(location.protocol || '') ?
+              // When comes via HTTP, avoid pathname if "index.html" is present,
+              // because it could be static file hosted without 404 or router enabled.
+              // Normally web server will be addressed by name, at which point we can rely on those niceties.
+              (/\bindex.html\b/i.test(location.pathname || '') ? 'search' : 'pathname') :
+              /file/.test(location.protocol || '') ? 'search' :
+                void 0;
+
         if (typeof history.replaceState !== 'function')
           source = 'hash';
         var slashSeparated = [];
@@ -5015,12 +5096,12 @@ I hope it works — firstly for me, and hopefully helps others.
 
         var firstLine = parsed && parseFirstLine(parsed.firstLine);
         if (!parsed || !firstLine) {
-          slashSeparated.push('edit');
-          slashSeparated.push(encodeURIComponent(text));
+          slashSeparated.push(
+            makeEncodedURL('', '', text)
+          );
         } else {
-          if (firstLine.verbPos >= 0) slashSeparated.push(firstLine.verb);
-          slashSeparated.push(firstLine.url);
-          if (parsed.body) slashSeparated.push('/' + parsed.body.replace(/^(\n+)/, function (str) { return str.replace(/\n/g, '/'); }));
+          if (firstLine.verbPos >= 0) slashSeparated.push(makeEncodedURL(firstLine.verb, firstLine.url, parsed.body));
+          else slashSeparated.push(makeEncodedURL('', firstLine.url, parsed.body))
         }
 
         switch (source) {

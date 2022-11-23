@@ -1814,26 +1814,48 @@ I hope it works — firstly for me, and hopefully helps others.
       }
 
       return new Promise(function (resolve, reject) {
-        xhr.open(opts.method, url);
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
-              console.log(xhr);
-              resolve({
-                headers: {},
-                body: typeof xhr.response === 'string' || xhr.response ? xhr.response : xhr.responseText
-              });
-            } else {
-              reject('HTTP/' + xhr.status + ' ' + xhr.statusText);
-              // xhr.abort();
-            }
-          }
+        var capturedError;
+        var handleResultTimeout;
+        xhr.onerror = function (err) {
+          capturedError = err;
+          clearTimeout(handleResultTimeout);
+          setTimeout(handleResult, 1);
         };
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState !== 4) return;
+
+          clearTimeout(handleResultTimeout);
+          setTimeout(handleResult, 1);
+        };
+
+        xhr.open(opts.method, url);
 
         if (opts.body) {
           xhr.send(opts.body);
         } else {
           xhr.send();
+        }
+
+        function handleResult() {
+          if (xhr.status === 200) {
+            console.log(xhr);
+            resolve({
+              headers: {},
+              body: typeof xhr.response === 'string' || xhr.response ? xhr.response : xhr.responseText
+            });
+          } else {
+            if (capturedError) {
+              console.log('XHR error ', capturedError, xhr);
+              reject(
+                (capturedError ? String(capturedError) + ' ' : '') +
+                'HTTP/' + xhr.status + ' ' + xhr.statusText);
+            }
+            else {
+              console.log('XHR error, object: ', xhr);
+              reject('HTTP/' + xhr.status + ' ' + xhr.statusText);
+            }
+            // xhr.abort();
+          }
         }
       });
     }
@@ -4431,9 +4453,9 @@ I hope it works — firstly for me, and hopefully helps others.
 
     /**
      * @param {string} text
-     * @param {string} mode
+     * @param {string} verb
      */
-    function createShell(text, mode) {
+    function createShell(text, verb) {
 
       injectShellStyles();
       var layout = bindLayout();
@@ -4443,7 +4465,7 @@ I hope it works — firstly for me, and hopefully helps others.
       }
 
       var useText =
-        mode === 'splash' ? embeddedSplashText : text;
+        verb === 'splash' ? embeddedSplashText : text;
       layout.pseudoEditor.value = useText;
       layout.pseudoGutter.innerHTML =
         Array(useText.split('\n').length + 1)
@@ -4471,11 +4493,11 @@ I hope it works — firstly for me, and hopefully helps others.
        */
       function loadingComplete(persist, textOverride, modeOverride) {
         if (typeof textOverride !== 'undefined') text = textOverride;
-        if (typeof modeOverride !== 'undefined') mode = modeOverride;
+        if (typeof modeOverride !== 'undefined') verb = modeOverride;
         layout.leftBottom.textContent = drinkChar + ' OK';
 
         layout.requestEditorHost.innerHTML = '';
-        if (mode === 'splash') {
+        if (verb === 'splash') {
           var editor = createCodeMirrorWithFirstClickChange(
             layout.requestEditorHost,
             {
@@ -4496,10 +4518,10 @@ I hope it works — firstly for me, and hopefully helps others.
               autofocus: true
             },
             function () {
-              editor.setOption('mode', mode);
+              editor.setOption('mode', isPlainTextVerb(verb) ? 'markdown' : 'javascript');
               editor.setValue(text);
-              editor.on('changes', debounce(updateVerbButton, 200, 900));
-              updateVerbButton();
+              editor.on('changes', debounce(updateVerbAutoDetect, 200, 900));
+              updateVerbAutoDetect();
             });
         } else {
           var editor =
@@ -4508,7 +4530,7 @@ I hope it works — firstly for me, and hopefully helps others.
               layout.requestEditorHost,
               {
                 value: text,
-                mode: mode,
+                mode: verb,
                 inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
                 lineNumbers: true,
                 extraKeys: {
@@ -4524,9 +4546,9 @@ I hope it works — firstly for me, and hopefully helps others.
             );
 
           editor.on('changes', debounce(function () {
-            updateVerbButton(true);
+            updateVerbAutoDetect(true);
           }, 200, 900));
-          updateVerbButton();
+          updateVerb(verb);
         }
 
         /** @type {ReturnType<typeof requireSplitter>} */
@@ -4534,7 +4556,27 @@ I hope it works — firstly for me, and hopefully helps others.
         /** @type {import('codemirror').Editor} */
         var replyEditor;
 
-        function updateVerbButton(shouldPersist) {
+        /** @param {string} newVerb */
+        function updateVerb(newVerb) {
+          verb = newVerb;
+
+          if (verb) {
+            var goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByTagName('button')[0]);
+            if (!goButton) {
+              layout.leftTop.innerHTML = '<button class=goButton></button>';
+              goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByTagName('button')[0]);
+            }
+            set(goButton, verb.toUpperCase());
+
+            goButton.onclick = function () {
+              accept();
+            };
+          } else {
+            layout.leftTop.innerHTML = '';
+          }
+        }
+
+        function updateVerbAutoDetect(shouldPersist) {
           var value = editor.getValue();
           var pars = parseTextRequest(value);
           if (pars && pars.firstLine) {
@@ -4544,15 +4586,10 @@ I hope it works — firstly for me, and hopefully helps others.
           if (parsFirst) console.log('edited ', pars, ' url ', parsFirst);
           else if (pars) console.log('edited ', pars);
 
-          if (parsFirst && parsFirst.verb) {
-            layout.leftTop.innerHTML = '<button class=goButton>' + parsFirst.verb.toUpperCase() + '</button>';
+          var detectedVerb = parsFirst && parsFirst.verb || 'edit';
 
-            var goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByTagName('button')[0]);
-            goButton.onclick = function () {
-              accept();
-            };
-          } else {
-            layout.leftTop.innerHTML = '';
+          if (detectedVerb !== verb) {
+            updateVerb(detectedVerb);
           }
 
           if (parsFirst && parsFirst.verbPos > 0) {
@@ -4809,8 +4846,9 @@ I hope it works — firstly for me, and hopefully helps others.
               if (!withSplitter) withSplitter = requireSplitter();
 
               var normalizedUrl = parsFirst.url;
-              if (!/^(http|https):/i.test(normalizedUrl))
-                normalizedUrl = 'http://' + normalizedUrl;
+              if (!/^(\/|\.|http|https):/i.test(normalizedUrl)) {
+                normalizedUrl = (location.protocol === 'http' ? 'http://' : 'http://') + normalizedUrl;
+              }
 
               var verbContinuous =
                 parsFirst.verb.charAt(0).toUpperCase() + parsFirst.verb.slice(1).toLowerCase();
@@ -4827,6 +4865,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
               var ftc = fetchXHR(normalizedUrl, {
                 method: parsFirst.verb,
+                withCredentials: true,
                 body: parsFirst.verb === 'GET' || !pars.body ? undefined :
                   pars.body
               });
@@ -5005,13 +5044,13 @@ I hope it works — firstly for me, and hopefully helps others.
     }
 
     function bootUrlEncoded() {
-      var initialTmod = getTextAndModeFromUrlEncoded();
+      var initialTmod = getTextAndVerbFromUrlEncoded();
       var text = initialTmod.text;
-      var mode = initialTmod.mode;
+      var verb = initialTmod.verb;
 
       sanitizeDOM();
 
-      var shellLoader = createShell(text, mode);
+      var shellLoader = createShell(text, verb);
       if (minimalDependenciesPresent()) {
         complete();
       } else {
@@ -5020,11 +5059,11 @@ I hope it works — firstly for me, and hopefully helps others.
         };
       }
 
-      function getTextAndModeFromUrlEncoded() {
+      function getTextAndVerbFromUrlEncoded() {
         var enc = detectCurrentUrlEncoded(location);
         if (!enc) {
           var text = 'post httpbin.org/post\n' + embeddedSplashText;
-          var mode = 'splash';
+          var verb = 'splash';
         } else {
           var skipVerb = enc.encodedUrl.verbPos < 0 && /^http/i.test(enc.encodedUrl.addr || '');
           if (isPlainTextVerb(enc.encodedUrl.verb))
@@ -5036,10 +5075,10 @@ I hope it works — firstly for me, and hopefully helps others.
           var text =
             firstLine +
               (enc.encodedUrl.body ? (firstLine ? '\n' : '') + enc.encodedUrl.body : '');
-          var mode = 'javascript';
+          var verb = enc.encodedUrl.verb;
         }
 
-        return { text: text, mode: mode };
+        return { text: text, verb: verb };
       }
 
       /** @param {typeof window.location} location */

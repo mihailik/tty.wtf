@@ -2260,7 +2260,12 @@ I hope it works — firstly for me, and hopefully helps others.
                   f.write(entry.content, entry.encoding);
                   byPath[path] = f;
                   newDOMFileCache[path] = true;
-                  document.body.insertBefore(f.node, anchor);
+
+                  if (f.node.parentElement) {
+                    f.node.parentElement.insertBefore(f.node, anchor);
+                  } else {
+                    document.body.appendChild(f.node);
+                  }
                 }
               }
             }

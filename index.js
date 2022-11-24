@@ -2172,7 +2172,7 @@ I hope it works — firstly for me, and hopefully helps others.
           while (true) {
 
             // keep very last node unprocessed until whole document loaded
-            // -- that means each iteration we find the next node, but process this._lastNode
+            // -- that means each iteration we find the next node, but process lastNode
             var nextNode = getNextNode();
 
             if (!nextNode && !toCompletion) {
@@ -2180,7 +2180,7 @@ I hope it works — firstly for me, and hopefully helps others.
               // no more nodes found, but more expected: no processing at this point
               // -- but try to estimate what part of the last known node is loaded (for better progress precision)
               if (lastNode && lastNode.nodeType === 8) {
-                var cmheader = new CommentHeader(this._lastNode);
+                var cmheader = new CommentHeader(/** @type {Comment} */(lastNode));
                 var speculativeFile = DOMFile.tryParse(cmheader);
                 if (speculativeFile) {
                   anticipationSize = speculativeFile.contentLength;
@@ -2289,18 +2289,14 @@ I hope it works — firstly for me, and hopefully helps others.
 
         function getNextNode() {
           if (!lastNode) {
-            var head = document.head || /** @type {HTMLElement} */(document.getElementsByTagName('head')[0]);
-            if (head) {
-              var next = head.firstChild;
-              if (next) return next;
-            }
-            var body = document.body;
-            if (body)
-              return body.firstChild;
-            return null;
+            return getFirstElement();
           }
 
           var nextNode = lastNode.nextSibling;
+          if (nextNode && (/** @type {HTMLElement} */(nextNode).tagName || '').toUpperCase() === 'HTML') {
+            nextNode = getFirstElement(/* skipPreHTML */true);
+          }
+
           if (!nextNode) {
             var body = document.body || null;
             var lastNodeParent = lastNode.parentNode || lastNode.parentElement || null;
@@ -2308,6 +2304,30 @@ I hope it works — firstly for me, and hopefully helps others.
               nextNode = body.firstChild;
           }
           return nextNode;
+        }
+
+        function getFirstElement(skipPreHTML) {
+          if (!skipPreHTML) {
+            var doc = document.documentElement || document.getElementsByTagName('html')[0];
+            if (doc && doc.previousSibling) {
+              var climbFirstPreHTML = doc.previousSibling;
+              while (climbFirstPreHTML.previousSibling) {
+                climbFirstPreHTML = climbFirstPreHTML.previousSibling;
+              }
+
+              return climbFirstPreHTML;
+            }
+          }
+
+          var head = document.head || /** @type {HTMLElement} */(document.getElementsByTagName('head')[0]);
+          if (head) {
+            var next = head.firstChild;
+            if (next) return next;
+          }
+          var body = document.body;
+          if (body)
+            return body.firstChild;
+          return null;
         }
 
         function loadNextOptionalDrive() {
@@ -2857,13 +2877,13 @@ I hope it works — firstly for me, and hopefully helps others.
         return domDrive;
 
         function files() {
-          if (typeof Object.keys === 'string') {
-            var result = Object.keys(this._byPath);
+          if (typeof Object.keys === 'function') {
+            var result = Object.keys(byPath);
           }
           else {
             /** @type {string[]} */
             var result = [];
-            for (var k in this._byPath) if (this._byPath.hasOwnProperty(k)) {
+            for (var k in byPath) if (byPath.hasOwnProperty(k)) {
               result.push(k);
             }
           }
@@ -2934,7 +2954,7 @@ I hope it works — firstly for me, and hopefully helps others.
         }
 
         function loadProgress() {
-          return { total: this._totals ? this._totals.totalSize : this._totalSize, loaded: this._totalSize };
+          return { total: totals ? totals.totalSize : totalSize, loaded: totalSize };
         }
 
         /** @param {DOMFile | DOMTotals} entry */
@@ -3393,11 +3413,11 @@ I hope it works — firstly for me, and hopefully helps others.
               function keys() {
                 /** @type {string[]} */
                 var result = [];
-                var len = this._localStorage.length;
+                var len = localStorage.length;
                 for (var i = 0; i < len; i++) {
-                  var str = this._localStorage.key(i);
-                  if (str.length > this._prefix.length && str.slice(0, this._prefix.length) === this._prefix)
-                    result.push(str.slice(this._prefix.length));
+                  var str = localStorage.key(i);
+                  if (str && str.length > prefix.length && str.slice(0, prefix.length) === prefix)
+                    result.push(str.slice(prefix.length));
                 }
                 return result;
               }
@@ -3454,8 +3474,8 @@ I hope it works — firstly for me, and hopefully helps others.
                 for (var i = 0; i < keys.length; i++) {
                   var k = keys[i];
                   if (k.charCodeAt(0) === 47 /* slash */) {
-                    var value = this._access.get(k);
-                    if (value.charCodeAt(0) === 91 /* open square bracket [ */) {
+                    var value = access.get(k);
+                    if (value && value.charCodeAt(0) === 91 /* open square bracket [ */) {
                       var cl = value.indexOf(']');
                       if (cl > 0 && cl < 10) {
                         var encoding = value.slice(1, cl);
@@ -3606,20 +3626,50 @@ I hope it works — firstly for me, and hopefully helps others.
                     callback('Loading from metadata table failed, generating multiple failures ' + sqlError.message);
                   }
 
-                  this._createMetadataTable(
-                    function (sqlError_creation) {
-                      if (finished) return;
-                      else finished = true;
+                  tryAgain();
 
-                      if (sqlError)
-                        callback(
-                          'Loading from metadata table failed: ' + sqlError.message + ' and creation metadata table failed: ' + sqlError_creation.message);
-                      else
-                        // original metadata access failed, but create table succeeded
-                        callback(void 0, createWebSQLDetached(db, 0, false));
-                    });
+                  function tryAgain() {
+                    db.transaction(
+                      function (transaction) {
+                        createMetadataTable(
+                          transaction,
+                          function (sqlError_creation) {
+                            if (finished) return;
+                            else finished = true;
+
+                            if (sqlError_creation) {
+                              repeatingFailures_unexpected++;
+                              if (repeatingFailures_unexpected > 5) {
+                                callback('Loading from metadata table failed: ' + sqlError.message + ' and creation metadata table failed: ' + sqlError_creation.message);
+                                return;
+                              }
+                            }
+
+                            // original metadata access failed, but create table succeeded
+                            callback(void 0, createWebSQLDetached(db, 0, false));
+                          })
+                      }
+                    )
+                  }
                 });
 
+            }
+
+            /**
+             * 
+             * @param {SQLTransaction} transaction
+             * @param {(error?: SQLError) => void} callback 
+             */
+            function createMetadataTable(transaction, callback) {
+              transaction.executeSql(
+                'CREATE TABLE "*metadata" (name PRIMARY KEY, value)',
+                [],
+                function (transaction, result) {
+                  return callback();
+                },
+                function (transaction, sqlError) {
+                  return callback(sqlError);
+                });
             }
 
             /**
@@ -3873,7 +3923,7 @@ I hope it works — firstly for me, and hopefully helps others.
                     transaction.executeSql(
                       updateSQL,
                       ['content', content, encoding],
-                      this._closures.updateMetadata,
+                      updateMetadata,
                       function (transaction, sqlError) {
                         reportSQLError('Failed to update table "' + tableName + '" for file "' + file + '" after creation.', sqlError);
                       });
@@ -3949,23 +3999,6 @@ I hope it works — firstly for me, and hopefully helps others.
                       function (tr, sqlerr) {
                         reportSQLError('Failed to update metadata table after creation.', sqlerr);
                       });
-                  });
-              }
-
-              /**
-               * 
-               * @param {SQLTransaction} transaction
-               * @param {(error?: SQLError) => void} callback 
-               */
-              function createMetadataTable(transaction, callback) {
-                transaction.executeSql(
-                  'CREATE TABLE "*metadata" (name PRIMARY KEY, value)',
-                  [],
-                  function (transaction, result) {
-                    return callback();
-                  },
-                  function (transaction, sqlError) {
-                    return callback(sqlError);
                   });
               }
 
@@ -5254,9 +5287,10 @@ I hope it works — firstly for me, and hopefully helps others.
 
     /**
      * @param {string} uniquenessSource
-     * @param {string} baseUrl
      */
-    function bootBacked(uniquenessSource, baseUrl) {
+    function bootBacked(uniquenessSource) {
+      var baseUrl = location && /localhost|(127\.)/i.test(location.hostname) ? './' : 'https://catch.rest/';
+      var thisScriptUrl = getThisScriptAddress() || '//catch.rest/index.js';
 
       var shellLoader = createShell('Loading...', 'text');
 
@@ -5281,7 +5315,13 @@ I hope it works — firstly for me, and hopefully helps others.
           if (minimalDependenciesPresent())
             return complete();
 
-          // try to load from baseUrl first!
+          var libScript = document.createElement('script');
+          libScript.src = thisScriptUrl.replace(/\/[^\/]+$/, '/lib.js');
+          libScript.onload = function () {
+            if (minimalDependenciesPresent())
+              return complete();
+          };
+          document.body.appendChild(libScript);
         }
 
         function complete() {
@@ -5306,7 +5346,7 @@ I hope it works — firstly for me, and hopefully helps others.
             function (updatedText) {
               drive.write(bestFile, updatedText);
             },
-            drive.read(bestFile),
+            drive.read(bestFile) || bestFile || 'file not found amongst: ' + drive.files().join(',') + '.',
             detectMode
           );
 
@@ -5321,6 +5361,23 @@ I hope it works — firstly for me, and hopefully helps others.
           }
         }
       });
+
+      function getThisScriptAddress() {
+        for (var i = document.scripts.length - 1; i >= 0; i--) {
+          var scr = document.scripts[i];
+          if (scr.src && /\/index.js$/i.test(scr.src)) {
+            return scr.src;
+          }
+        }
+
+        var scriptElements = document.getElementsByTagName('script');
+        for (var i = scriptElements.length - 1; i >= 0; i--) {
+          var scr = scriptElements[i];
+          if (scr.src && /\/index.js$/i.test(scr.src)) {
+            return scr.src;
+          }
+        }
+      }
 
       /**
        * @param {((progress: { loadedSize: number, anticipatedTotalSize: number | undefined, fileCount: number }) => void)=} progressCallback
@@ -5382,8 +5439,7 @@ I hope it works — firstly for me, and hopefully helps others.
       if (typeof catchREST_urlencoded !== 'undefined' && catchREST_urlencoded) {
         bootUrlEncoded();
       } else {
-        var baseUrl = location && /localhost|(127\.)/i.test(location.hostname) ? './' : 'https://catch.rest/'
-        bootBacked(location.pathname, baseUrl);
+        bootBacked(location.pathname);
       }
     }
 

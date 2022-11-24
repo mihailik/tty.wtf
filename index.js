@@ -667,6 +667,10 @@ body {
   height: 4em;
   margin-top: 3em;
   margin-left: 0.6em;
+  border: solid 1px #bbb;
+  background: silver;
+  box-shadow: inset 1px 1px 3px white, inset -2px -2px 3px #6a6666, 3px 3px 8px #cac8c8;
+  cursor: pointer;
 }
 
   */});
@@ -4467,8 +4471,10 @@ I hope it works — firstly for me, and hopefully helps others.
 
       var splitterRatio = initialSplitterRatio;
 
-      // TODO: apply this with delay for animated entry
-      topChild.style.height = (initialSplitterRatio * 100).toFixed(2) + '%';
+      var animateInMsec = 300;
+      setTimeout(function () {
+        topChild.style.height = (initialSplitterRatio * 100).toFixed(2) + '%';
+      }, animateInMsec);
 
       var splitterHeight = '3em';
 
@@ -4478,7 +4484,12 @@ I hope it works — firstly for me, and hopefully helps others.
         ' top: ' + (initialSplitterRatio * 100).toFixed(2) + '%;' +
         ' width: 100%;' +
         ' height: ' + (100 - initialSplitterRatio * 100).toFixed(2) + '%;' +
-        ' padding-top: ' + splitterHeight;
+        ' padding-top: ' + splitterHeight + ';' +
+        ' transition: transform ' + animateInMsec + 'ms;' +
+        ' transform: translateY(' + options.parentElement.offsetHeight + 'px)';
+      setTimeout(function () {
+        bottomContainer.style.transform = '';
+      }, 1);
       var bottomHost = document.createElement('div');
       bottomHost.style.cssText =
         'position: relative; width: 100%; height: 100%;';
@@ -4770,9 +4781,16 @@ I hope it works — firstly for me, and hopefully helps others.
             }
             set(goButton, verb.toUpperCase());
 
-            goButton.onclick = function () {
-              accept();
+            var clickTimeout;
+            goButton.onclick = function (e) {
+              if (!e) e = /** @type {MouseEvent} */(window.event);
+              if (e.preventDefault) e.preventDefault();
+              clearTimeout(clickTimeout);
+              clickTimeout = setTimeout(() => {
+                accept();
+              }, 100);
             };
+
           } else {
             layout.leftTop.innerHTML = '';
           }
@@ -4841,33 +4859,15 @@ I hope it works — firstly for me, and hopefully helps others.
           var addPaddingUnderText = 30;
           var initialSplitterRatio = wholeTextHeight + addPaddingUnderText < wholeHeight / 2 ? (wholeTextHeight + addPaddingUnderText) / wholeHeight : 0.5;
 
-          var splitterRatio = initialSplitterRatio;
+          var splitterLayout = addHorizontalSplitterForBottom({
+            parentElement: layout.contentPageHost,
+            topChild: layout.requestEditorHost,
+            initialSplitterRatio: initialSplitterRatio,
+            splitterHeight: '3em'
+          });
 
-          // TODO: apply this with delay for animated entry
-          layout.requestEditorHost.style.height = (initialSplitterRatio * 100).toFixed(2) + '%';
-
-          var splitterHeight = '3em';
-
-          var bottomContainer = document.createElement('div');
-          bottomContainer.style.cssText =
-            'position: absolute; left: 0;' +
-            ' top: ' +(initialSplitterRatio * 100).toFixed(2) + '%;' +
-            ' width: 100%;' +
-            ' height: ' + (100 - initialSplitterRatio * 100).toFixed(2) + '%;' +
-            ' padding-top: ' + splitterHeight;
-          var bottomHost = document.createElement('div');
-          bottomHost.style.cssText =
-            'position: relative; width: 100%; height: 100%;';
-          bottomContainer.appendChild(bottomHost);
-          layout.contentPageHost.appendChild(bottomContainer);
-
-          var splitterOuter = document.createElement('div');
-          splitterOuter.id = 'splitterOuter';
-          splitterOuter.style.cssText =
-            'position: absolute; left: 0; top: 0; ' +
-            ' width: 100%; ' +
-            'padding-left: 5em; ' +
-            ' height: ' + splitterHeight + ';';
+          var bottomHost = splitterLayout.bottomHost;
+          var splitterOuter = splitterLayout.splitterOuter;
           
           var splitterBorderTop = document.createElement('div');
           splitterBorderTop.style.cssText =
@@ -4892,153 +4892,12 @@ I hope it works — firstly for me, and hopefully helps others.
           splitterBorderBottom.id = 'splitterBorderBottom';
           splitterOuter.appendChild(splitterBorderBottom);
 
-          bottomContainer.appendChild(splitterOuter);
-
-          //bottomHost.style.background = 'silver';
-
-          on(splitterOuter, 'mousedown', splitter_mousedown);
-          on(splitterOuter, 'mouseup', splitter_mouseup);
-          on(splitterOuter, 'mousemove', splitter_mousemove);
-          on(splitterOuter, 'touchstart', splitter_touchstart);
-          on(splitterOuter, 'touchmove', splitter_touchmove);
-          on(splitterOuter, 'touchend', splitter_touchend);
-
           return {
-            bottomContainer: bottomContainer,
             bottomHost: bottomHost,
             splitterContainer: splitterContainer,
             splitterMainPanel: splitterMainPanel
           };
-
-          var dragStart, overlayElem, latestDragY;
-
-          function createOverlay(pageY, offsetY) {
-            if (overlayElem) return;
-            // overlay whole window, nothing works until resizing complete
-            overlayElem = document.createElement('div');
-            overlayElem.style.cssText =
-              'position: absolute; position: fixed; ' +
-              'left: 0; top: 0; width: 100%; height: 100%; ' +
-              'z-index: 1000; ' +
-              'cursor: ns-resize;';
-            document.body.appendChild(overlayElem);
-            on(overlayElem, 'mouseup', splitter_mouseup);
-            on(overlayElem, 'mousemove', splitter_mousemove);
-            on(overlayElem, 'touchend', splitter_touchend);
-            var splitterHeight = splitterContainer.offsetHeight;
-            dragStart = {
-              centerY: pageY - offsetY,
-              offCenterY: offsetY,
-              splitterRatio: splitterRatio
-            };
-          }
-
-          function dragTo(pageY) {
-            if (!overlayElem) return;
-            latestDragY = pageY;
-            var wholeSize = layout.contentPageHost.offsetHeight;
-            var newSplitterRatio = Math.min(0.9, Math.max(0.05,
-              (pageY - dragStart.offCenterY) / wholeSize));
-
-            var newTopHeight = (newSplitterRatio * 100).toFixed(2) + '%';
-            var newBottomTop = (newSplitterRatio * 100).toFixed(2) + '%';
-            var newBottomHeight = (100 - newSplitterRatio * 100).toFixed(2) + '%';
-
-            if (layout.requestEditorHost.style.height !== newTopHeight ||
-              bottomContainer.style.top !== newBottomTop ||
-              bottomContainer.style.height !== newBottomHeight) {
-              var logmousemove = {
-                topHeight: layout.requestEditorHost.style.height + ' --> ' + newTopHeight,
-                requestEditorHost: layout.requestEditorHost,
-                bottomTop: bottomContainer.style.top + '-->' + newBottomTop,
-                bottomHeight: bottomContainer.style.height + '-->' + newBottomHeight,
-                bottomContainer: bottomContainer
-              };
-
-              if (layout.requestEditorHost.style.height !== newTopHeight) {
-                layout.requestEditorHost.style.height = newTopHeight;
-                logmousemove.topHeight += ' (' + layout.requestEditorHost.style.height + ')';
-              }
-              if (bottomContainer.style.top !== newBottomTop) {
-                bottomContainer.style.top = newBottomTop;
-                logmousemove.bottomTop += ' (' + bottomContainer.style.top + ')';
-              }
-              if (bottomContainer.style.height !== newBottomHeight) {
-                bottomContainer.style.height = newBottomHeight;
-                logmousemove.bottomHeight += ' (' + bottomContainer.style.height + ')';
-              }
-
-              console.log('mousemove ', logmousemove);
-            }
-
-          }
-
-          function dropOverlay() {
-            if (overlayElem)
-              document.body.removeChild(overlayElem);
-            dragStart = void 0;
-            overlayElem = void 0;
-            latestDragY = void 0;
-          }
-
-          /** @param {MouseEvent} e */
-          function splitter_mousedown(e) {
-            if (!e) e = /** @type {MouseEvent} e */(window.event);
-            if (e.preventDefault) e.preventDefault();
-            createOverlay(e.pageY, e.offsetY);
-            console.log('mousedown ', dragStart);
-          }
-
-          /** @param {MouseEvent} e */
-          function splitter_mouseup(e) {
-            if (!e) e = /** @type {MouseEvent} e */(window.event);
-            if (e.preventDefault) e.preventDefault();
-            console.log('mouseup ', dragStart);
-            dropOverlay();
-          }
-
-          /** @param {MouseEvent} e */
-          function splitter_mousemove(e) {
-            if (!e) e = /** @type {MouseEvent} e */(window.event);
-            if (e.preventDefault) e.preventDefault();
-            if (!dragStart) return;
-
-            dragTo(e.pageY);
-          }
-
-          /** @param {TouchEvent} e */
-          function splitter_touchstart(e) {
-            if (!e) e = /** @type {TouchEvent} e */(window.event);
-            if (e.preventDefault) e.preventDefault();
-            var touches = e.changedTouches || e.touches;
-            var tch = touches && touches[0];
-            if (tch && tch.pageY > 0) {
-              createOverlay(tch.pageY, tch.pageY - layout.requestEditorHost.offsetHeight);
-            }
-          }
-
-          /** @param {TouchEvent} e */
-          function splitter_touchend(e) {
-            if (!e) e = /** @type {TouchEvent} e */(window.event);
-            if (e.preventDefault) e.preventDefault();
-            dropOverlay();
-          }
-
-          /** @param {TouchEvent} e */
-          function splitter_touchmove(e) {
-            if (!e) e = /** @type {TouchEvent} e */(window.event);
-            if (e.preventDefault) e.preventDefault();
-            var touches = e.touches || e.changedTouches;
-            var tch = touches && touches[0];
-            for (var i = 0; touches && i < touches.length; i++) {
-              if (Math.abs(touches[i].pageY - latestDragY) < Math.abs(tch.pageY - latestDragY))
-                tch = touches[i];
-            }
-
-            if (tch && tch.pageY > 0)
-              dragTo(tch.pageY);
-          }
-}
+        }
 
         function accept() {
           var pars = parseTextRequest(editor.getValue());

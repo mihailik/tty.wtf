@@ -2583,7 +2583,7 @@ I hope it works — firstly for me, and hopefully helps others.
             replace(/\<\*(\**)\!/g, '<$1!');
 
           // decode
-          var decodedText = encoding(restoredText);
+          var decodedText = encoding ? encoding(restoredText) : restoredText;
 
           // update just in case it's been off
           this.contentLength = decodedText.length;
@@ -5335,20 +5335,52 @@ I hope it works — firstly for me, and hopefully helps others.
           var allFiles = drive.files();
           var bestFile = findBestFile();
 
-          var detectMode =
-            /\.json$/i.test(bestFile) ? 'json' :
-              /\.js$/i.test(bestFile) ? 'javascript' :
-                /\.html$/i.test(bestFile) ? 'html' :
-                  /\.md$/i.test(bestFile) ? 'markdown' :
-                    'text';
+          if (bestFile) {
+            // HTML comment multifile mode
+            var detectMode =
+              /\.json$/i.test(bestFile) ? 'json' :
+                /\.js$/i.test(bestFile) ? 'javascript' :
+                  /\.html$/i.test(bestFile) ? 'html' :
+                    /\.md$/i.test(bestFile) ? 'markdown' :
+                      'text';
 
-          shellLoader.loadingComplete(
-            function (updatedText) {
-              drive.write(bestFile, updatedText);
-            },
-            drive.read(bestFile) || bestFile || 'file not found amongst: ' + drive.files().join(',') + '.',
-            detectMode
-          );
+            shellLoader.loadingComplete(
+              function (updatedText) {
+                drive.write(bestFile, updatedText);
+              },
+              drive.read(bestFile),
+              detectMode
+            );
+
+          } else {
+            // Markdown or plain text mode
+            var combined = [];
+            for (var i = document.body.childNodes.length - 1; i >= 0; i--) {
+              var nod = document.body.childNodes[i] || document.body.childNodes.item(i);
+              switch (nod.nodeType) {
+                case 1: // element
+                  var elem = /** @type {HTMLElement} */(nod);
+                  if (!elem.tagName || ['SCRIPT', 'STYLE', 'LINK'].indexOf(elem.tagName.toUpperCase()) >= 0) continue;
+                  if (elem.id === 'shell') continue;
+                  combined.push(elem.outerHTML);
+                  break;
+
+                case 3: // text
+                case 4: // CDATA
+                // case 8: // comment
+                  combined.push(nod.textContent);
+                  break;
+              }
+            }
+
+            shellLoader.loadingComplete(
+              function (updatedText) {
+                drive.write('/index.md', updatedText);
+              },
+              combined.join('\n').replace(/^\s+/, ''),
+              'markdown'
+            );
+          }
 
           function findBestFile() {
             var bestFile =

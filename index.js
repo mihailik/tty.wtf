@@ -289,6 +289,25 @@ function catchREST() {
   // #region SHARED FUNCTIONALITY
 
   var drinkChar = '\ud83c\udf79';
+  
+  /**
+   * @param {string} pathname
+   * @param {string=} protocol
+   * @param {string=} host
+   */
+  function getBaseUrl(pathname, protocol, host) {
+    if (protocol && protocol.indexOf('file') >= 0) return; // running from local file, no need to adjust base URL
+    var verb = getVerb(pathname);
+    if (!verb) return; // no deep URL, no need to adjust base URL
+    if (verb.verb === 'local') {
+      // @ts-ignore
+      catchREST_urlencoded = false;
+    }
+
+    var baseUrl = (protocol || '') + '//' + (host || '') + pathname.slice(0, verb.index);
+
+    return baseUrl;
+  }
 
   /** @param {Function} fn */
   function getFunctionCommentContent(fn) {
@@ -835,6 +854,8 @@ I hope it works — firstly for me, and hopefully helps others.
   */});
   
   var embeddedSplashText = embeddedSplashMarkdown.replace(/&#x1F379;/g, drinkChar);
+  var embeddedSplashMarkdownWithScript = embeddedSplashMarkdown +
+    '\n<script src="./index.js"></script>'
 
   var embeddedMetaBlockHTML = getFunctionCommentContent(function () {/*
 <meta charset="UTF-8">
@@ -850,18 +871,13 @@ I hope it works — firstly for me, and hopefully helps others.
   var embeddedAdjustUrlencodedBaseURL =
     'catchREST_urlencoded = true; (function() {\n' +
     getFunctionBody(function () {
-      if (location.protocol.indexOf('file') >= 0) return; // running from local file, no need to adjust base URL
-      var verb = getVerb(location.pathname);
-      if (!verb) return; // no deep URL, no need to adjust base URL
-      if (verb.verb === 'local') {
-        // @ts-ignore
-        catchREST_urlencoded = false;
+      var baseUrl = getBaseUrl(location.pathname, location.protocol, location.host);
+      if (baseUrl) {
+        var inject = '<base href="' + baseUrl + '">';
+        document.write(inject);
       }
-
-      var baseUrl = location.protocol + '//' + location.host + location.pathname.slice(0, verb.index);
-      var inject = '<base href="' + baseUrl + '">';
-      document.write(inject);
     }) + '\n\n' +
+    getBaseUrl + '\n' +
     getVerb + '\n' +
     '})()';
 
@@ -1281,7 +1297,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
           var builtHTML = getEmbeddedWholeHTML(true /* urlencoded */);
 
-          var builtReadme = embeddedSplashMarkdown +
+          var builtReadme = embeddedSplashMarkdownWithScript +
             '\n<' + '!--' + ' {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' ' + process.platform + '/' + process.arch + '} ' + '--' + '>\n'; 
 
           var skipIndexHTML = skipUnlessUpdated(
@@ -4461,17 +4477,18 @@ I hope it works — firstly for me, and hopefully helps others.
      *  topChild: HTMLElement;
      *  splitterHeight: string;
      *  initialSplitterRatio: number;
+     *  animateInMsec?: number;
      * }} options
      */
     function addHorizontalSplitterForBottom(options) {
       var parentElement = options.parentElement,
         topChild = options.topChild,
         splitterHeight = options.splitterHeight,
-        initialSplitterRatio = options.initialSplitterRatio;
+        initialSplitterRatio = options.initialSplitterRatio,
+        animateInMsec = /** @type {number} */(options.animateInMsec) >= 0 ? options.animateInMsec : 300;
 
       var splitterRatio = initialSplitterRatio;
 
-      var animateInMsec = 300;
       setTimeout(function () {
         topChild.style.height = (initialSplitterRatio * 100).toFixed(2) + '%';
       }, animateInMsec);
@@ -4719,8 +4736,8 @@ I hope it works — firstly for me, and hopefully helps others.
 
               lineNumbers: true,
               extraKeys: {
-                'Ctrl-Enter': accept,
-                'Cmd-Enter': accept
+                'Ctrl-Enter': executeSendRequestCommand,
+                'Cmd-Enter': executeSendRequestCommand
               },
               // @ts-ignore
               foldGutter: true,
@@ -4747,8 +4764,8 @@ I hope it works — firstly for me, and hopefully helps others.
                 inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
                 lineNumbers: true,
                 extraKeys: {
-                  'Ctrl-Enter': accept,
-                  'Cmd-Enter': accept
+                  'Ctrl-Enter': executeSendRequestCommand,
+                  'Cmd-Enter': executeSendRequestCommand
                 },
                 // @ts-ignore
                 foldGutter: true,
@@ -4787,7 +4804,7 @@ I hope it works — firstly for me, and hopefully helps others.
               if (e.preventDefault) e.preventDefault();
               clearTimeout(clickTimeout);
               clickTimeout = setTimeout(() => {
-                accept();
+                executeSendRequestCommand();
               }, 100);
             };
 
@@ -4899,7 +4916,7 @@ I hope it works — firstly for me, and hopefully helps others.
           };
         }
 
-        function accept() {
+        function executeSendRequestCommand() {
           var pars = parseTextRequest(editor.getValue());
 
           if (pars && pars.firstLine) {
@@ -5235,7 +5252,11 @@ I hope it works — firstly for me, and hopefully helps others.
       }
     }
 
-    function bootBacked(uniquenessSource) {
+    /**
+     * @param {string} uniquenessSource
+     * @param {string} baseUrl
+     */
+    function bootBacked(uniquenessSource, baseUrl) {
 
       var shellLoader = createShell('Loading...', 'text');
 
@@ -5244,17 +5265,24 @@ I hope it works — firstly for me, and hopefully helps others.
           complete();
         } else {
           /** @type {*} */(catchREST)['continue'] = function () {
-            complete();
+            docLoadedCheckDependenciesAgain();
           };
           on(window, 'load', complete);
           setTimeout(function () {
             if (document.readyState === 'complete')
-              complete();
+              docLoadedCheckDependenciesAgain();
           }, 100);
         }
 
         console.log('drive loaded ', drive);
         var completed = false;
+
+        function docLoadedCheckDependenciesAgain() {
+          if (minimalDependenciesPresent())
+            return complete();
+
+          // try to load from baseUrl first!
+        }
 
         function complete() {
           if (completed) return;
@@ -5354,7 +5382,8 @@ I hope it works — firstly for me, and hopefully helps others.
       if (typeof catchREST_urlencoded !== 'undefined' && catchREST_urlencoded) {
         bootUrlEncoded();
       } else {
-        bootBacked(location.pathname);
+        var baseUrl = location && /localhost|(127\.)/i.test(location.hostname) ? './' : 'https://catch.rest/'
+        bootBacked(location.pathname, baseUrl);
       }
     }
 

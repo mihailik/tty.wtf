@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<!-- {build-by-hash:18w7ot0k5x7 Thu Nov 24 2022 09:46:03 GMT+0000 (Greenwich Mean Time) with  darwin/x64} -->
+<!-- {build-by-hash:2ew0zcj55ec Thu Nov 24 2022 18:47:33 GMT+0000 (Greenwich Mean Time) with  darwin/x64} -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,18 +11,25 @@
 <title>Catch Rest &#x1F379;</title>
 <script>
 catchREST_urlencoded = true; (function() {
-if (location.protocol.indexOf('file') >= 0) return; // running from local file, no need to adjust base URL
-      var verb = getVerb(location.pathname);
-      if (!verb) return; // no deep URL, no need to adjust base URL
-      if (verb.verb === 'local') {
-        // @ts-ignore
-        catchREST_urlencoded = false;
+var baseUrl = getBaseUrl(location.pathname, location.protocol, location.host);
+      if (baseUrl) {
+        var inject = '<base href="' + baseUrl + '">';
+        document.write(inject);
       }
 
-      var baseUrl = location.protocol + '//' + location.host + location.pathname.slice(0, verb.index);
-      var inject = '<base href="' + baseUrl + '">';
-      document.write(inject);
+function getBaseUrl(pathname, protocol, host) {
+    if (protocol && protocol.indexOf('file') >= 0) return; // running from local file, no need to adjust base URL
+    var verb = getVerb(pathname);
+    if (!verb) return; // no deep URL, no need to adjust base URL
+    if (verb.verb === 'local') {
+      // @ts-ignore
+      catchREST_urlencoded = false;
+    }
 
+    var baseUrl = (protocol || '') + '//' + (host || '') + pathname.slice(0, verb.index);
+
+    return baseUrl;
+  }
 function getVerb(path) {
     var verbMatch = /(^|\/)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|http:|https:)(\/|$)/i.exec(path + '');
     return verbMatch ? { leadingSlash: verbMatch[1], verb: verbMatch[2], trailingSlash: verbMatch[3], index: verbMatch.index + (verbMatch[1] ? 1 : 0) } : void 0;

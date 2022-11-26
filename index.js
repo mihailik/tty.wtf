@@ -1023,10 +1023,15 @@ I hope it works — firstly for me, and hopefully helps others.
         'codemirror/addon/edit/matchtags.js',
         'codemirror/addon/edit/trailingspace.js',
 
-        'xlsx/dist/xlsx.full.min.js',
+
+        // DISABLE XLSX for now
+        // 'xlsx/dist/xlsx.full.min.js',
+
+        // this one is not available, apparently
         //'xlsx/jszip.js'
 
-        'typescript/lib/typescript.js'
+        // DISABLE for now
+        // 'typescript/lib/typescript.js'
         // include lib.d.ts here? probably no
       ];
 

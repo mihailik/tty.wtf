@@ -5258,11 +5258,10 @@ I hope it works — firstly for me, and hopefully helps others.
           var injectLeadPath =
             location.pathname.slice(0, enc.encodedUrl.verbPos)
               .replace(/^\/+/, '').replace(/\/+$/, '');
-          if (injectLeadPath)
-            slashSeparated.push(injectLeadPath);
+          if (injectLeadPath) slashSeparated.push(injectLeadPath);
         } else {
-          var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/');
-          slashSeparated.push(injectLeadPath);
+          var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/').replace(/^\//, '');
+          if (injectLeadPath) slashSeparated.push(injectLeadPath);
         }
 
         var firstLine = parsed && parseFirstLine(parsed.firstLine);

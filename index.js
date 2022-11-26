@@ -4787,7 +4787,7 @@ I hope it works — firstly for me, and hopefully helps others.
               editor.setOption('mode', isPlainTextVerb(verb) ? 'markdown' : 'javascript');
               editor.setValue(text);
               editor.on('changes', debounce(function () {
-                updateVerbAutoDetect();
+                updateVerbAutoDetect(true);
               }, 200, 900));
               updateVerbAutoDetect();
             });

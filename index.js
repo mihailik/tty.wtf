@@ -4966,7 +4966,8 @@ I hope it works — firstly for me, and hopefully helps others.
 
               var normalizedUrl = parsFirst.url;
               if (!/^(\/|\.|http|https):/i.test(normalizedUrl)) {
-                normalizedUrl = (location.protocol === 'http' ? 'http://' : 'http://') + normalizedUrl;
+                // default to HTTPS for all cases except the page is from unsecured HTTP
+                normalizedUrl = (/^http\b/i.test(location.protocol) ? 'http://' : 'https://') + normalizedUrl;
               }
 
               var verbContinuous =

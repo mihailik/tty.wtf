@@ -5260,6 +5260,9 @@ I hope it works — firstly for me, and hopefully helps others.
               .replace(/^\/+/, '').replace(/\/+$/, '');
           if (injectLeadPath)
             slashSeparated.push(injectLeadPath);
+        } else {
+          var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/');
+          slashSeparated.push(injectLeadPath);
         }
 
         var firstLine = parsed && parseFirstLine(parsed.firstLine);

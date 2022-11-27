@@ -620,9 +620,12 @@ body {
   font-size: 85%;
 }
 
-#shell #requestEditorHost .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
+#shell .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
   text-indent: -3em;
   padding-left: 3.3em;
+}
+
+#shell #requestEditorHost .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
   border-bottom: solid 1px #f0f0f0;
   s-this-is-LINED-PAPER
 }

@@ -460,7 +460,9 @@ function catchREST() {
         }
       );
 
-    var result = verb + (normalizedUrl ? '/' + normalizedUrl : '') + (normalizedBody ? '//' + normalizedBody : '');
+    var result =
+      isPlainTextVerb(verb) ? verb + '/' + normalizedBody :
+      verb + (normalizedUrl ? '/' + normalizedUrl : '') + (normalizedBody ? '//' + normalizedBody : '');
     return result;
   }
 
@@ -5202,7 +5204,7 @@ I hope it works — firstly for me, and hopefully helps others.
             skipVerb = true;
 
           var firstLine =
-            skipVerb && !enc.encodedUrl.addr ? enc.encodedUrl.body :
+            skipVerb && !enc.encodedUrl.addr ? '' :
               (skipVerb ? '' : enc.encodedUrl.verb) + (enc.encodedUrl.addr ? (skipVerb ? '' : ' ') + enc.encodedUrl.addr : '');
           var text =
             firstLine +

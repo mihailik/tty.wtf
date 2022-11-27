@@ -1843,6 +1843,10 @@ I hope it works — firstly for me, and hopefully helps others.
       }
     }
 
+    /**
+     * @param {string} url
+     * @param {RequestInit} opts
+     */
     function fetchXHR(url, opts) {
       if (typeof XMLHttpRequest === 'function') {
         var xhr = new XMLHttpRequest();
@@ -1875,10 +1879,17 @@ I hope it works — firstly for me, and hopefully helps others.
         };
 
         xhr.withCredentials = true;
-        xhr.open(opts.method, url);
+        xhr.open((opts.method || 'GET'), url);
+        if (opts.headers) {
+          for (var i = 0; i < opts.headers.entries.length; i++) {
+            /** @type{[string, string]} */
+            var entry = opts.headers.entries[i];
+            xhr.setRequestHeader(entry[0], entry[1]);
+          }
+        }
 
         if (opts.body) {
-          xhr.send(opts.body);
+          xhr.send(/** @type {*} */(opts.body));
         } else {
           xhr.send();
         }
@@ -5100,25 +5111,42 @@ I hope it works — firstly for me, and hopefully helps others.
                 normalizedUrl = (/^http\b/i.test(location.protocol) ? 'http://' : 'https://') + normalizedUrl;
               }
 
-              var verbContinuous =
+              var headers = [];
+              var bodyNormalized = pars.body;
+              if (bodyNormalized) {
+                while (/^\s/i.test(bodyNormalized)) {
+                  var headerValMatch = /^\s+([^\:\s]+)\s*\:\s*(.+)\s*(\n|$)/.exec(bodyNormalized);
+                  if (headerValMatch) {
+                    var headerName = headerValMatch[1];
+                    var headerValue = headerValMatch[2];
+                    headers.push([headerName, headerValue]);
+                    bodyNormalized = bodyNormalized.slice(headerValMatch[0].length);
+                  } else {
+                    break;
+                  }
+                }
+              }
+
+              var verbContinuousTense =
                 parsFirst.verb.charAt(0).toUpperCase() + parsFirst.verb.slice(1).toLowerCase();
-              verbContinuous +=
+              verbContinuousTense +=
                 (
                   // getTing - duplicate last consonant if precedet by vowel
-                  'eyuioa'.indexOf(verbContinuous.charAt(verbContinuous.length - 2)) >= 0 &&
-                  'eyuioa'.indexOf(verbContinuous.charAt(verbContinuous.length - 1)) < 0 ?
-                  verbContinuous.charAt(verbContinuous.length - 1) :
+                  'eyuioa'.indexOf(verbContinuousTense.charAt(verbContinuousTense.length - 2)) >= 0 &&
+                  'eyuioa'.indexOf(verbContinuousTense.charAt(verbContinuousTense.length - 1)) < 0 ?
+                  verbContinuousTense.charAt(verbContinuousTense.length - 1) :
                   ''
                 ) + 'ing';
 
-              set(withSplitter.splitterMainPanel, verbContinuous + '...');
+              set(withSplitter.splitterMainPanel, verbContinuousTense + '...');
 
               var startTime = getTimeNow();
               var ftc = fetchXHR(normalizedUrl, {
                 method: parsFirst.verb,
                 withCredentials: true,
-                body: parsFirst.verb === 'GET' || !pars.body ? undefined :
-                  pars.body
+                headers: /** @type {*} */({ entries: headers }),
+                body: parsFirst.verb === 'GET' || !bodyNormalized ? undefined :
+                  bodyNormalized
               });
               ftc.then(
                 function (response) {

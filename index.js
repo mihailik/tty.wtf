@@ -678,7 +678,9 @@ body {
 }
 
 #shell .CodeMirror-guttermarker-subtle {
-  color: #91d2db;
+  color: #ffdc22;
+  filter: drop-shadow(0px 0px 2px black);
+  transform: scale(1.8) translate(1px, -1px);
 }
 
 #shell #pseudoGutter {

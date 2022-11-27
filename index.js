@@ -5143,7 +5143,9 @@ I hope it works — firstly for me, and hopefully helps others.
               var startTime = getTimeNow();
               var ftc = fetchXHR(normalizedUrl, {
                 method: parsFirst.verb,
+                // @ts-ignore
                 withCredentials: true,
+                credentials: 'include',
                 headers: /** @type {*} */({ entries: headers }),
                 body: parsFirst.verb === 'GET' || !bodyNormalized ? undefined :
                   bodyNormalized
@@ -5344,7 +5346,13 @@ I hope it works — firstly for me, and hopefully helps others.
       function getTextAndVerbFromUrlEncoded() {
         var enc = detectCurrentUrlEncoded(location);
         if (!enc) {
-          var text = 'post httpbin.org/post\n' + embeddedSplashText;
+          var text = [
+            'post httpbin.org/post',
+            ' Content-type: text/html',
+            ' Funny: YES!',
+            '',
+            'Send this to test?'
+          ].join('\n');
           var verb = 'splash';
         } else {
           var skipVerb = enc.encodedUrl.verbPos < 0 && /^http/i.test(enc.encodedUrl.addr || '');

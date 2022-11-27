@@ -1858,6 +1858,7 @@ I hope it works — firstly for me, and hopefully helps others.
           setTimeout(handleResult, 0);
         };
 
+        xhr.withCredentials = true;
         xhr.open(opts.method, url);
 
         if (opts.body) {

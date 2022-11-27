@@ -432,28 +432,30 @@ function catchREST() {
     var normalizedUrl = !url ? '' :
       encodeURI(url)
         .replace(
-          /(^http:)|(^https:)|(\/\/)|(#)|(\?)/gi,
-          function (whole, httpPrefix, httpSecurePrefix, slash, hash, question) {
+          /(^http:)|(^https:)|(\/\/)|(#)|(\&)|(\?)/gi,
+          function (whole, httpPrefix, httpSecurePrefix, slash, hash, ampersand, question) {
             return (
               slash ? '/%2F' :
                 hash ? '%23' :
-                  question ? '%3F' :
-                    whole
+                  ampersand ? '%26' :
+                    question ? '%3F' :
+                      whole
             );
           });
 
     var normalizedBody = body
       .replace(
-        /([^\n\/ \+\#\?]*)((\n)|(\/)|(\+)|( )|(#)|(\?))/gi,
-        function (whole, plain, remain, newLine, slash, plus, space, hash, question) {
+        /([^\n\/\+ \#\&\?]*)((\n)|(\/)|(\+)|( )|(#)|(\&)|(\?))/gi,
+        function (whole, plain, remain, newLine, slash, plus, space, hash, ampersand, question) {
           return encodeURI(plain || '') + (
             newLine ? '/' :
               slash ? '%2F' :
                 plus ? '%2B' :
                   space ? '+' :
                     hash ? '%23' :
-                      question ? '%3F' :
-                        (remain || '')
+                      ampersand ? '%26' :
+                        question ? '%3F' :
+                          (remain || '')
           );
         }
       );
@@ -602,6 +604,7 @@ body {
 #shell .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
   text-indent: -3em;
   padding-left: 3.3em;
+  s-border-bottom: solid 1px gainsboro;
 }
 
 #shell .CodeMirror-gutters {
@@ -5248,20 +5251,23 @@ I hope it works — firstly for me, and hopefully helps others.
               // because it could be static file hosted without 404 or router enabled.
               // Normally web server will be addressed by name, at which point we can rely on those niceties.
               (/\bindex.html\b/i.test(location.pathname || '') ? 'search' : 'pathname') :
-              /file/.test(location.protocol || '') ? 'search' :
+              /file/.test(location.protocol || '') ? 'hash' :
                 void 0;
 
         if (typeof history.replaceState !== 'function')
           source = 'hash';
         var slashSeparated = [];
-        if (enc && enc.encodedUrl && enc.encodedUrl.verbPos > 0) {
-          var injectLeadPath =
-            location.pathname.slice(0, enc.encodedUrl.verbPos)
-              .replace(/^\/+/, '').replace(/\/+$/, '');
-          if (injectLeadPath) slashSeparated.push(injectLeadPath);
-        } else {
-          var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/').replace(/^\//, '');
-          if (injectLeadPath) slashSeparated.push(injectLeadPath);
+        if (source === 'pathname') {
+          // pathname should start with the root, calculate injectLeadPath
+          if (enc && enc.encodedUrl && enc.encodedUrl.verbPos > 0) {
+            var injectLeadPath =
+              location.pathname.slice(0, enc.encodedUrl.verbPos)
+                .replace(/^\/+/, '').replace(/\/+$/, '');
+            if (injectLeadPath) slashSeparated.push(injectLeadPath);
+          } else {
+            var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/').replace(/^\//, '');
+            if (injectLeadPath) slashSeparated.push(injectLeadPath);
+          }
         }
 
         var firstLine = parsed && parseFirstLine(parsed.firstLine);

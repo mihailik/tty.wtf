@@ -33,9 +33,9 @@ function catchREST() {
     // @ts-ignore
     Object.defineProperty =
       /**
-       * @param {*} obj 
-       * @param {*} key 
-       * @param {*} attr 
+       * @param {*} obj
+       * @param {*} key
+       * @param {*} attr
        */
       function (obj, key, attr) {
         obj['_get_' + key] = attr.get;
@@ -289,7 +289,7 @@ function catchREST() {
   // #region SHARED FUNCTIONALITY
 
   var drinkChar = '\ud83c\udf79';
-  
+
   /**
    * @param {string} pathname
    * @param {string=} protocol
@@ -873,7 +873,7 @@ I hope it works — firstly for me, and hopefully helps others.
 *Ka chi fo!*
 
   */});
-  
+
   var embeddedSplashText = embeddedSplashMarkdown.replace(/&#x1F379;/g, drinkChar);
   var embeddedSplashMarkdownWithScript = embeddedSplashMarkdown +
     '\n<script src="./index.js"></script>'
@@ -910,7 +910,7 @@ I hope it works — firstly for me, and hopefully helps others.
     /** @type {Partial<typeof process>} */
     var pr = typeof process !== 'undefined' && process || {};
     var html =
-      '<!' + 'DOCTYPE html' + '><' + 'html lang="en"' + 
+      '<!' + 'DOCTYPE html' + '><' + 'html lang="en"' +
       '><' + 'head' + '>\n' +
       '<!-- {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' with  ' + pr.platform + '/' + pr.arch + '} -->\n' +
       embeddedMetaBlockHTML + '\n' +
@@ -936,7 +936,7 @@ I hope it works — firstly for me, and hopefully helps others.
       '</' + 'script' + '>\n' +
 
       '</' + 'body' + '></' + 'html' + '>';
-    
+
     return html;
   }
 
@@ -1324,7 +1324,7 @@ I hope it works — firstly for me, and hopefully helps others.
           var builtHTML = getEmbeddedWholeHTML(true /* urlencoded */);
 
           var builtReadme = embeddedSplashMarkdownWithScript +
-            '\n<' + '!--' + ' {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' ' + process.platform + '/' + process.arch + '} ' + '--' + '>\n'; 
+            '\n<' + '!--' + ' {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' ' + process.platform + '/' + process.arch + '} ' + '--' + '>\n';
 
           var skipIndexHTML = skipUnlessUpdated(
             indexHTML_path,
@@ -1509,7 +1509,7 @@ I hope it works — firstly for me, and hopefully helps others.
       /** @typedef {string | Buffer | { statusCode?: number, body: string | Buffer | null | undefined } | null | undefined} RequestHandlerResult */
 
       /**
-       * 
+       *
        * @param {string | null | undefined} host
        * @param {number} port
        * @returns {Promise<{ port: number, host: string, server: import('http').Server, handle(handler: (ctx: RequestContext) => Promise<RequestHandlerResult>): void }>}
@@ -1597,7 +1597,7 @@ I hope it works — firstly for me, and hopefully helps others.
                     }
 
                     return new Promise(function (resolve) { setTimeout(resolve, 100); }).then(function () {
-                      if (!entry.req.complete) 
+                      if (!entry.req.complete)
                         console.log('Request promise completed, but request not yet handled: ' + entry.req.method + ' ' + entry.req.url);
                     });
                   }
@@ -2077,7 +2077,7 @@ I hope it works — firstly for me, and hopefully helps others.
         var newStorageFileCache = {};
 
         loadNextOptionalDrive();
-        
+
         /** @param {string} path @this {BootState} */
         function read(path) {
           if (toUpdateDOM && path in toUpdateDOM)
@@ -2523,7 +2523,7 @@ I hope it works — firstly for me, and hopefully helps others.
           if (typeof completionCallback === 'function') {
             // TODO: report lack of subscription?
             completionCallback(mountDrive);
-          } 
+          }
         }
 
         return bootState;
@@ -2595,11 +2595,11 @@ I hope it works — firstly for me, and hopefully helps others.
 
       /**
        * @class
-       * @param {Comment} node 
-       * @param {string} path 
-       * @param {(text: string) => any} encoding 
-       * @param {number} contentOffset 
-       * @param {number} contentLength 
+       * @param {Comment} node
+       * @param {string} path
+       * @param {(text: string) => any} encoding
+       * @param {number} contentOffset
+       * @param {number} contentLength
        */
       function DOMFile(node, path, encoding, contentOffset, contentLength) {
         this.node = node;
@@ -3061,7 +3061,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
 
       /**
-       * 
+       *
        * @param {Drive.Detached.DOMDrive} dom
        * @param {Drive.Shadow=} shadow
        * @returns {Drive}
@@ -3509,7 +3509,7 @@ I hope it works — firstly for me, and hopefully helps others.
                 catch (parseError) {
                 }
               }
-              
+
               return detached;
 
               /**
@@ -3703,9 +3703,9 @@ I hope it works — firstly for me, and hopefully helps others.
             }
 
             /**
-             * 
+             *
              * @param {SQLTransaction} transaction
-             * @param {(error?: SQLError) => void} callback 
+             * @param {(error?: SQLError) => void} callback
              */
             function createMetadataTable(transaction, callback) {
               transaction.executeSql(
@@ -3720,9 +3720,9 @@ I hope it works — firstly for me, and hopefully helps others.
             }
 
             /**
-             * @param {Database} db 
-             * @param {number} timestamp 
-             * @param {boolean} metadataTableIsValid 
+             * @param {Database} db
+             * @param {number} timestamp
+             * @param {boolean} metadataTableIsValid
              */
             function createWebSQLDetached(db, timestamp, metadataTableIsValid) {
               /**
@@ -4155,7 +4155,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
             /**
              * @param {string} uniqueKey
-             * @param {(error?: string, detached?: Drive.Detached) => void} callback 
+             * @param {(error?: string, detached?: Drive.Detached) => void} callback
              */
             function detectIndexedDB(uniqueKey, callback) {
               try {
@@ -4204,7 +4204,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
             /**
              * @param {string} uniqueKey
-             * @param {(error?: string, detached?: Drive.Detached) => void} callback 
+             * @param {(error?: string, detached?: Drive.Detached) => void} callback
              */
             function detectIndexedDBCore(uniqueKey, callback) {
 
@@ -5064,7 +5064,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
           var bottomHost = splitterLayout.bottomHost;
           var splitterOuter = splitterLayout.splitterOuter;
-          
+
           var splitterBorderTop = document.createElement('div');
           splitterBorderTop.style.cssText =
             'position: absolute; left: 0; top: -1px; width: 100%; height: 1px;';
@@ -5216,12 +5216,12 @@ I hope it works — firstly for me, and hopefully helps others.
 
       function bindLayout() {
         var shell = /** @type {HTMLElement} */(document.getElementById('shell'));
- 
+
         var leftBar = /** @type {HTMLElement} */(document.getElementById('leftBar'));
         var leftTop = /** @type {HTMLElement} */(document.getElementById('leftTop'));
         var leftMiddle = /** @type {HTMLElement} */(document.getElementById('leftMiddle'));
         var leftBottom = /** @type {HTMLElement} */(document.getElementById('leftBottom'));
- 
+
         var contentPageHost = /** @type {HTMLElement} */(document.getElementById('contentPageHost'));
         var requestEditorHost = /** @type {HTMLElement} */(document.getElementById('requestEditorHost'));
 

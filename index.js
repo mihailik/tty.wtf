@@ -5423,7 +5423,7 @@ I hope it works — firstly for me, and hopefully helps others.
                 .replace(/^\/+/, '').replace(/\/+$/, '');
             if (injectLeadPath) slashSeparated.push(injectLeadPath);
           } else {
-            var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/').replace(/^\//, '');
+            var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/').replace(/^\/+/, '').replace(/\/+$/, '');
             if (injectLeadPath) slashSeparated.push(injectLeadPath);
           }
         }

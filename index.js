@@ -1954,6 +1954,51 @@ I hope it works — firstly for me, and hopefully helps others.
             /** @type {Function} */(func).apply(self, args);
       }
     }
+
+    /**
+     * @param {string} html
+     * @param {HTMLElement=} toParent
+     * @returns {Node[]}
+     */
+    function createElements(html, toParent) {
+      var virt = document.createElement('div');
+      virt.innerHTML = embeddedShellLayoutHTML;
+
+      var elements = [];
+
+      var lastAdded;
+      for (var i = virt.childNodes.length - 1; i >= 0; i--) {
+        var nod = virt.childNodes[i] || virt.childNodes.item(i);
+        virt.removeChild(nod);
+        if (toParent) {
+          if (lastAdded) toParent.insertBefore(nod, lastAdded);
+          else toParent.appendChild(nod);
+          lastAdded = nod;
+        }
+        elements.push(nod);
+      }
+
+      return elements;
+    }
+
+    function getOrCreateDocumentBody() {
+      var body = document.body;
+      if (!body) {
+        body = document.createElement('body');
+        var docElement = document.documentElement;
+        if (!docElement) {
+          docElement =
+            (document.head ? document.head.parentElement : null) ||
+            document.getElementsByTagName('html')[0] ||
+            (document.getElementsByTagName('head')[0] ? document.getElementsByTagName('head')[0].parentElement : null);
+        }
+
+        docElement.appendChild(body);
+      }
+
+      return body;
+    }
+
     // #endregion COMMON BROWSER UTILS
 
     // #region PERSISTENCE
@@ -4858,7 +4903,7 @@ I hope it works — firstly for me, and hopefully helps others.
      * @param {string} text
      * @param {string} verb
      */
-    function createShell(text, verb) {
+    function shell(text, verb) {
 
       injectShellStyles();
       var layout = bindLayout();
@@ -4867,21 +4912,25 @@ I hope it works — firstly for me, and hopefully helps others.
         layout = injectShellHTML();
       }
 
-      var useText =
-        verb === 'splash' ? embeddedSplashText : text;
-      layout.pseudoEditor.value = useText;
-      layout.pseudoGutter.innerHTML =
-        Array(useText.split('\n').length + 1)
-        .join(',').split(',')
-        .map(function(_,index) {return index+1; }).join('<br>');
-      console.log('Loading..');
-      layout.leftBottom.style.whiteSpace = 'nowrap';
-      layout.leftBottom.textContent = drinkChar + ' Loading..';
+      init();
 
       return {
         loadingTakesTime: loadingTakesTime,
         loadingComplete: loadingComplete
       };
+
+      function init() {
+        var useText =
+          verb === 'splash' ? embeddedSplashText : text;
+        layout.pseudoEditor.value = useText;
+        layout.pseudoGutter.innerHTML =
+          Array(useText.split('\n').length + 1)
+            .join(',').split(',')
+            .map(function (_, index) { return index + 1; }).join('<br>');
+        console.log('Loading..');
+        layout.leftBottom.style.whiteSpace = 'nowrap';
+        layout.leftBottom.textContent = drinkChar + ' Loading..';
+      }
 
       function loadingTakesTime() {
         layout.pseudoEditor.value = (layout.pseudoEditor.value || '').replace(/^Loading\.\./, 'Loading...');
@@ -4965,31 +5014,86 @@ I hope it works — firstly for me, and hopefully helps others.
         /** @type {import('codemirror').Editor} */
         var replyEditor;
 
+        /** @type {ReturnType<typeof createRequestVerbSidebarLayout>} */
+        var requestVerbSidebarLayout;
+        /** @type {ReturnType<typeof createPlainTextSidebarLayout>} */
+        var plainTextSidebarLayout;
+
         /** @param {string} newVerb */
         function updateVerb(newVerb) {
           verb = newVerb;
 
-          if (verb) {
-            var goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByTagName('button')[0]);
-            if (!goButton) {
-              layout.leftTop.innerHTML = '<button class=goButton></button>';
-              goButton = /** @type {HTMLButtonElement} */(layout.leftTop.getElementsByTagName('button')[0]);
+          if (!verb || isPlainTextVerb(verb)) {
+            if (requestVerbSidebarLayout) {
+              requestVerbSidebarLayout.container.style.zIndex = '10';
+              requestVerbSidebarLayout.container.style.pointerEvents = 'none';
+              requestVerbSidebarLayout.container.style.opacity = '0';
             }
-            set(goButton, verb.toUpperCase());
+            if (withSplitter) {
+              // retain?
+            }
 
-            var clickTimeout;
-            goButton.onclick = function (e) {
-              if (!e) e = /** @type {MouseEvent} */(window.event);
-              if (e.preventDefault) e.preventDefault();
-              clearTimeout(clickTimeout);
-              clickTimeout = setTimeout(() => {
-                executeSendRequestCommand();
-              }, 100);
-            };
+            if (!plainTextSidebarLayout) {
+              plainTextSidebarLayout = createPlainTextSidebarLayout();
+              layout.leftTop.appendChild(plainTextSidebarLayout.container);
+            } else {
+              plainTextSidebarLayout.container.style.pointerEvents = 'all';
+              plainTextSidebarLayout.container.style.opacity = '1';
+            }
 
           } else {
-            layout.leftTop.innerHTML = '';
+            if (plainTextSidebarLayout) {
+              plainTextSidebarLayout.container.style.zIndex = '10';
+              plainTextSidebarLayout.container.style.pointerEvents = 'none';
+              plainTextSidebarLayout.container.style.opacity = '0';
+            }
+
+            if (!requestVerbSidebarLayout) {
+              requestVerbSidebarLayout = createRequestVerbSidebarLayout();
+              layout.leftTop.appendChild(requestVerbSidebarLayout.container);
+
+              var clickTimeout;
+              requestVerbSidebarLayout.goButton.onclick = function (e) {
+                if (!e) e = /** @type {MouseEvent} */(window.event);
+                if (e.preventDefault) e.preventDefault();
+                clearTimeout(clickTimeout);
+                clickTimeout = setTimeout(() => {
+                  executeSendRequestCommand();
+                }, 100);
+              };
+            } else {
+              requestVerbSidebarLayout.container.style.pointerEvents = 'all';
+              requestVerbSidebarLayout.container.style.opacity = '1';
+            }
+
+            set(requestVerbSidebarLayout.goButton, verb.toUpperCase());
           }
+        }
+
+        function createRequestVerbSidebarLayout() {
+          var layoutElem = document.createElement('div');
+          layoutElem.style.cssText = 'transition: opacity 350ms;'
+          layoutElem.innerHTML = '<button class=goButton></button>';
+          var goButton = /** @type {HTMLButtonElement} */(layoutElem.getElementsByClassName('goButton')[0]);
+
+          return {
+            container: layoutElem,
+            goButton: goButton
+          };
+        }
+
+        function createPlainTextSidebarLayout() {
+          var layout = document.createElement('div');
+          var layoutElem = document.createElement('div');
+          layoutElem.style.cssText = 'transition: opacity 350ms;'
+          layoutElem.innerHTML = getFunctionCommentContent(function () {/*
+Text<br>
+Edit
+          */});
+
+          return {
+            container: layoutElem,
+          };
         }
 
         /**
@@ -5246,32 +5350,8 @@ I hope it works — firstly for me, and hopefully helps others.
       function injectShellHTML() {
         var virt = document.createElement('div');
         virt.innerHTML = embeddedShellLayoutHTML;
-        var body = document.body;
-
-        if (!body) {
-          body = document.createElement('body');
-          var docElement = document.documentElement;
-          if (!docElement) {
-            docElement =
-              (document.head ? document.head.parentElement : null) ||
-              document.getElementsByTagName('html')[0] ||
-              (document.getElementsByTagName('head')[0] ? document.getElementsByTagName('head')[0].parentElement : null);
-          }
-
-          docElement.appendChild(body);
-        }
-
-        var lastAdded;
-        for (var i = virt.childNodes.length - 1; i >= 0; i--) {
-          var nod = virt.childNodes[i] || virt.childNodes.item(i);
-          if (nod.nodeType === 1) {
-            virt.removeChild(nod);
-            if (lastAdded) body.insertBefore(nod, lastAdded);
-            else body.appendChild(nod);
-            lastAdded = nod;
-          }
-        }
-
+        var body = getOrCreateDocumentBody();
+        createElements(embeddedShellLayoutHTML, body);
         return bindLayout();
       }
 
@@ -5317,11 +5397,6 @@ I hope it works — firstly for me, and hopefully helps others.
       }
     }
 
-    // local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace|http:|https:
-    function loadVerb(verb) {
-
-    }
-
     function minimalDependenciesPresent() {
       // @ts-ignore
       return typeof CodeMirror === 'function';
@@ -5334,7 +5409,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
       sanitizeDOM();
 
-      var shellLoader = createShell(text, verb);
+      var shellLoader = shell(text, verb);
       if (minimalDependenciesPresent()) {
         complete();
       } else {
@@ -5346,13 +5421,13 @@ I hope it works — firstly for me, and hopefully helps others.
       function getTextAndVerbFromUrlEncoded() {
         var enc = detectCurrentUrlEncoded(location);
         if (!enc) {
-          var text = [
-            'post httpbin.org/post',
-            ' Content-type: text/html',
-            ' Funny: YES!',
-            '',
-            'Send this to test?'
-          ].join('\n');
+          var text = getFunctionCommentContent(function () {/*
+post httpbin.org/post
+Content-type: text/html
+Funny: YES!
+
+Send this to test?
+        */});
           var verb = 'splash';
         } else {
           var skipVerb = enc.encodedUrl.verbPos < 0 && /^http/i.test(enc.encodedUrl.addr || '');
@@ -5469,7 +5544,7 @@ I hope it works — firstly for me, and hopefully helps others.
       var baseUrl = location && /localhost|(127\.)/i.test(location.hostname) ? './' : 'https://catch.rest/';
       var thisScriptUrl = getThisScriptAddress() || '//catch.rest/index.js';
 
-      var shellLoader = createShell('Loading...', 'text');
+      var shellLoader = shell('Loading...', 'text');
 
       loadAsync().then(function (drive) {
         if (minimalDependenciesPresent()) {

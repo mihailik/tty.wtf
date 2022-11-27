@@ -1845,17 +1845,17 @@ I hope it works — firstly for me, and hopefully helps others.
 
       return new Promise(function (resolve, reject) {
         var capturedError;
-        var handleResultTimeout;
+        var handleResultDebounceTimeout;
         xhr.onerror = function (err) {
           capturedError = err;
-          clearTimeout(handleResultTimeout);
-          setTimeout(handleResult, 1);
+          clearTimeout(handleResultDebounceTimeout);
+          setTimeout(handleResult, 0);
         };
         xhr.onreadystatechange = function () {
           if (xhr.readyState !== 4) return;
 
-          clearTimeout(handleResultTimeout);
-          setTimeout(handleResult, 1);
+          clearTimeout(handleResultDebounceTimeout);
+          setTimeout(handleResult, 0);
         };
 
         xhr.open(opts.method, url);
@@ -1876,9 +1876,13 @@ I hope it works — firstly for me, and hopefully helps others.
           } else {
             if (capturedError) {
               console.log('XHR error ', capturedError, xhr);
-              reject(
-                (capturedError ? String(capturedError) + ' ' : '') +
-                'HTTP/' + xhr.status + ' ' + xhr.statusText);
+              if (!xhr.status && !capturedError.message)
+                reject('No access HTTP/' + xhr.status + (xhr.statusText ? ' ' + xhr.statusText : ''));
+              else
+                reject(
+                  (capturedError && capturedError.message ? capturedError.message :
+                    capturedError ? String(capturedError) + ' ' :
+                      '') + 'HTTP/' + xhr.status + ' ' + xhr.statusText);
             }
             else {
               console.log('XHR error, object: ', xhr);

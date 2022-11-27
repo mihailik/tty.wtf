@@ -601,17 +601,18 @@ body {
 }
 
 .CodeMirror .cm-req-verb {
-  padding: 0.1em;
-  padding-top: 0;
-  margin: -0.1em;
-  margin-top: 0;
-  background: rgba(0,0,0,0.1);
+  padding: 0.2em;
+  padding-top: 0.1em;
+  margin: -0.2em;
+  margin-top: -0.1em;
+  background: #ff00d833;
   border-radius: 0.5em;
   font-weight: bold;
 }
 
 .CodeMirror .cm-req-url {
   text-decoration: underline;
+  color: royalblue;
 }
 
 .CodeMirror .cm-req-header {
@@ -619,18 +620,31 @@ body {
   font-size: 85%;
 }
 
-#shell .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
+#shell #requestEditorHost .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
   text-indent: -3em;
   padding-left: 3.3em;
-  s-border-bottom: solid 1px gainsboro;
+  border-bottom: solid 1px #f0f0f0;
+  s-this-is-LINED-PAPER
+}
+
+#shell #requestEditorHost .CodeMirror-code *:last-child pre.CodeMirror-line:after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 100%;
+  height: 20000%;
+  background: repeating-linear-gradient(to bottom, #f0f0f0, #f0f0f0 1px, white 1px, white 1.25em);
+  s-this-is-LINED-PAPER
 }
 
 #shell .CodeMirror-gutters {
-  background: #fbfbfb;
+  background: #225368;
 }
 
-#shell .CodeMirror-gutter.CodeMirror-linenumber {
-  color: #ddd;
+#shell .CodeMirror-linenumber {
+  color: #5ab1be;
+  font-weight: 300;
 }
 #shell .CodeMirror-linenumber {
   min-width: 5em;
@@ -649,7 +663,7 @@ body {
 }
 
 #shell #contentPageHost #splitterOuter {
-  background: linear-gradient(to right, #fbfbfb 5em, #eee);
+  background: linear-gradient(to right, #225368 5em, #347c8d);
 }
 
 #shell #contentPageHost #splitter {
@@ -660,6 +674,7 @@ body {
 
 #shell #contentPageHost #splitterLabel {
   padding-left: 1em;
+  color: #98e0e9;
 }
 
 #shell #contentPageHost #splitterBorderTop {
@@ -670,10 +685,14 @@ body {
   background: linear-gradient(to right, transparent 1.2em, #dedada 1.5em, #d2d2d2);
 }
 
+#shell .CodeMirror-guttermarker-subtle {
+  color: #91d2db;
+}
+
 #shell #pseudoGutter {
   border-right: solid 1px #e4e4e4;
-  background: #fbfbfb;
-  color: #999;
+  background: #225368;
+  color: #5ab1be;
 
   position: absolute;
   left: 0; top: 0;
@@ -694,7 +713,7 @@ body {
 }
 
 #shell #leftBar {
-  background: #fbfbfb;
+  background: #004c8b;
 }
 
 #shell #leftBar #leftTop * {
@@ -729,7 +748,7 @@ body {
 
 <div id=shell style="position: fixed; left: 0; top: 0; width: 100%; height: 100%;  padding-left: 0.2em;">
 
-  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 0.2em;">
+  <div id=leftBar style="position: absolute; left: 0; top: 0; height: 100%; width: 0.25em;">
     <table style="width: 100%; height: 100%; position: absolute; z-index: 100000; pointer-events: none;" cellspacing=0 cellpadding=0>
     <tr><td valign=top id=leftTop>
       <!-- top sidebar -->

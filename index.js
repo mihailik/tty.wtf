@@ -490,8 +490,6 @@ function catchREST() {
 
   /** @param {string} firstLine */
   function parseFirstLine(firstLine) {
-    // TODO: detect verb, then URL, potentially infer HTTP/S protocol
-
     var verbMatch = /^(\s*)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace)(\s+|$)/i.exec(firstLine + '');
     if (!verbMatch) {
       var url = firstLine.replace(/^\s+/, '');
@@ -514,14 +512,13 @@ function catchREST() {
 
     var leadWhitespace = verbMatch[1] || '';
     var verb = verbMatch[2];
-    var trailWhitespace = verbMatch[3];
 
     // capitalised verb (first word) is a strong sign of just normal text
     if (verb.charAt(0).toUpperCase() + verb.slice(1).toLowerCase() === verb) return;
 
     var urlRest = firstLine.slice(leadWhitespace.length + verb.length);
     var url = urlRest.replace(/^\s+/, '');
-    var urlPos = leadWhitespace.length + urlRest.length - url.length;
+    var urlPos = leadWhitespace.length + verb.length + urlRest.length - url.length;
     url = url.replace(/\s+$/, '');
 
     if (!url) return; // empty URL is not good
@@ -529,7 +526,7 @@ function catchREST() {
     return {
       verb: verb,
       url: url,
-      verbPos: leadWhitespace,
+      verbPos: leadWhitespace.length,
       urlPos: urlPos
     };
   }
@@ -601,6 +598,25 @@ body {
   left: 0; top: 0;
   width: 100%; height: 100%;
   font: inherit;
+}
+
+.CodeMirror .cm-req-verb {
+  padding: 0.1em;
+  padding-top: 0;
+  margin: -0.1em;
+  margin-top: 0;
+  background: rgba(0,0,0,0.1);
+  border-radius: 0.5em;
+  font-weight: bold;
+}
+
+.CodeMirror .cm-req-url {
+  text-decoration: underline;
+}
+
+.CodeMirror .cm-req-header {
+  color: gray;
+  font-size: 85%;
 }
 
 #shell .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
@@ -4524,6 +4540,101 @@ I hope it works — firstly for me, and hopefully helps others.
 
     // #endregion PERSISTENCE
 
+    // #region CODEMIRROR PARSING MODE
+    /** @typedef {{
+     *  firstLine?: ReturnType<typeof parseFirstLine> | 'skip' | 'header' | 'body'
+     * }} RestRequestModeState */
+    /** @type {import('codemirror').ModeFactory<RestRequestModeState>} */
+    function restRequestMode(config, modeOptions) {
+      return {
+        name: 'rest-request',
+        token: processToken,
+        startState: defineStartState
+      };
+
+      function defineStartState() {
+        return {};
+      }
+
+      /**
+       * @param {import('codemirror').StringStream} stream
+       * @param {RestRequestModeState} state
+       */
+      function processToken(stream, state) {
+        var startPos = stream.pos;
+        var res = processTokenCore(stream, state);
+        console.log(
+          'token: ' +
+          (startPos > 0 ? '_' + stream.string.slice(0, startPos) + '_' : '_') +
+          res + ':"' + stream.string.slice(startPos, stream.pos) + '"' +
+          (stream.pos < stream.string.length ? '_' + stream.string.slice(stream.pos) + '_' : '_')
+        );
+
+        return res;
+      }
+
+      /**
+       * @param {import('codemirror').StringStream} stream
+       * @param {RestRequestModeState} state
+       */
+      function processTokenCore(stream, state) {
+        if (!state.firstLine)
+          state.firstLine = parseFirstLine(stream.string) || 'skip';
+
+        if (state.firstLine === 'skip') {
+          while (stream.next() && stream.column()) { /* skip until end of line/text */ };
+          return 'text';
+        }
+
+        if (state.firstLine === 'header') {
+          if (/^\s/.test(stream.string)) {
+            while (stream.next() && stream.column()) { /* skip until end of line/text */ };
+            return 'req-header';
+          }
+          state.firstLine = 'body';
+        }
+
+        if (state.firstLine === 'body') {
+          // this is body/headers
+          var nextPeek = stream.string;
+          stream.skipToEnd();
+          return 'text';
+        }
+
+        if (state.firstLine.verbPos >= 0) {
+          if (stream.pos < state.firstLine.verbPos) {
+            while (stream.pos < state.firstLine.verbPos) stream.next();
+            return 'whitespace';
+          }
+          else if (stream.pos < state.firstLine.verbPos + state.firstLine.verb.length) {
+            while (stream.pos < state.firstLine.verbPos + state.firstLine.verb.length) stream.next();
+            if (state.firstLine.urlPos < 0) state.firstLine = 'header';
+            return 'req-verb';
+          }
+        }
+
+        if (state.firstLine.url) {
+          if (stream.pos < state.firstLine.urlPos) {
+            while (stream.pos < state.firstLine.urlPos) stream.next();
+            return 'whitespace';
+          }
+          else if (stream.pos < state.firstLine.urlPos + state.firstLine.url.length) {
+            while (stream.pos < state.firstLine.urlPos + state.firstLine.url.length) stream.next();
+            state.firstLine = 'header';
+            return 'req-url';
+          }
+          state.firstLine = 'header';
+          stream.next();
+          return 'whitespace';
+        }
+
+        state.firstLine = 'body';
+        stream.next();
+        return 'body';
+      }
+    }
+    // #endregion
+
     /**
      * @param {{
      *  parentElement: HTMLElement;
@@ -4777,6 +4888,10 @@ I hope it works — firstly for me, and hopefully helps others.
         if (typeof modeOverride !== 'undefined') verb = modeOverride;
         layout.leftBottom.textContent = drinkChar + ' OK';
 
+        // @ts-ignore
+        CodeMirror
+          .defineMode('rest-request', restRequestMode);
+
         layout.requestEditorHost.innerHTML = '';
         if (verb === 'splash') {
           var editor = createCodeMirrorWithFirstClickChange(
@@ -4799,7 +4914,7 @@ I hope it works — firstly for me, and hopefully helps others.
               autofocus: true
             },
             function () {
-              editor.setOption('mode', isPlainTextVerb(verb) ? 'markdown' : 'javascript');
+              editor.setOption('mode', isPlainTextVerb(verb) ? 'markdown' : 'rest-request');
               editor.setValue(text);
               editor.on('changes', debounce(function () {
                 updateVerbAutoDetect(true);
@@ -4813,7 +4928,7 @@ I hope it works — firstly for me, and hopefully helps others.
               layout.requestEditorHost,
               {
                 value: text,
-                mode: verb,
+                mode: isPlainTextVerb(verb) ? 'markdown' : 'rest-request',
                 inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
                 lineNumbers: true,
                 extraKeys: {

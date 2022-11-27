@@ -677,14 +677,6 @@ body {
   color: #98e0e9;
 }
 
-#shell #contentPageHost #splitterBorderTop {
-  background: linear-gradient(to right, transparent 5.4em, #f3f3f3 6.5em, #e6e6e6);
-}
-
-#shell #contentPageHost #splitterBorderBottom {
-  background: linear-gradient(to right, transparent 1.2em, #dedada 1.5em, #d2d2d2);
-}
-
 #shell .CodeMirror-guttermarker-subtle {
   color: #91d2db;
 }
@@ -713,7 +705,7 @@ body {
 }
 
 #shell #leftBar {
-  background: #004c8b;
+  background: #0c4d69;
 }
 
 #shell #leftBar #leftTop * {
@@ -726,10 +718,12 @@ body {
   height: 4em;
   margin-top: 3em;
   margin-left: 0.6em;
-  border: solid 1px #bbb;
-  background: silver;
-  box-shadow: inset 1px 1px 3px white, inset -2px -2px 3px #6a6666, 3px 3px 8px #cac8c8;
+  border: solid 1px #870000;
+  background: #f5adad;
+  box-shadow: inset 2px 2px 3px white, inset -2px -2px 3px #963232, 3px 3px 8px #00405c;
   cursor: pointer;
+  color: #7f053c;
+  text-shadow: -1px -1px 2px #4101017d, 1px 1px 2px #ffffffba;
 }
 
   */});
@@ -5188,12 +5182,6 @@ Edit
           var bottomHost = splitterLayout.bottomHost;
           var splitterOuter = splitterLayout.splitterOuter;
 
-          var splitterBorderTop = document.createElement('div');
-          splitterBorderTop.style.cssText =
-            'position: absolute; left: 0; top: -1px; width: 100%; height: 1px;';
-          splitterBorderTop.id = 'splitterBorderTop';
-          splitterOuter.appendChild(splitterBorderTop);
-
           var splitterContainer = document.createElement('div');
           splitterContainer.style.cssText =
             'position: relative; width: 100%; height: 100%;';
@@ -5204,12 +5192,6 @@ Edit
             '<table style="width: 100%; height: 100%; position: absolute;" cellspacing=0 cellpadding=0> ' +
             '<tr><td id=splitterLabel></td></tr></table>';
           var splitterMainPanel = splitterContainer.getElementsByTagName('td')[0];
-
-          var splitterBorderBottom = document.createElement('div');
-          splitterBorderBottom.style.cssText =
-            'position: relative; width: 100%; height: 1px;';
-          splitterBorderBottom.id = 'splitterBorderBottom';
-          splitterOuter.appendChild(splitterBorderBottom);
 
           return {
             bottomHost: bottomHost,

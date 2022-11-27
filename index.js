@@ -574,7 +574,7 @@ html {
   margin:0;padding:0;
   width:100%;height:100%;
 
-  background: white; color: black;
+  background: #225368; color: black;
   font-family:
     "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans",
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",

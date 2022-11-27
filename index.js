@@ -562,6 +562,363 @@ function catchREST() {
 
   //#endregion SHARED FUNCTIONALITY
 
+  // #region UNICODE-STYLING
+
+  var variants = {
+    bold: { AZ: '𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭', az: '𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇', '09': '𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵' },
+    italic: { AZ: '𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡', az: '𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻' },
+    bolditalic: { AZ: '𝘼𝘽𝘾𝘿𝙀𝙁𝙂𝙃𝙄𝙅𝙆𝙇𝙈𝙉𝙊𝙋𝙌𝙍𝙎𝙏𝙐𝙑𝙒𝙓𝙔𝙕', az: '𝙖𝙗𝙘𝙙𝙚𝙛𝙜𝙝𝙞𝙟𝙠𝙡𝙢𝙣𝙤𝙥𝙦𝙧𝙨𝙩𝙪𝙫𝙬𝙭𝙮𝙯' },
+    fractur: { AB: '𝔄𝔅', C: 'ℭ', DG: '𝔇𝔈𝔉𝔊', HI: 'ℌℑ', JQ: '𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔', R: 'ℜ', SY: '𝔖𝔗𝔘𝔙𝔚𝔛𝔜', Z: 'ℨ', az: '𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷' },
+    boldfractur: { AZ: '𝕬𝕭𝕮𝕯𝕰𝕱𝕲𝕳𝕴𝕵𝕶𝕷𝕸𝕹𝕺𝕻𝕼𝕽𝕾𝕿𝖀𝖁𝖂𝖃𝖄𝖅', az: '𝖆𝖇𝖈𝖉𝖊𝖋𝖌𝖍𝖎𝖏𝖐𝖑𝖒𝖓𝖔𝖕𝖖𝖗𝖘𝖙𝖚𝖛𝖜𝖝𝖞𝖟' },
+    cursive: { AZ: '𝒜𝐵𝒞𝒟𝐸𝐹𝒢𝐻𝐼𝒥𝒦𝐿𝑀𝒩𝒪𝒫𝒬𝑅𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵', az: '𝒶𝒷𝒸𝒹𝑒𝒻𝑔𝒽𝒾𝒿𝓀𝓁𝓂𝓃𝑜𝓅𝓆𝓇𝓈𝓉𝓊𝓋𝓌𝓍𝓎𝓏' }, // TODO: handle cursive B, E, F, H, I, L, M, R
+    boldcursive: { AZ: '𝓐𝓑𝓒𝓓𝓔𝓕𝓖𝓗𝓘𝓙𝓚𝓛𝓜𝓝𝓞𝓟𝓠𝓡𝓢𝓣𝓤𝓥𝓦𝓧𝓨𝓩', az: '𝓪𝓫𝓬𝓭𝓮𝓯𝓰𝓱𝓲𝓳𝓴𝓵𝓶𝓷𝓸𝓹𝓺𝓻𝓼𝓽𝓾𝓿𝔀𝔁𝔂𝔃' },
+    super: { AP: 'ᴬᴮᶜᴰᴱᶠᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾ', Q: 'ᴼ̴', RW: 'ᴿˢᵀᵁⱽᵂ', ap: 'ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖ', q: '٩', rz: 'ʳˢᵗᵘᵛʷˣʸᶻ', '09': '⁰¹²³⁴⁵⁶⁷⁸⁹' },
+    box: { AZ: '🄰🄱🄲🄳🄴🄵🄶🄷🄸🄹🄺🄻🄼🄽🄾🄿🅀🅁🅂🅃🅄🅅🅆🅇🅈🅉' },
+    plate: { AZ: '🅰🅱🅲🅳🅴🅵🅶🅷🅸🅹🅺🅻🅼🅽🅾🅿🆀🆁🆂🆃🆄🆅🆆🆇🆈🆉' },
+    round: { AZ: 'ⒶⒷⒸⒹⒺⒻⒼⒽⒾⒿⓀⓁⓂⓃⓄⓅⓆⓇⓈⓉⓊⓋⓌⓍⓎⓏ', az: 'ⓐⓑⓒⓓⓔⓕⓖⓗⓘⓙⓚⓛⓜⓝⓞⓟⓠⓡⓢⓣⓤⓥⓦⓧⓨⓩ', '09': '⓪①②③④⑤⑥⑦⑧⑨' },
+    typewriter: { AZ: '𝙰𝙱𝙲𝙳𝙴𝙵𝙶𝙷𝙸𝙹𝙺𝙻𝙼𝙽𝙾𝙿𝚀𝚁𝚂𝚃𝚄𝚅𝚆𝚇𝚈𝚉', az: '𝚊𝚋𝚌𝚍𝚎𝚏𝚐𝚑𝚒𝚓𝚔𝚕𝚖𝚗𝚘𝚙𝚚𝚛𝚜𝚝𝚞𝚟𝚠𝚡𝚢𝚣', '09': '𝟶𝟷𝟸𝟹𝟺𝟻𝟼𝟽𝟾𝟿' },
+    wide: {
+      AB: '𝔸𝔹', C: 'ℂ', DG: '𝔻𝔼𝔽𝔾', H: 'ℍ', IM: '𝕀𝕁𝕂𝕃𝕄', N: 'ℕ', O: '𝕆', PR: 'ℙℚℝ', SY: '𝕊𝕋𝕌𝕍𝕎𝕏𝕐', Z: 'ℤ',
+      az: '𝕒𝕓𝕔𝕕𝕖𝕗𝕘𝕙𝕚𝕛𝕜𝕝𝕞𝕟𝕠𝕡𝕢𝕣𝕤𝕥𝕦𝕧𝕨𝕩𝕪𝕫', '09': '𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡'
+    }
+  };
+
+  /** @type {ReturnType<typeof createParser>} */
+  var _parseRanges;
+
+  /**
+ * @param text {string}
+ * @param modifier {string}
+ * @param remove {boolean=}
+ **/
+  function applyModifier(text, modifier, remove) {
+    if (!_parseRanges) _parseRanges = createParser();
+    var parsed = _parseRanges(text, { disableCoalescing: true });
+    var text = '';
+
+    for (var iRange = 0; iRange < parsed.length; iRange++) {
+      var range = parsed[iRange];
+
+      if (typeof range === 'string') {
+        if (remove) {
+          text += range;
+        } else {
+          var rangeMap = variants[modifier];
+          if (!rangeMap && modifier !== 'underlined') {
+            // strange modifier???
+            text += range;
+          } else {
+            for (var iChar = 0; iChar < range.length; iChar++) {
+              // range is an ASCII string, iterate for each character
+              var ch = range.charAt(iChar);
+              var formattedCh = applyModifierToPlainCh(ch, [modifier]);
+              text += formattedCh;
+            }
+          }
+        }
+      } else {
+        /** @type {string} */
+        var applyFullModifiers;
+        if (remove) {
+          if (range.modifiers.indexOf(modifier) < 0) {
+            // formatted, but not with this modifier — not removing anything
+            text += range.formatted;
+            continue;
+          } else if (range.modifiers.length === 1) {
+            // last modifier to be removed, simply reduce back to ASCII unformatted
+            text += range.plain;
+            continue;
+          } else {
+            applyFullModifiers = range.modifiers.filter(mod => mod !== modifier).join('');
+          }
+        } else {
+          applyFullModifiers = range.modifiers.indexOf(modifier) < 0 ?
+            range.modifiers.concat([modifier]).sort().join('') :
+            range.fullModifiers;
+        }
+
+        var formattedCh = applyModifierToPlainCh(
+          range.plain,
+          applyFullModifiers === modifier ? [modifier] : [applyFullModifiers, modifier]);
+        text += formattedCh;
+      }
+    }
+
+    return text;
+  }
+
+  var regex_underlined = /underlined/g;
+
+  /**
+   * @param plainCh {string}
+   * @param modifierAndFallbacks {string[]}
+   **/
+  function applyModifierToPlainCh(plainCh, modifierAndFallbacks) {
+    // underlined is handled separately
+    if (modifierAndFallbacks.length === 1 && modifierAndFallbacks[0] === 'underlined') return plainCh + '\u0332';
+
+    for (var iMod = 0; iMod < modifierAndFallbacks.length; iMod++) {
+      var mod = modifierAndFallbacks[iMod];
+
+      // again, underlined is handled separately
+      var underlined = regex_underlined.test(mod);
+      if (underlined) mod = mod.replace(regex_underlined, '');
+      if (!mod && underlined) {
+        return plainCh + '\u0332';
+      }
+
+      var rangeMap = variants[mod];
+      if (!rangeMap) continue;
+
+      var formattedRange = rangeMap[plainCh];
+      if (formattedRange) return formattedRange;
+
+      for (var asciiRange in rangeMap) {
+        var formattedRange = rangeMap[asciiRange];
+        if (typeof formattedRange === 'string' && plainCh.charCodeAt(0) >= asciiRange.charCodeAt(0) && plainCh.charCodeAt(0) <= asciiRange.charCodeAt(1)) {
+          // found respective range in modifier entry, pick corresponding formatted character
+          var formattedIndex = plainCh.charCodeAt(0) - asciiRange.charCodeAt(0);
+          var formattedUnit = formattedRange.length / (asciiRange.charCodeAt(1) - asciiRange.charCodeAt(0) + 1);
+          var formattedChar = formattedRange.slice(formattedIndex * formattedUnit, (formattedIndex + 1) * formattedUnit);
+          if (underlined) formattedChar += '\u0332';
+          return formattedChar;
+        }
+      }
+    }
+
+    return plainCh;
+  }
+
+  var regex_escapeableRegexChars = /[#-.]|[[-^]|[?|{}]/g;
+
+  /** @param str {string} */
+  function sanitizeForRegex(str) {
+    var sanitized = str.replace(regex_escapeableRegexChars, '\\$&');
+    return sanitized;
+  }
+
+
+  function createParser() {
+
+    /** @typedef {{ formatted: string, plain: string, modifiers: string[], fullModifiers: string }} LookupEntry */
+
+    /** @type {{ [formatted: string]: (LookupEntry & {underlinedModifiers: string[], underlinedFullModifiers: string}) }} */
+    var lookup = {};
+
+    /** @type {RegExp} */
+    var formattedRegex;
+
+    var regex_underlinedChar = /[^\r\n]\u0332/g;
+
+    function buildLookups() {
+      /** @type {LookupEntry[]} */
+      var lookupList = [];
+
+      for (var modKind in variants) {
+        var rangeMap = variants[modKind];
+        if (!rangeMap || typeof rangeMap !== 'object') continue;
+
+        var modifiers = modKind === 'bold' || modKind.indexOf('bold') ? [modKind] : ['bold', modKind.slice(4)];
+        var underlinedModifiers = modifiers.concat(['underlined']);
+        var underlinedFullModifiers = modKind + 'underlined';
+
+        for (var rangeDesc in rangeMap) {
+          var rangeChars = rangeMap[rangeDesc];
+          if (!rangeChars || typeof rangeChars !== 'string') continue;
+
+          var rangeCount = rangeDesc.length === 1 ? 1 : rangeDesc.charCodeAt(1) - rangeDesc.charCodeAt(0) + 1;
+          var formattedWidth = rangeChars.length / rangeCount;
+          for (let i = 0; i < rangeCount; i++) {
+            var ascii = String.fromCharCode(rangeDesc.charCodeAt(0) + i);
+            var rangeCh = rangeChars.slice(i * formattedWidth, (i + 1) * formattedWidth);
+            var entry = {
+              formatted: rangeCh,
+              plain: ascii,
+              modifiers: modifiers,
+              underlinedModifiers: underlinedModifiers,
+              fullModifiers: modKind,
+              underlinedFullModifiers: underlinedFullModifiers
+            };
+            lookupList.push(entry);
+            lookup[entry.formatted] = entry;
+          }
+        }
+      }
+
+      lookupList.sort(function (entry1, entry2) {
+        return -(entry1.formatted.length - entry2.formatted.length);
+      });
+
+      formattedRegex = new RegExp(lookupList.map(function (entry) {
+        var sanitizedEntry = sanitizeForRegex(entry.formatted);
+        var underlineEntry = sanitizedEntry + '\u0332';
+        return underlineEntry + '|' + sanitizedEntry;
+      }).join('|'), 'g');
+    }
+
+    /** @typedef {(string | (LookupEntry & { length: number }))[] & { modifiers: string[], fullModifiers: string }} ParsedList */
+
+    /**
+     * @param text {string}
+     * @param options {{ disableCoalescing?: boolean }=}
+     **/
+    function parser(text, options) {
+
+      /**
+       * @param start {number}
+       * @param end {number}
+       **/
+      function addUnderlinedsAndPlainTextBetween(start, end) {
+        while (start < end) {
+          regex_underlinedChar.lastIndex = start;
+          var matchUnderlined = regex_underlinedChar.exec(text);
+          if (!matchUnderlined || matchUnderlined.index >= end) {
+            addFormattedToResult(text.slice(start, end));
+            break;
+          }
+
+          if (matchUnderlined.index > start) addFormattedToResult(text.slice(start, matchUnderlined.index));
+
+          var underlinedText = matchUnderlined[0];
+          var plain = underlinedText.slice(0, underlinedText.length - 1);
+
+          var added = false;
+          if (!disableCoalescing) {
+            var prevEntry = result.length && result[result.length - 1];
+            if (prevEntry && typeof prevEntry !== 'string' && prevEntry.fullModifiers === 'underlined') {
+              added = true;
+              prevEntry.formatted += underlinedText;
+              prevEntry.plain += plain;
+              prevEntry.length += underlinedText.length;
+            }
+          }
+
+          if (!added) {
+            addFormattedToResult({
+              formatted: underlinedText,
+              plain: plain,
+              modifiers: ['underlined'],
+              fullModifiers: 'underlined',
+              length: underlinedText.length
+            });
+          }
+
+          if (result.modifiers.indexOf('underlined') < 0) result.modifiers.push('underlined');
+
+          start = matchUnderlined.index + underlinedText.length;
+        }
+      }
+
+      var regex_formattableCharacters = /[a-z0-9]/;
+
+      /** @param {typeof result[0]} entry */
+      function addFormattedToResult(entry) {
+        var prev = result.length && result[result.length - 1];
+
+        if (!disableCoalescing) {
+          if (typeof entry === 'string') {
+            if (typeof prev === 'string') {
+              result[result.length - 1] = prev + entry;
+              return;
+            }
+          } else if (prev) {
+            if (typeof prev === 'string') {
+              var nextPrev = result.length > 1 && result[result.length - 2];
+              if (nextPrev && typeof nextPrev !== 'string' &&
+                nextPrev.fullModifiers === entry.fullModifiers &&
+                !regex_formattableCharacters.test(prev) && prev.indexOf('\n') < 0) {
+                nextPrev.formatted += prev + entry.formatted;
+                nextPrev.plain += prev + entry.plain;
+                nextPrev.length += prev.length + entry.length;
+                result.pop(); // plain text in the middle eliminated
+                return;
+              }
+            }
+            else if (prev.fullModifiers === entry.fullModifiers) {
+              prev.formatted += entry.formatted;
+              prev.plain += entry.plain;
+              prev.length += entry.length;
+              return;
+            }
+          }
+        }
+
+        if (typeof entry !== 'string' && (!prev || typeof prev === 'string' || prev.fullModifiers !== entry.fullModifiers))
+          for (var i = 0; i < entry.modifiers.length; i++) {
+            var mod = entry.modifiers[i];
+            if (!modifierDict[mod]) {
+              modifierDict[mod] = true;
+              result.modifiers.push(mod);
+            }
+          }
+
+        result.push(entry);
+      }
+
+      /** @type {ParsedList} */
+      var result = /** @type{*} */([]);
+      result.modifiers = [];
+      result.fullModifiers = '';
+      if (!text) return result;
+
+      var disableCoalescing = options && options.disableCoalescing;
+
+      var modifierDict = {};
+
+      formattedRegex.lastIndex = 0;
+      let index = 0;
+      while (true) {
+        formattedRegex.lastIndex = index;
+        var match = formattedRegex.exec(text);
+        if (!match) break;
+
+        if (match.index > index) {
+          addUnderlinedsAndPlainTextBetween(index, match.index);
+          // result.push(text.slice(index, match.index));
+        }
+
+        var underlined = false;
+
+        var entryKey = match[0];
+        if (entryKey.charCodeAt(entryKey.length - 1) === ('\u0332').charCodeAt(0)) {
+          entryKey = entryKey.slice(0, entryKey.length - 1);
+          underlined = true;
+        }
+
+        var entry = lookup[entryKey];
+        var prev = result.length && result[result.length - 1];
+
+        var modifiers = !underlined ? entry.modifiers : entry.underlinedModifiers;
+        var fullModifiers = !underlined ? entry.fullModifiers : entry.underlinedFullModifiers;
+
+        addFormattedToResult({
+          formatted: match[0],
+          plain: entry.plain,
+          modifiers: modifiers,
+          fullModifiers: fullModifiers,
+          length: match[0].length
+        });
+
+        index = match.index + match[0].length;
+      }
+
+      if (index < text.length) {
+        addUnderlinedsAndPlainTextBetween(index, text.length);
+      }
+
+      result.modifiers.sort();
+      result.fullModifiers = result.modifiers.join('');
+
+      return result;
+    }
+
+    buildLookups();
+
+    return parser;
+  }
+
+  // #endregion
+
   // #region EMBEDDED RESOURCES
 
   var catchREST_hash = calcHash(catchREST + '').toString(36);

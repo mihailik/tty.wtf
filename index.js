@@ -368,10 +368,10 @@ function catchREST() {
       if (addrEndPos > 0 && encodedStr.charAt(addrEndPos - 1) === ':')
         addrEndPos = encodedStr.indexOf('//', addrEndPos + 2);
       if (addrEndPos >= 0) {
-        addr = encodedStr.slice(0, addrEndPos); // TODO: unescape strange characters here?
+        addr = decodeURIComponent(encodedStr.slice(0, addrEndPos)); // TODO: unescape strange characters here?
         encodedStr = encodedStr.slice(addrEndPos + 2);
       } else {
-        addr = encodedStr;
+        addr = decodeURIComponent(encodedStr);
         encodedStr = '';
       }
 
@@ -488,14 +488,6 @@ function catchREST() {
     };
   }
 
-  function decodeURLText(encodedUrl) {
-    return (
-      encodedUrl
-        .replace(/\s+$/, '')
-        .replace(/%2f/i, '/')
-    );
-  }
-
   /** @param {string} firstLine */
   function parseFirstLine(firstLine) {
     var verbMatch = /^(\s*)(local|read|edit|view|browse|shell|get|post|put|head|delete|option|connect|trace)(\s+|$)/i.exec(firstLine + '');
@@ -505,8 +497,6 @@ function catchREST() {
       if (url.indexOf('http:') === 0 || url.indexOf('https:') === 0) {
         url = url.replace(/\s+$/, '');
         if (!url || /\s/.test(url)) return; // do not allow whitespace inside implied verb-less URL
-
-        url = decodeURLText(url);
 
         return {
           verb: 'GET',
@@ -530,7 +520,6 @@ function catchREST() {
     var url = urlRest.replace(/^\s+/, '');
     var urlPos = leadWhitespace.length + verb.length + urlRest.length - url.length;
     url = url.replace(/\s+$/, '');
-    url = decodeURLText(url);
 
     if (!url) return; // empty URL is not good
 

@@ -420,7 +420,7 @@ function catchREST() {
 
   /**
    * @param {string} verb
-   * * @param {string} url
+   * @param {string} url
    * @param {string} body
    */
   function makeEncodedURL(verb, url, body) {

@@ -353,7 +353,7 @@ function catchREST() {
     }
 
     if (verb === 'http:' || verb === 'https:') {
-      encodedStr = verb + encodedStr;
+      encodedStr = verb + '/' + encodedStr;
       verb = 'GET';
       verbPos = -1;
     }
@@ -425,23 +425,41 @@ function catchREST() {
    */
   function makeEncodedURL(verb, url, body) {
     if (!verb) {
-      if (url) verb = 'GET';
+      if (url) {
+        if (!/^(http|https):/i.test(url)) verb = 'GET';
+      }
       else verb = 'edit';
     }
 
-    var normalizedUrl = !url ? '' :
-      encodeURI(url)
-        .replace(
-          /(^http:)|(^https:)|(\/\/)|(#)|(\&)|(\?)/gi,
-          function (whole, httpPrefix, httpSecurePrefix, slash, hash, ampersand, question) {
-            return (
-              slash ? '/%2F' :
-                hash ? '%23' :
-                  ampersand ? '%26' :
-                    question ? '%3F' :
-                      whole
-            );
-          });
+    if (verb) {
+      var normalizedUrl = !url ? '' :
+        encodeURI(url)
+          .replace(
+            /(^http:)|(^https:)|(\/\/)|(#)|(\&)|(\?)/gi,
+            function (whole, httpPrefix, httpSecurePrefix, slash, hash, ampersand, question) {
+              return (
+                slash ? '/%2F' :
+                  hash ? '%23' :
+                    ampersand ? '%26' :
+                      question ? '%3F' :
+                        whole
+              );
+            });
+    } else {
+      var normalizedUrl = !url ? '' :
+        encodeURI(url)
+          .replace(
+            /(^http:(\/\/)?)|(^https:(\/\/)?)|(\/\/)|(#)|(\&)|(\?)/gi,
+            function (whole, httpPrefix, httpSecurePrefix, httpSlash2, httpsSlash2, slash, hash, ampersand, question) {
+              return (
+                slash ? '/%2F' :
+                  hash ? '%23' :
+                    ampersand ? '%26' :
+                      question ? '%3F' :
+                        whole
+              );
+            });
+    }
 
     var normalizedBody = body
       .replace(
@@ -462,7 +480,9 @@ function catchREST() {
 
     var result =
       isPlainTextVerb(verb) ? verb + '/' + normalizedBody :
-      verb + (normalizedUrl ? '/' + normalizedUrl : '') + (normalizedBody ? '//' + normalizedBody : '');
+        (verb ? verb + '/' : '') + (normalizedUrl ? normalizedUrl : '') + (
+          (normalizedBody && (verb || normalizedUrl)) ? '//' + normalizedBody : normalizedBody || ''
+        );
     return result;
   }
 
@@ -5861,8 +5881,20 @@ Send this to test?
                 .replace(/^\/+/, '').replace(/\/+$/, '');
             if (injectLeadPath) slashSeparated.push(injectLeadPath);
           } else {
-            var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/').replace(/^\/+/, '').replace(/\/+$/, '');
-            if (injectLeadPath) slashSeparated.push(injectLeadPath);
+            if (enc && enc.encodedUrl && enc.encodedUrl.addr) {
+              var rawVerb = getVerb(location.pathname);
+              if (rawVerb) {
+                var injectLeadPath =
+                  location.pathname.slice(0, rawVerb.index)
+                    .replace(/^\/+/, '').replace(/\/+$/, '');
+                if (injectLeadPath) slashSeparated.push(injectLeadPath);
+              }
+            }
+
+            if (!rawVerb) {
+              var injectLeadPath = location.pathname.replace(/\/([^\/]+)$/, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+              if (injectLeadPath) slashSeparated.push(injectLeadPath);
+            }
           }
         }
 

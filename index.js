@@ -5630,19 +5630,22 @@ I hope it works — firstly for me, and hopefully helps others.
 
           if (!modifyText) return;
 
-          var newText = leadText + applyModifier(
+          var replacedModifyText = applyModifier(
             modifyText,
             modifier,
-            remove) + trailText;
+            remove);
+
+          var newText = leadText + replacedModifyText + trailText;
 
           if (oldText !== newText) {
-            editor.setValue(newText);
-            if (selectionStartPos !== leadText.length) {
-              //editor.setSelection().selectionStart = leadText.length;
-            }
-            //if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
+            editor.replaceSelection(replacedModifyText);
+            // editor.setValue(newText);
+            // if (selectionStartPos !== leadText.length) {
+            //   //editor.setSelection().selectionStart = leadText.length;
+            // }
+            // //if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
 
-            // onchange - already triggers?
+            // // onchange - already triggers?
           }
         }
 

@@ -5469,6 +5469,9 @@ I hope it works — firstly for me, and hopefully helps others.
             if (!plainTextSidebarLayout) {
               plainTextSidebarLayout = createPlainTextSidebarLayout();
               layout.leftTop.appendChild(plainTextSidebarLayout.container);
+              for (var iButton = 0; iButton < plainTextSidebarLayout.buttons.length; iButton++) {
+                addHandler(plainTextSidebarLayout.buttons[iButton]);
+              }
             } else {
               plainTextSidebarLayout.container.style.pointerEvents = 'all';
               plainTextSidebarLayout.container.style.opacity = '1';
@@ -5564,6 +5567,82 @@ I hope it works — firstly for me, and hopefully helps others.
               buttonsHTML += '<button id=' + mod + '><span class=mod-button-content>' + symbolHTML + '</span></button>';
             }
             return buttonsHTML;
+          }
+        }
+
+        /** @param {HTMLButtonElement} btn */
+        function addHandler(btn) {
+          btn.onmousedown = btn_onmousedown;
+          btn.onmouseup = btn_mouseup;
+          btn.onclick = btn_click;
+
+          /** @param {MouseEvent} evt */
+          function btn_onmousedown(evt) {
+            if (evt.preventDefault) evt.preventDefault();
+            if (evt.stopPropagation) evt.stopPropagation();
+            if ('cancelBubble' in evt) evt.cancelBubble = true;
+
+            handleClick();
+          }
+
+          /** @param {MouseEvent} evt */
+          function btn_mouseup(evt) {
+            if (evt.preventDefault) evt.preventDefault();
+            if (evt.stopPropagation) evt.stopPropagation();
+            if ('cancelBubble' in evt) evt.cancelBubble = true;
+          }
+
+          /** @param {MouseEvent} evt */
+          function btn_click(evt) {
+            if (evt.preventDefault) evt.preventDefault();
+            if (evt.stopPropagation) evt.stopPropagation();
+            if ('cancelBubble' in evt) evt.cancelBubble = true;
+          }
+
+          function handleClick() {
+            var modifier = btn.id;
+            var remove = (btn.className || '').indexOf('pressed') >= 0;
+            applyModifierToSelection(modifier, remove);
+          }
+        }
+
+        /**
+         * @param modifier {string}
+         * @param remove {boolean=}
+         **/
+        function applyModifierToSelection(modifier, remove) {
+          var oldText = editor.getValue();
+          var selectionStartCoord = editor.getCursor('from');
+          var selectionEndCoord = editor.getCursor('to');
+          var selectionStartPos = editor.indexFromPos(selectionStartCoord);
+          var selectionEndPos = editor.indexFromPos(selectionEndCoord);
+          if (selectionStartPos > selectionEndPos) {
+            var _m = selectionEndPos;
+            selectionEndPos = selectionStartPos;
+            selectionStartPos = _m;
+          }
+
+          if (!modifier || !oldText) return;
+
+          var leadText = oldText.slice(0, selectionStartPos);
+          var modifyText = oldText.slice(selectionStartPos, selectionEndPos);
+          var trailText = oldText.slice(selectionEndPos);
+
+          if (!modifyText) return;
+
+          var newText = leadText + applyModifier(
+            modifyText,
+            modifier,
+            remove) + trailText;
+
+          if (oldText !== newText) {
+            editor.setValue(newText);
+            if (selectionStartPos !== leadText.length) {
+              //editor.setSelection().selectionStart = leadText.length;
+            }
+            //if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
+
+            // onchange - already triggers?
           }
         }
 

@@ -1090,7 +1090,8 @@ body {
   background: #0c4d69;
 }
 
-#shell #leftBar #leftTop * {
+#shell #leftBar #leftTop > * {
+  position: relative;
   pointer-events: auto;
 }
 
@@ -1106,6 +1107,43 @@ body {
   cursor: pointer;
   color: #7f053c;
   text-shadow: -1px -1px 2px #4101017d, 1px 1px 2px #ffffffba;
+}
+
+#shell #editorModeSidebar button {
+  border-radius: 100%;
+  width: 7em;
+  height: 7em;
+  margin-top: 0.5em;
+  margin-left: 1.3em;
+  border: solid 1px #4a739f;
+  background: #b5dbe0;
+  box-shadow: inset 2px 2px 3px white, inset -2px -2px 3px #327285, 3px 3px 8px #00405c;
+  cursor: pointer;
+  color: #103a5f;
+  text-shadow: -1px -1px 2px #011a418a, 1px 1px 2px #ffffffba;
+  font-size: 60%;
+}
+
+#shell #editorModeSidebar button .symbol-formatted {
+  font-size: 340%;
+  position: relative;
+  top: 0.08em;
+  left: -0.02em;
+}
+
+#shell #editorModeSidebar button#italic .symbol-formatted { left: -0.07em; }
+#shell #editorModeSidebar button#cursive .symbol-formatted { left: 0.1em; }
+#shell #editorModeSidebar button#box .symbol-formatted { left: 0.05em; top: 0.08em; }
+#shell #editorModeSidebar button#plate .symbol-formatted { top: 0.14em; }
+#shell #editorModeSidebar button#typewriter .symbol-formatted { left: 0.14em; }
+#shell #editorModeSidebar button#typewriter .mod-button-content {
+  position: relative;
+  left: -0.4em;
+}
+
+#shell #editorModeSidebar button#cursive .mod-button-content {
+  position: relative;
+  left: -0.5em;
 }
 
   */});
@@ -5467,7 +5505,8 @@ I hope it works — firstly for me, and hopefully helps others.
 
         function createRequestVerbSidebarLayout() {
           var layoutElem = document.createElement('div');
-          layoutElem.style.cssText = 'transition: opacity 350ms;'
+          layoutElem.id = 'requestModeSidebar';
+          layoutElem.style.cssText = 'transition: opacity 350ms; position: absolute; width: 100%; height: 100%;'
           layoutElem.innerHTML = '<button class=goButton></button>';
           var goButton = /** @type {HTMLButtonElement} */(layoutElem.getElementsByClassName('goButton')[0]);
 
@@ -5478,17 +5517,54 @@ I hope it works — firstly for me, and hopefully helps others.
         }
 
         function createPlainTextSidebarLayout() {
-          var layout = document.createElement('div');
           var layoutElem = document.createElement('div');
-          layoutElem.style.cssText = 'transition: opacity 350ms;'
-          layoutElem.innerHTML = getFunctionCommentContent(function () {/*
-Text<br>
-Edit
-          */});
+          layoutElem.id = 'editorModeSidebar';
+          layoutElem.style.cssText = 'transition: opacity 350ms; position: absolute; overflow-y: auto; height: 100%;'
+          layoutElem.innerHTML = createButtonsHTML();
+
+          var buttons = [];
+          var buttonList = layoutElem.getElementsByTagName('button');
+          for (var i = 0; i < buttonList.length; i++) {
+            var btn = buttonList[i] || (buttonList.item ? buttonList.item(i) : void 0);
+            if (btn) {
+              buttons.push(btn);
+            }
+          }
 
           return {
             container: layoutElem,
+            buttons
           };
+
+          function createButtonsHTML() {
+            var buttonsHTML = '';
+            var addedSymbols = '';
+            var modList = [];
+            for (var mod in variants) {
+              if (mod !== 'bold' && /^bold/.test(mod)) continue;
+              modList.push(mod);
+              // underline is treated differently, keep track of it though
+              if (mod === 'italic') modList.push('underlined');
+            }
+
+            for (var i = 0; i < modList.length; i++) {
+              var mod = modList[i];
+              var symbolPlain = mod.charAt(0);
+              if (addedSymbols.indexOf(symbolPlain) >= 0) symbolPlain = mod.charAt(mod.length - 1);
+              addedSymbols += symbolPlain;
+              var symbolFormatted = applyModifierToPlainCh(symbolPlain.toUpperCase(), mod === 'fractur' || mod === 'cursive' ? ['bold' + mod] : [mod]);
+              var symbolHTML = symbolPlain === mod.charAt(0) ?
+                '<span class=symbol-formatted>' + symbolFormatted + '</span>' +
+                (mod === 'underlined' ?
+                  '<span style="position:relative;top: -0.5em;">nder<span style="position: absolute; left: 0; top: 1em">lined</span></span>' :
+                  mod.slice(1)
+                ) :
+                mod.slice(0, mod.length - 1) + '<span class=symbol-formatted>' + symbolFormatted + '</span>';
+
+              buttonsHTML += '<button id=' + mod + '><span class=mod-button-content>' + symbolHTML + '</span></button>';
+            }
+            return buttonsHTML;
+          }
         }
 
         /**

@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<!-- {build-by-hash:1p6xl6m78i2 Sun Nov 27 2022 21:35:34 GMT+0000 (Greenwich Mean Time) with  darwin/x64} -->
+<!-- {build-by-hash:1h567cshwnr Thu Dec 01 2022 20:17:20 GMT+0000 (Greenwich Mean Time) with  darwin/x64} -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -181,7 +181,8 @@ body {
   background: #0c4d69;
 }
 
-#shell #leftBar #leftTop * {
+#shell #leftBar #leftTop > * {
+  position: relative;
   pointer-events: auto;
 }
 
@@ -198,7 +199,44 @@ body {
   color: #7f053c;
   text-shadow: -1px -1px 2px #4101017d, 1px 1px 2px #ffffffba;
 }
-.cssAuthenticityMarker{/* {hex:1i9y1ezowi7} */}
+
+#shell #editorModeSidebar button {
+  border-radius: 100%;
+  width: 7em;
+  height: 7em;
+  margin-top: 0.5em;
+  margin-left: 1.3em;
+  border: solid 1px #4a739f;
+  background: #b5dbe0;
+  box-shadow: inset 2px 2px 3px white, inset -2px -2px 3px #327285, 3px 3px 8px #00405c;
+  cursor: pointer;
+  color: #103a5f;
+  text-shadow: -1px -1px 2px #011a418a, 1px 1px 2px #ffffffba;
+  font-size: 60%;
+}
+
+#shell #editorModeSidebar button .symbol-formatted {
+  font-size: 340%;
+  position: relative;
+  top: 0.08em;
+  left: -0.02em;
+}
+
+#shell #editorModeSidebar button#italic .symbol-formatted { left: -0.07em; }
+#shell #editorModeSidebar button#cursive .symbol-formatted { left: 0.1em; }
+#shell #editorModeSidebar button#box .symbol-formatted { left: 0.05em; top: 0.08em; }
+#shell #editorModeSidebar button#plate .symbol-formatted { top: 0.14em; }
+#shell #editorModeSidebar button#typewriter .symbol-formatted { left: 0.14em; }
+#shell #editorModeSidebar button#typewriter .mod-button-content {
+  position: relative;
+  left: -0.4em;
+}
+
+#shell #editorModeSidebar button#cursive .mod-button-content {
+  position: relative;
+  left: -0.5em;
+}
+.cssAuthenticityMarker{/* {hex:2e4fkalnzeo} */}
 </style>
 </head><body><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">

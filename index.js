@@ -5522,12 +5522,15 @@ on(div, "touchstart", () => {
         loadingComplete: loadingComplete
       };
 
+      function getSplash() {
+        var isTtyWtfSplash = typeof location !== 'undefined' && location && /tty/i.test(location.hostname || '');
+        var splashText = isTtyWtfSplash ? embeddedTtyWtfSplashMarkdown_get() : embeddedSplashText;
+        return splashText;
+      }
+
       function init() {
-        var isTtyWtfSplash = /tty/i.test(location.hostname || '');
         var useText =
-          verb === 'splash' ?
-            (isTtyWtfSplash ? embeddedTtyWtfSplashMarkdown_get() : embeddedSplashText) :
-            text;
+          verb === 'splash' ? getSplash() : text;
         layout.pseudoEditor.value = useText;
         layout.pseudoGutter.innerHTML =
           Array(useText.split('\n').length + 1)
@@ -5580,7 +5583,7 @@ on(div, "touchstart", () => {
           var editor = createCodeMirrorWithFirstClickChange(
             layout.requestEditorHost,
             {
-              value: embeddedSplashText,
+              value: getSplash(),
 
               mode: 'markdown',
               //inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile

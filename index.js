@@ -1729,10 +1729,10 @@ on(div, "touchstart", () => {
           
           .replace(
             getFunctionCommentContent(function () {/*
-  forceCompositionEnd() {
+  ContentEditableInput.prototype.forceCompositionEnd = function () {
         */}),
             getFunctionCommentContent(function () {/*
-  forceCompositionEnd() {
+  ContentEditableInput.prototype.forceCompositionEnd = function () {
     if (+new Date() < this.lastTap - 400) return
     var cm = this.cm;
     var startPos = cm.indexFromPos(cm.getCursor('from'))

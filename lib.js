@@ -1,4 +1,4 @@
-// {build-by-hash:23smx3k787o Sat Dec 03 2022 12:09:10 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
+// {build-by-hash:nrw6ztj09v Sat Dec 03 2022 15:26:58 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
 // #region codemirror
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: https://codemirror.net/5/LICENSE
@@ -9160,6 +9160,11 @@
     this.forceCompositionEnd();
   };
   ContentEditableInput.prototype.forceCompositionEnd = function () {
+    if (+new Date() < this.lastTap - 400) return
+    var cm = this.cm;
+    var startPos = cm.indexFromPos(cm.getCursor('from'))
+    var endPos = cm.indexFromPos(cm.getCursor('to'))
+    if (startPos !== endPos) return // do not force composition during selection
     if (!this.composing) { return }
     clearTimeout(this.readDOMTimeout);
     this.composing = null;

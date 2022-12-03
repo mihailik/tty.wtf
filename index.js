@@ -5505,7 +5505,7 @@ I hope it works — firstly for me, and hopefully helps others.
               value: embeddedSplashText,
 
               mode: 'markdown',
-              inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
+              //inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
 
               lineNumbers: true,
               extraKeys: addedCommands,
@@ -5531,7 +5531,7 @@ I hope it works — firstly for me, and hopefully helps others.
               {
                 value: text,
                 mode: isPlainTextVerb(verb) ? 'markdown' : 'rest-request',
-                inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
+                //inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
                 lineNumbers: true,
                 extraKeys: addedCommands,
                 // @ts-ignore

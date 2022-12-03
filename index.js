@@ -1721,7 +1721,7 @@ on(div, "touchstart", function () { return input.forceCompositionEnd(); });
         */}),
             getFunctionCommentContent(function () {/*
 on(div, "touchstart", () => {
-  input.forceCompositionEnd()
+  input.forceCompositionEnd(true)
   input.lastTap = +new Date()
 })
         */ })
@@ -1732,12 +1732,14 @@ on(div, "touchstart", () => {
   ContentEditableInput.prototype.forceCompositionEnd = function () {
         */}),
             getFunctionCommentContent(function () {/*
-  ContentEditableInput.prototype.forceCompositionEnd = function () {
-    if (+new Date() < this.lastTap - 400) return
-    var cm = this.cm;
-    var startPos = cm.indexFromPos(cm.getCursor('from'))
-    var endPos = cm.indexFromPos(cm.getCursor('to'))
-    if (startPos !== endPos) return // do not force composition during selection
+  ContentEditableInput.prototype.forceCompositionEnd = function (cancellable) {
+    if (cancellable) {
+      if (+new Date() < this.lastTap - 400) return
+      var cm = this.cm;
+      var startPos = cm.indexFromPos(cm.getCursor('from'))
+      var endPos = cm.indexFromPos(cm.getCursor('to'))
+      if (startPos !== endPos) return // do not force composition during selection
+    }
           */ })
           )
         );

@@ -8025,7 +8025,7 @@
     }
     on(d.scroller, "touchstart", function (e) {
       if (!signalDOMEvent(cm, e) && !isMouseLikeTouchEvent(e) && !clickInGutter(cm, e)) {
-        d.input.ensurePolled();
+        d.input.ensurePolled(true);
         clearTimeout(touchFinished);
         var now = +new Date;
         d.activeTouch = {start: now, moved: false,
@@ -8865,7 +8865,7 @@
     });
 
     on(div, "touchstart", () => {
-  input.forceCompositionEnd()
+  input.forceCompositionEnd(true)
   input.lastTap = +new Date()
 })
 
@@ -9153,18 +9153,20 @@
     }
   };
 
-  ContentEditableInput.prototype.ensurePolled = function () {
-    this.forceCompositionEnd();
+  ContentEditableInput.prototype.ensurePolled = function (cancellable) {
+    this.forceCompositionEnd(cancellable);
   };
   ContentEditableInput.prototype.reset = function () {
     this.forceCompositionEnd();
   };
-  ContentEditableInput.prototype.forceCompositionEnd = function () {
-    if (+new Date() < this.lastTap - 400) return
-    var cm = this.cm;
-    var startPos = cm.indexFromPos(cm.getCursor('from'))
-    var endPos = cm.indexFromPos(cm.getCursor('to'))
-    if (startPos !== endPos) return // do not force composition during selection
+  ContentEditableInput.prototype.forceCompositionEnd = function (cancellable) {
+    if (cancellable) {
+      if (+new Date() < this.lastTap - 400) return
+      var cm = this.cm;
+      var startPos = cm.indexFromPos(cm.getCursor('from'))
+      var endPos = cm.indexFromPos(cm.getCursor('to'))
+      if (startPos !== endPos) return // do not force composition during selection
+    }
     if (!this.composing) { return }
     clearTimeout(this.readDOMTimeout);
     this.composing = null;

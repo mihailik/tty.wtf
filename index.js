@@ -606,14 +606,21 @@ function catchREST() {
   /** @type {ReturnType<typeof createParser>} */
   var _parseRanges;
 
+  /** @type {ReturnType<typeof createParser>} */
+  function runParseRanges(text, options) {
+    if (!_parseRanges)
+      if (!_parseRanges) _parseRanges = createParser();
+    var parsed = _parseRanges(text, options);
+    return parsed;
+  }
+
   /**
  * @param text {string}
  * @param modifier {string}
  * @param remove {boolean=}
  **/
   function applyModifier(text, modifier, remove) {
-    if (!_parseRanges) _parseRanges = createParser();
-    var parsed = _parseRanges(text, { disableCoalescing: true });
+    var parsed = runParseRanges(text, { disableCoalescing: true });
     var text = '';
 
     for (var iRange = 0; iRange < parsed.length; iRange++) {
@@ -665,6 +672,68 @@ function catchREST() {
     }
 
     return text;
+  }
+
+  /**
+   * @param {string} text
+   * @param {number} start
+   * @param {number} end
+   */
+  function getModifiersTextSection(text, start, end) {
+    var modText = text;
+    if (start !== end) {
+      modText = modText.slice(start, end);
+      return { text: modText, start: start, end: end, parsed: runParseRanges(modText, void 0) };
+    }
+
+    var consequentMatch = /\S+\s*$/.exec(text.slice(0, start));
+    var consequentEntryStart = start - (consequentMatch ? consequentMatch[0].length : 0);
+
+    if (!consequentMatch || !consequentMatch[0]) {
+      // if cannot find consequent BEFORE, try consequent AFTER
+      consequentMatch = /^\s*\S+/.exec(text.slice(start));
+      if (!consequentMatch) return { text: '', start: start, end: start, parsed: runParseRanges('', void 0) };
+      var parsed = runParseRanges(consequentMatch[0], void 0);
+      var consequentEntry = parsed[0];
+    } else {
+      var parsed = runParseRanges(consequentMatch[0], void 0);
+      var consequentEntry = parsed[parsed.length - 1];
+    }
+
+    if (!parsed.length) return { text: '', start: start, end: start, parsed };
+
+    // pick previous if this is punctuation or whitespace after formatted word
+    if (typeof consequentEntry === 'string' && parsed && parsed.length > 1) {
+      var prevConsequentEntry = parsed[parsed.length - 2];
+      if (consequentEntry.indexOf('\n') < 0 &&
+        typeof prevConsequentEntry !== 'string' &&
+        consequentEntry == applyModifier(consequentEntry, prevConsequentEntry.fullModifiers)) {
+        consequentEntry = prevConsequentEntry;
+      }
+    }
+
+
+    if (consequentMatch && consequentMatch[0]) {
+      if (consequentEntry) {
+        parsed.length = 1;
+        parsed.modifiers = typeof consequentEntry === 'string' ? [] : consequentEntry.modifiers;
+        parsed.fullModifiers = typeof consequentEntry === 'string' ? '' : consequentEntry.fullModifiers;
+        parsed[0] = consequentEntry;
+      } else {
+        parsed.length = 0;
+        parsed.modifiers = [];
+        parsed.fullModifiers = '';
+      }
+
+      return {
+        text: typeof consequentEntry === 'string' ? consequentEntry : consequentEntry.formatted,
+        start: consequentEntryStart,
+        end: consequentEntryStart + consequentEntry.length,
+        parsed: parsed
+      };
+    }
+
+    return { text: '', start: start, end: start, parsed: parseRanges('') };
   }
 
   var regex_underlined = /underlined/g;
@@ -779,8 +848,8 @@ function catchREST() {
     /** @typedef {(string | (LookupEntry & { length: number }))[] & { modifiers: string[], fullModifiers: string }} ParsedList */
 
     /**
-     * @param text {string}
-     * @param options {{ disableCoalescing?: boolean }=}
+     * @param {string} text
+     * @param {{ disableCoalescing?: boolean }=} options
      **/
     function parser(text, options) {
 
@@ -1123,7 +1192,7 @@ body {
   color: #103a5f;
   text-shadow: -1px -1px 2px #011a418a, 1px 1px 2px #ffffffba;
   font-size: 60%;
-  transition: box-shadow 200ms, background 200ms, color 200ms, border 200ms;
+  transition: box-shadow 200ms, background 150ms, color 200ms, border 200ms;
 }
 
 #shell #editorModeSidebar button .symbol-formatted {
@@ -5554,10 +5623,38 @@ I hope it works — firstly for me, and hopefully helps others.
             }
           }
 
+          updateModifierButtonsForSelection();
+
+          var modifierButtonTimeout;
+          editor.on('cursorActivity', function () {
+            clearTimeout(modifierButtonTimeout);
+            modifierButtonTimeout = setTimeout(updateModifierButtonsForSelection, 10);
+          });
+
           return {
             container: layoutElem,
             buttons
           };
+
+          var btnPressedClassNameRegexp;
+
+          function updateModifierButtonsForSelection() {
+            if (!btnPressedClassNameRegexp) btnPressedClassNameRegexp = /\s*\bpressed\b\s*/g;
+
+            var selection = getCurrentSelection();
+            var modTextSection = getModifiersTextSection(selection.text, selection.startPos, selection.endPos);
+            console.log('modTextSection: ', modTextSection);
+
+            for (var i = 0; i < buttons.length; i++) {
+              var btn = /** @type {HTMLButtonElement} */(buttons[i]);
+              if (btn.id) {
+                var pressed = modTextSection && modTextSection.parsed && modTextSection.parsed.modifiers.indexOf(btn.id) >= 0;
+
+                if (pressed && !(btnPressedClassNameRegexp.test(btn.className || ''))) btn.className = trimEnd(btn.className || '') + ' pressed';
+                else if (btnPressedClassNameRegexp.test(btn.className || '')) btn.className = btn.className.replace(btnPressedClassNameRegexp, ' ');
+              }
+            }
+          }
 
           function createButtonsHTML() {
             var buttonsHTML = '';
@@ -5588,6 +5685,28 @@ I hope it works — firstly for me, and hopefully helps others.
             }
             return buttonsHTML;
           }
+        }
+
+        function getCurrentSelection() {
+          var text = editor.getValue();
+          var startCoord = editor.getCursor('from');
+          var endCoord = editor.getCursor('to');
+          var startPos = editor.indexFromPos(startCoord);
+          var endPos = editor.indexFromPos(endCoord);
+
+          if (startPos > endPos) {
+            var _m = endPos;
+            endPos = startPos;
+            startPos = _m;
+          }
+
+          return {
+            text: text,
+            startPos: startPos,
+            endPos: endPos,
+            startCoord: startCoord,
+            endCoord: endCoord
+          };
         }
 
         /** @param {HTMLButtonElement} btn */
@@ -5633,22 +5752,13 @@ I hope it works — firstly for me, and hopefully helps others.
          * @param remove {boolean=}
          **/
         function applyModifierToSelection(modifier, remove) {
-          var oldText = editor.getValue();
-          var selectionStartCoord = editor.getCursor('from');
-          var selectionEndCoord = editor.getCursor('to');
-          var selectionStartPos = editor.indexFromPos(selectionStartCoord);
-          var selectionEndPos = editor.indexFromPos(selectionEndCoord);
-          if (selectionStartPos > selectionEndPos) {
-            var _m = selectionEndPos;
-            selectionEndPos = selectionStartPos;
-            selectionStartPos = _m;
-          }
+          var selection = getCurrentSelection();
 
-          if (!modifier || !oldText) return;
+          if (!modifier || !selection.text) return;
 
-          var leadText = oldText.slice(0, selectionStartPos);
-          var modifyText = oldText.slice(selectionStartPos, selectionEndPos);
-          var trailText = oldText.slice(selectionEndPos);
+          var leadText = selection.text.slice(0, selection.startPos);
+          var modifyText = selection.text.slice(selection.startPos, selection.endPos);
+          var trailText = selection.text.slice(selection.endPos);
 
           if (!modifyText) return;
 
@@ -5659,7 +5769,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
           var newText = leadText + replacedModifyText + trailText;
 
-          if (oldText !== newText) {
+          if (selection.text !== newText) {
             editor.replaceSelection(replacedModifyText, 'around');
             // editor.setValue(newText);
             // if (selectionStartPos !== leadText.length) {

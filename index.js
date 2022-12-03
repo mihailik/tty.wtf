@@ -1734,6 +1734,7 @@ on(div, "touchstart", () => {
             getFunctionCommentContent(function () {/*
   forceCompositionEnd() {
     if (+new Date() < this.lastTap - 400) return
+    var cm = this.cm;
     var startPos = cm.indexFromPos(cm.getCursor('from'))
     var endPos = cm.indexFromPos(cm.getCursor('to'))
     if (startPos !== endPos) return // do not force composition during selection

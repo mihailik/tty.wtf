@@ -1714,28 +1714,34 @@ I hope it works — firstly for me, and hopefully helps others.
       }
 
       function patchCodeMirror(libText) {
-        var original = getFunctionCommentContent(function () {/* 
+        var replacedText = (libText
+          .replace(
+            getFunctionCommentContent(function () {/*
 on(div, "touchstart", function () { return input.forceCompositionEnd(); });
-        */});
+        */}),
+            getFunctionCommentContent(function () {/*
+on(div, "touchstart", () => {
+  input.forceCompositionEnd()
+  input.lastTap = +new Date()
+})
+        */ })
+          )
+          
+          .replace(
+            getFunctionCommentContent(function () {/*
+  forceCompositionEnd() {
+        */}),
+            getFunctionCommentContent(function () {/*
+  forceCompositionEnd() {
+    if (+new Date() < this.lastTap - 400) return
+    var startPos = cm.indexFromPos(cm.getCursor('from'))
+    var endPos = cm.indexFromPos(cm.getCursor('to'))
+    if (startPos !== endPos) return // do not force composition during selection
+          */ })
+          )
+        );
 
-        var replacement = getFunctionCommentContent(function () {/*
-    var lastTouchStart;
-    on(div, "touchstart", function () {
-      // do not force composition for double-tap, it breaks selection
-      if (+new Date() < lastTouchStart + 400) return;
-      lastTouchStart = + new Date();
-
-      var startCoord = cm.getCursor('from');
-      var endCoord = cm.getCursor('to');
-      var startPos = cm.indexFromPos(startCoord);
-      var endPos = cm.indexFromPos(endCoord);
-      if (startPos !== endPos) return; // do not force composition during selection
-
-      return input.forceCompositionEnd();
-    });
-        */ });
-
-        var replacedText = libText.replace(original, replacement);
+        if (replacedText === libText) console.log('CodeMirror was not patched: version incompatible.');
         return replacedText;
       }
 

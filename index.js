@@ -1722,7 +1722,7 @@ on(div, "touchstart", function () { return input.forceCompositionEnd(); });
     var lastTouchStart;
     on(div, "touchstart", function () {
       // do not force composition for double-tap, it breaks selection
-      if (lastTouchStart < +new Date() + DOUBLECLICK_DELAY) return;
+      if (+new Date() < lastTouchStart + 400) return;
       lastTouchStart = + new Date();
 
       var startCoord = cm.getCursor('from');

@@ -1,4 +1,4 @@
-// {build-by-hash:vtsly60eco Sat Dec 03 2022 11:29:32 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
+// {build-by-hash:195dlbxu45h Sat Dec 03 2022 11:47:22 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
 // #region codemirror
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: https://codemirror.net/5/LICENSE
@@ -8867,7 +8867,7 @@
     var lastTouchStart;
     on(div, "touchstart", function () {
       // do not force composition for double-tap, it breaks selection
-      if (lastTouchStart < +new Date() + DOUBLECLICK_DELAY) return;
+      if (+new Date() < lastTouchStart + 400) return;
       lastTouchStart = + new Date();
 
       var startCoord = cm.getCursor('from');

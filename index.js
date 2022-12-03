@@ -739,7 +739,7 @@ function catchREST() {
       };
     }
 
-    return { text: '', start: start, end: start, parsed: parseRanges('') };
+    return { text: '', start: start, end: start, parsed: runParseRanges('', void 0) };
   }
 
   var regex_underlined = /underlined/g;
@@ -5511,7 +5511,7 @@ on(div, "touchstart", () => {
         if (typeof modeOverride !== 'undefined') verb = modeOverride;
         layout.leftBottom.textContent = drinkChar + ' OK';
 
-        var addedCommands = {
+        var addedCommands = /** @type {import('codemirror').KeyMap} */ ({
           'Ctrl-Enter': executeSendRequestCommand,
           'Cmd-Enter': executeSendRequestCommand,
           'Ctrl-B': executeApplyBoldModifierCommand,
@@ -5526,7 +5526,7 @@ on(div, "touchstart", () => {
           'Cmd-R': executeApplyRoundModifierCommand,
           'Ctrl-T': executeApplyTypewriterModifierCommand,
           'Cmd-T': executeApplyTypewriterModifierCommand
-        };
+        });
 
         // @ts-ignore
         CodeMirror

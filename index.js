@@ -1714,61 +1714,24 @@ I hope it works — firstly for me, and hopefully helps others.
       }
 
       function patchCodeMirror(libText) {
-        return libText;
-
         var original = getFunctionCommentContent(function () {/* 
-    for (var i = 0; i < view.length; i++) {
-      var lineView = view[i];
-      if (lineView.hidden) ; else if (!lineView.node || lineView.node.parentNode != container) { // Not drawn yet
-        var node = buildLineElement(cm, lineView, lineN, dims);
-        container.insertBefore(node, cur);
-      } else { // Already drawn
-        while (cur != lineView.node) { cur = rm(cur); }
-        var updateNumber = lineNumbers && updateNumbersFrom != null &&
-          updateNumbersFrom <= lineN && lineView.lineNumber;
-        if (lineView.changes) {
-          if (indexOf(lineView.changes, "gutter") > -1) { updateNumber = false; }
-          updateLineForChanges(cm, lineView, lineN, dims);
-        }
-        if (updateNumber) {
-          removeChildren(lineView.lineNumber);
-          lineView.lineNumber.appendChild(document.createTextNode(lineNumberFor(cm.options, lineN)));
-        }
-        cur = lineView.node.nextSibling;
-      }
-      lineN += lineView.size;
-    }
-    while (cur) { cur = rm(cur); }
+on(div, "touchstart", function () { return input.forceCompositionEnd(); });
         */});
 
         var replacement = getFunctionCommentContent(function () {/*
-    for (var i = 0; i < view.length; i++) {
-      var lineView = view[i];
-      var skipReplacingExact = false;
-      if (lineView.hidden) ; else if (!lineView.node || lineView.node.parentNode != container) { // Not drawn yet
-        var node = buildLineElement(cm, lineView, lineN, dims);
-        if (node && cur && node.outerHTML === cur.outerHTML) {
-          skipReplacingExact = true;
-          cur = cur.nextSibling;
-        }
-        else container.insertBefore(node, cur);
-      } else { // Already drawn
-        while (cur != lineView.node) { cur = rm(cur); }
-        var updateNumber = lineNumbers && updateNumbersFrom != null &&
-          updateNumbersFrom <= lineN && lineView.lineNumber;
-        if (lineView.changes) {
-          if (indexOf(lineView.changes, "gutter") > -1) { updateNumber = false; }
-          updateLineForChanges(cm, lineView, lineN, dims);
-        }
-        if (updateNumber) {
-          removeChildren(lineView.lineNumber);
-          lineView.lineNumber.appendChild(document.createTextNode(lineNumberFor(cm.options, lineN)));
-        }
-        cur = lineView.node.nextSibling;
-      }
-      lineN += lineView.size;
-    }
-    if (!skipReplacingExact) while (cur) { cur = rm(cur); }
+    var lastTouchStart;
+    on(div, "touchstart", function () {
+      // do not force composition for double-tap, it breaks selection
+      if (lastTouchStart < +new Date() + DOUBLECLICK_DELAY) return;
+
+      var startCoord = cm.getCursor('from');
+      var endCoord = cm.getCursor('to');
+      var startPos = cm.indexFromPos(startCoord);
+      var endPos = cm.indexFromPos(endCoord);
+      if (startPos !== endPos) return; // do not force composition during selection
+
+      return input.forceCompositionEnd();
+    });
         */ });
 
         var replacedText = libText.replace(original, replacement);

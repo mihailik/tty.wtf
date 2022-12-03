@@ -1,4 +1,4 @@
-// {build-by-hash:6203mmldsy Sat Dec 03 2022 10:51:31 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
+// {build-by-hash:5zlih7izin Sat Dec 03 2022 11:07:24 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
 // #region codemirror
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: https://codemirror.net/5/LICENSE
@@ -8864,7 +8864,11 @@
       }
     });
 
+    var lastTouchStart;
     on(div, "touchstart", function () {
+      // do not force composition for double-tap, it breaks selection
+      if (lastTouchStart < +new Date() + DOUBLECLICK_DELAY) return;
+
       var startCoord = cm.getCursor('from');
       var endCoord = cm.getCursor('to');
       var startPos = cm.indexFromPos(startCoord);

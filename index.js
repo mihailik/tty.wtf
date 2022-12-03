@@ -1714,6 +1714,8 @@ I hope it works — firstly for me, and hopefully helps others.
       }
 
       function patchCodeMirror(libText) {
+        return libText;
+
         var original = getFunctionCommentContent(function () {/* 
     for (var i = 0; i < view.length; i++) {
       var lineView = view[i];
@@ -6205,8 +6207,8 @@ I hope it works — firstly for me, and hopefully helps others.
         if (!enc) {
           var text = getFunctionCommentContent(function () {/*
 post httpbin.org/post
-Content-type: text/html
-Funny: YES!
+  Content-type: text/html
+  Funny: YES!
 
 Send this to test?
         */});

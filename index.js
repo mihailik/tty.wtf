@@ -1004,7 +1004,7 @@ body {
 
 #shell #requestEditorHost .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like {
   border-bottom: solid 1px #f0f0f0;
-  s-this-is-LINED-PAPER
+  s-comment: this is LINED-PAPER
 }
 
 #shell #requestEditorHost .CodeMirror-code *:last-child pre.CodeMirror-line:after {
@@ -1015,7 +1015,8 @@ body {
   width: 100%;
   height: 20000%;
   background: repeating-linear-gradient(to bottom, #f0f0f0, #f0f0f0 1px, white 1px, white 1.25em);
-  s-this-is-LINED-PAPER
+  
+  s-comment: this is LINED-PAPER
 }
 
 #shell .CodeMirror-gutters {

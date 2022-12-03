@@ -1714,7 +1714,6 @@ I hope it works — firstly for me, and hopefully helps others.
       }
 
       function patchCodeMirror(libText) {
-        return libText;
         var replacedText = (libText
           .replace(
             getFunctionCommentContent(function () {/*
@@ -1726,8 +1725,34 @@ on(div, "touchstart", () => {
   input.lastTap = +new Date()
 })
         */ })
-          )
+        )
           
+          .replace(
+            getFunctionCommentContent(function() {/*
+      on(d.scroller, "touchstart", function (e) {
+      if (!signalDOMEvent(cm, e) && !isMouseLikeTouchEvent(e) && !clickInGutter(cm, e)) {
+        d.input.ensurePolled();
+            */}),
+            getFunctionCommentContent(function() {/*
+      on(d.scroller, "touchstart", function (e) {
+      if (!signalDOMEvent(cm, e) && !isMouseLikeTouchEvent(e) && !clickInGutter(cm, e)) {
+        d.input.ensurePolled(true);
+            */})
+        )
+          
+          .replace(
+            getFunctionCommentContent(function() {/*
+  ContentEditableInput.prototype.ensurePolled = function () {
+    this.forceCompositionEnd();
+  };
+            */}),
+            getFunctionCommentContent(function() {/*
+  ContentEditableInput.prototype.ensurePolled = function (cancellable) {
+    this.forceCompositionEnd(cancellable);
+  };
+            */})
+          )
+
           .replace(
             getFunctionCommentContent(function () {/*
   ContentEditableInput.prototype.forceCompositionEnd = function () {

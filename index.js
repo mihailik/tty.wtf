@@ -1284,7 +1284,7 @@ body {
 </div>
   */});
 
-  var embeddedSplashMarkdown = getFunctionCommentContent(function () {/*
+  var embeddedReadmeSplashMarkdown = getFunctionCommentContent(function () {/*
 # This is a prototype project code name Catch REST &#x1F379;
 
 
@@ -1402,9 +1402,20 @@ I hope it works — firstly for me, and hopefully helps others.
 
   */});
 
-  var embeddedSplashText = embeddedSplashMarkdown.replace(/&#x1F379;/g, drinkChar);
-  var embeddedSplashMarkdownWithScript = embeddedSplashMarkdown +
+  var embeddedSplashText = embeddedReadmeSplashMarkdown.replace(/&#x1F379;/g, drinkChar);
+  var embeddedSplashReadmeMarkdownWithScript = embeddedReadmeSplashMarkdown +
     '\n<script src="./index.js"></script>'
+
+  var embeddedTtyWtfSplashMarkdown_get = function () {
+    var thumbsup = '\ud83d\udc4d';
+    return (
+      applyModifier('ty', 'boldunderlined') + applyModifier('pe', 'bold') + ' ' +
+      applyModifier('any', 'cursive') + ' ' + applyModifier('text', 'italic') + ', ' +
+      applyModifier('apply', 'typewriter') + ' ' + applyModifier('formatting', 'wide') +
+      '\n\n' +
+      'Copy-paste into text field in any social media or raw text files ' + thumbsup
+    );
+  }
 
   var embeddedMetaBlockHTML = getFunctionCommentContent(function () {/*
 <meta charset="UTF-8">
@@ -1915,7 +1926,7 @@ on(div, "touchstart", () => {
 
           var builtHTML = getEmbeddedWholeHTML(true /* urlencoded */);
 
-          var builtReadme = embeddedSplashMarkdownWithScript +
+          var builtReadme = embeddedSplashReadmeMarkdownWithScript +
             '\n<' + '!--' + ' {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' ' + process.platform + '/' + process.arch + '} ' + '--' + '>\n';
 
           var skipIndexHTML = skipUnlessUpdated(
@@ -5512,8 +5523,11 @@ on(div, "touchstart", () => {
       };
 
       function init() {
+        var isTtyWtfSplash = /tty/i.test(location.hostname || '');
         var useText =
-          verb === 'splash' ? embeddedSplashText : text;
+          verb === 'splash' ?
+            (isTtyWtfSplash ? embeddedTtyWtfSplashMarkdown_get() : embeddedSplashText) :
+            text;
         layout.pseudoEditor.value = useText;
         layout.pseudoGutter.innerHTML =
           Array(useText.split('\n').length + 1)
@@ -6331,7 +6345,7 @@ Send this to test?
             history.replaceState(
               null,
               'unused-string',
-              location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + location.pathname + '?' + slashSeparated.join('/'));
+              location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + location.pathname.replace(/^\/+/, '').replace(/\/+$/, '') + '?' + slashSeparated.join('/'));
             break;
 
           case 'hash':

@@ -5903,12 +5903,22 @@ on(div, "touchstart", () => {
 
           var leftClickKeyMap = { LeftClick: onFirstClick, LeftDoubleClick: onFirstClick };
           editor.addKeyMap(leftClickKeyMap);
+          editor.on('cursorActivity', onFirstClick);
+          editor.on('beforeSelectionChange', onFirstClick);
+          editor.on('dblclick', onFirstClick);
+          editor.on('touchstart', onFirstClick);
 
           return editor;
 
-          function onFirstClick(args) {
-            editor.removeKeyMap(leftClickKeyMap);
-            return firstClickCallback(args);
+          function onFirstClick() {
+            setTimeout(function () {
+              editor.removeKeyMap(leftClickKeyMap);
+              editor.off('cursorActivity', onFirstClick);
+              editor.off('beforeSelectionChange', onFirstClick);
+              editor.off('dblclick', onFirstClick);
+              editor.off('touchstart', onFirstClick);
+              return firstClickCallback();
+            }, 50);
           }
 
         }

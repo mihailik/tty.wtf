@@ -1,4 +1,4 @@
-// {build-by-hash:3mnto0nm3c Sat Dec 03 2022 10:42:10 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
+// {build-by-hash:1ydnxu222pj Sat Dec 03 2022 10:44:48 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
 // #region codemirror
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: https://codemirror.net/5/LICENSE
@@ -4255,7 +4255,10 @@
       var skipReplacingExact = false;
       if (lineView.hidden) ; else if (!lineView.node || lineView.node.parentNode != container) { // Not drawn yet
         var node = buildLineElement(cm, lineView, lineN, dims);
-        if (node && cur && node.outerHTML === cur.outerHTML) skipReplacingExact = true;
+        if (node && cur && node.outerHTML === cur.outerHTML) {
+          skipReplacingExact = true;
+          cur = cur.nextSibling;
+        }
         else container.insertBefore(node, cur);
       } else { // Already drawn
         while (cur != lineView.node) { cur = rm(cur); }

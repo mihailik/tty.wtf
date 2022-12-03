@@ -1745,7 +1745,10 @@ I hope it works — firstly for me, and hopefully helps others.
       var skipReplacingExact = false;
       if (lineView.hidden) ; else if (!lineView.node || lineView.node.parentNode != container) { // Not drawn yet
         var node = buildLineElement(cm, lineView, lineN, dims);
-        if (node && cur && node.outerHTML === cur.outerHTML) skipReplacingExact = true;
+        if (node && cur && node.outerHTML === cur.outerHTML) {
+          skipReplacingExact = true;
+          cur = cur.nextSibling;
+        }
         else container.insertBefore(node, cur);
       } else { // Already drawn
         while (cur != lineView.node) { cur = rm(cur); }

@@ -1123,6 +1123,7 @@ body {
   color: #103a5f;
   text-shadow: -1px -1px 2px #011a418a, 1px 1px 2px #ffffffba;
   font-size: 60%;
+  transition: box-shadow 200ms, background 200ms, color 200ms, border 200ms;
 }
 
 #shell #editorModeSidebar button .symbol-formatted {
@@ -1142,9 +1143,27 @@ body {
   left: -0.4em;
 }
 
+#shell #editorModeSidebar button .mod-button-content {
+  display: block;
+  transform: none;
+  transition: transform 100ms;
+}
+
 #shell #editorModeSidebar button#cursive .mod-button-content {
   position: relative;
   left: -0.5em;
+}
+
+#shell #editorModeSidebar button.pressed {
+  border: solid 1px #3e6b9c;
+  background: #103443;
+  box-shadow: inset 3px 4px 6px #040a0d, inset -3px -3px 12px #30576c, 3px 3px 8px #0f6a92;
+  color: #6691b6;
+  text-shadow: 2px 2px 4px #011a41eb, -1px -1px 2px rgba(255, 255, 255, 0.43);
+}
+
+#shell #editorModeSidebar button.pressed .mod-button-content {
+  transform: translate(2px, 2px);
 }
 
   */});
@@ -5604,6 +5623,8 @@ I hope it works — firstly for me, and hopefully helps others.
             var modifier = btn.id;
             var remove = (btn.className || '').indexOf('pressed') >= 0;
             applyModifierToSelection(modifier, remove);
+            if (remove) btn.className = (btn.className || '').replace(/(\s+|^)pressed(\s+|$)/g, ' ');
+            else btn.className = (btn.className || '').replace(/\s+$/, '') + 'pressed';
           }
         }
 
@@ -5639,7 +5660,7 @@ I hope it works — firstly for me, and hopefully helps others.
           var newText = leadText + replacedModifyText + trailText;
 
           if (oldText !== newText) {
-            editor.replaceSelection(replacedModifyText);
+            editor.replaceSelection(replacedModifyText, 'around');
             // editor.setValue(newText);
             // if (selectionStartPos !== leadText.length) {
             //   //editor.setSelection().selectionStart = leadText.length;

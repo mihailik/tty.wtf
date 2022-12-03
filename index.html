@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="en"><head>
-<!-- {build-by-hash:3so2rj09y4 Thu Dec 01 2022 20:45:29 GMT+0000 (Greenwich Mean Time) with  darwin/x64} -->
+<!-- {build-by-hash:1m3zvaik1iw Sat Dec 03 2022 09:17:08 GMT+0000 (Greenwich Mean Time) with  darwin/x64} -->
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -214,6 +214,7 @@ body {
   color: #103a5f;
   text-shadow: -1px -1px 2px #011a418a, 1px 1px 2px #ffffffba;
   font-size: 60%;
+  transition: box-shadow 200ms, background 200ms, color 200ms, border 200ms;
 }
 
 #shell #editorModeSidebar button .symbol-formatted {
@@ -233,11 +234,29 @@ body {
   left: -0.4em;
 }
 
+#shell #editorModeSidebar button .mod-button-content {
+  display: block;
+  transform: none;
+  transition: transform 100ms;
+}
+
 #shell #editorModeSidebar button#cursive .mod-button-content {
   position: relative;
   left: -0.5em;
 }
-.cssAuthenticityMarker{/* {hex:ozi5xd6nmx} */}
+
+#shell #editorModeSidebar button.pressed {
+  border: solid 1px #3e6b9c;
+  background: #103443;
+  box-shadow: inset 3px 4px 6px #040a0d, inset -3px -3px 12px #30576c, 3px 3px 8px #0f6a92;
+  color: #6691b6;
+  text-shadow: 2px 2px 4px #011a41eb, -1px -1px 2px rgba(255, 255, 255, 0.43);
+}
+
+#shell #editorModeSidebar button.pressed .mod-button-content {
+  transform: translate(2px, 2px);
+}
+.cssAuthenticityMarker{/* {hex:jb74bz3grk} */}
 </style>
 </head><body><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">

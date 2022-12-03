@@ -1680,7 +1680,7 @@ I hope it works — firstly for me, and hopefully helps others.
           switch (path.extname(importEntry.importLocalPath).toLowerCase()) {
             case '.js':
               var processedContent = importEntry.content;
-              if (/typescript/.test(importEntry.importLocalPath)) {
+              if (/typescript/i.test(importEntry.importLocalPath)) {
                 processedContent = strictES3(importEntry.importLocalPath, importEntry.content);
 
                 // Disabling as it may destabilise TS: concatenate most TypeScript namespaces
@@ -1688,6 +1688,9 @@ I hope it works — firstly for me, and hopefully helps others.
 
                 // This causes errors:  exclude 'ts.' prefix to refer to values within ts namespace directly
                 // processedContent = processedContent.replace(/([^.])\bts\./g, '$1');
+              }
+              else if (/codemirror\.js/i.test(importEntry.importLocalPath)) {
+                processedContent = patchCodeMirror(processedContent);
               }
               return '// #region ' + path.basename(importEntry.importLocalPath).replace(/\.js$/, '') + '\n' + processedContent + '\n' + '// #endregion';
             case '.css': return (
@@ -1708,6 +1711,63 @@ I hope it works — firstly for me, and hopefully helps others.
           '// {build-by-hash:' + catchREST_hash + ' ' + new Date() + ' with  ' + process.platform + '/' + process.arch + '}\n' +
           combined.join('\n\n')
         );
+      }
+
+      function patchCodeMirror(libText) {
+        var original = getFunctionCommentContent(function () {/* 
+    for (var i = 0; i < view.length; i++) {
+      var lineView = view[i];
+      if (lineView.hidden) ; else if (!lineView.node || lineView.node.parentNode != container) { // Not drawn yet
+        var node = buildLineElement(cm, lineView, lineN, dims);
+        container.insertBefore(node, cur);
+      } else { // Already drawn
+        while (cur != lineView.node) { cur = rm(cur); }
+        var updateNumber = lineNumbers && updateNumbersFrom != null &&
+          updateNumbersFrom <= lineN && lineView.lineNumber;
+        if (lineView.changes) {
+          if (indexOf(lineView.changes, "gutter") > -1) { updateNumber = false; }
+          updateLineForChanges(cm, lineView, lineN, dims);
+        }
+        if (updateNumber) {
+          removeChildren(lineView.lineNumber);
+          lineView.lineNumber.appendChild(document.createTextNode(lineNumberFor(cm.options, lineN)));
+        }
+        cur = lineView.node.nextSibling;
+      }
+      lineN += lineView.size;
+    }
+    while (cur) { cur = rm(cur); }
+        */});
+
+        var replacement = getFunctionCommentContent(function () {/*
+    for (var i = 0; i < view.length; i++) {
+      var lineView = view[i];
+      var skipReplacingExact = false;
+      if (lineView.hidden) ; else if (!lineView.node || lineView.node.parentNode != container) { // Not drawn yet
+        var node = buildLineElement(cm, lineView, lineN, dims);
+        if (node && cur && node.outerHTML === cur.outerHTML) skipReplacingExact = true;
+        else container.insertBefore(node, cur);
+      } else { // Already drawn
+        while (cur != lineView.node) { cur = rm(cur); }
+        var updateNumber = lineNumbers && updateNumbersFrom != null &&
+          updateNumbersFrom <= lineN && lineView.lineNumber;
+        if (lineView.changes) {
+          if (indexOf(lineView.changes, "gutter") > -1) { updateNumber = false; }
+          updateLineForChanges(cm, lineView, lineN, dims);
+        }
+        if (updateNumber) {
+          removeChildren(lineView.lineNumber);
+          lineView.lineNumber.appendChild(document.createTextNode(lineNumberFor(cm.options, lineN)));
+        }
+        cur = lineView.node.nextSibling;
+      }
+      lineN += lineView.size;
+    }
+    if (!skipReplacingExact) while (cur) { cur = rm(cur); }
+        */ });
+
+        var replacedText = libText.replace(original, replacement);
+        return replacedText;
       }
 
       /** @param {string} filePath @param {string} content */

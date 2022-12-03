@@ -1185,6 +1185,19 @@ body {
   text-shadow: -1px -1px 2px #4101017d, 1px 1px 2px #ffffffba;
 }
 
+#shell #editorModeSidebar {
+  s-comment: Firefox
+  scrollbar-width: none;
+
+  s-comment: Internet Explorer 10+
+  -ms-overflow-style: none;
+}
+#shell #editorModeSidebar::-webkit-scrollbar {
+  s-comment: WebKit
+  width: 0;
+  height: 0;
+}
+
 #shell #editorModeSidebar button {
   border-radius: 100%;
   width: 7em;

@@ -8864,7 +8864,15 @@
       }
     });
 
-    on(div, "touchstart", function () { return input.forceCompositionEnd(); });
+    on(div, "touchstart", function () {
+      var startCoord = cm.getCursor('from');
+      var endCoord = cm.getCursor('to');
+      var startPos = cm.indexFromPos(startCoord);
+      var endPos = cm.indexFromPos(endCoord);
+      if (startPos !== endPos) return; // do not force composition during selection
+
+      return input.forceCompositionEnd();
+    });
 
     on(div, "input", function () {
       if (!this$1.composing) { this$1.readFromDOMSoon(); }

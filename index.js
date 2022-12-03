@@ -678,6 +678,12 @@ function catchREST() {
    * @param {string} text
    * @param {number} start
    * @param {number} end
+   * @returns {{
+   *  text: string;
+   *  start: number;
+   *  end: number;
+   *  parsed: ReturnType<typeof runParseRanges>;
+   * } | undefined};
    */
   function getModifiersTextSection(text, start, end) {
     var modText = text;
@@ -5470,6 +5476,23 @@ I hope it works — firstly for me, and hopefully helps others.
         if (typeof modeOverride !== 'undefined') verb = modeOverride;
         layout.leftBottom.textContent = drinkChar + ' OK';
 
+        var addedCommands = {
+          'Ctrl-Enter': executeSendRequestCommand,
+          'Cmd-Enter': executeSendRequestCommand,
+          'Ctrl-B': executeApplyBoldModifierCommand,
+          'Cmd-B': executeApplyBoldModifierCommand,
+          'Ctrl-I': executeApplyItalicModifierCommand,
+          'Cmd-I': executeApplyItalicModifierCommand,
+          'Ctrl-U': executeApplyUnderlinedModifierCommand,
+          'Cmd-U': executeApplyUnderlinedModifierCommand,
+          'Ctrl-P': executeApplyPlateModifierCommand,
+          'Cmd-P': executeApplyPlateModifierCommand,
+          'Ctrl-R': executeApplyRoundModifierCommand,
+          'Cmd-R': executeApplyRoundModifierCommand,
+          'Ctrl-T': executeApplyTypewriterModifierCommand,
+          'Cmd-T': executeApplyTypewriterModifierCommand
+        };
+
         // @ts-ignore
         CodeMirror
           .defineMode('rest-request', restRequestMode);
@@ -5485,10 +5508,7 @@ I hope it works — firstly for me, and hopefully helps others.
               inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
 
               lineNumbers: true,
-              extraKeys: {
-                'Ctrl-Enter': executeSendRequestCommand,
-                'Cmd-Enter': executeSendRequestCommand
-              },
+              extraKeys: addedCommands,
               // @ts-ignore
               foldGutter: true,
               gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
@@ -5513,10 +5533,7 @@ I hope it works — firstly for me, and hopefully helps others.
                 mode: isPlainTextVerb(verb) ? 'markdown' : 'rest-request',
                 inputStyle: 'textarea', // force textarea, because contentEditable is flaky on mobile
                 lineNumbers: true,
-                extraKeys: {
-                  'Ctrl-Enter': executeSendRequestCommand,
-                  'Cmd-Enter': executeSendRequestCommand
-                },
+                extraKeys: addedCommands,
                 // @ts-ignore
                 foldGutter: true,
                 gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
@@ -5643,7 +5660,6 @@ I hope it works — firstly for me, and hopefully helps others.
 
             var selection = getCurrentSelection();
             var modTextSection = getModifiersTextSection(selection.text, selection.startPos, selection.endPos);
-            console.log('modTextSection: ', modTextSection);
 
             for (var i = 0; i < buttons.length; i++) {
               var btn = /** @type {HTMLButtonElement} */(buttons[i]);
@@ -5771,6 +5787,7 @@ I hope it works — firstly for me, and hopefully helps others.
 
           if (selection.text !== newText) {
             editor.replaceSelection(replacedModifyText, 'around');
+            return true;
             // editor.setValue(newText);
             // if (selectionStartPos !== leadText.length) {
             //   //editor.setSelection().selectionStart = leadText.length;
@@ -5872,95 +5889,124 @@ I hope it works — firstly for me, and hopefully helps others.
           };
         }
 
+        /** @param {string} mod */
+        function applyModifierCommand(mod) {
+          var selection = getCurrentSelection();
+          if (!selection.text) return; // TODO: can we apply to the current word instead?
+
+          var modifiers = getModifiersTextSection(selection.text, selection.startPos, selection.endPos);
+          var remove = false;
+          if (modifiers && modifiers.parsed) {
+            for (var i = 0; i < modifiers.parsed.length; i++) {
+              var parsChunk = modifiers.parsed[i];
+              if (typeof parsChunk === 'string') continue;
+              if (parsChunk.fullModifiers.indexOf(mod) >= 0) {
+                remove = true;
+                break;
+              }
+            }
+          }
+
+          return applyModifierToSelection(mod, remove);
+        }
+
+        function executeApplyBoldModifierCommand() { return applyModifierCommand('bold'); }
+        function executeApplyItalicModifierCommand() { return applyModifierCommand('italic'); }
+        function executeApplyPlateModifierCommand() { return applyModifierCommand('plate'); }
+        function executeApplyRoundModifierCommand() { return applyModifierCommand('round'); }
+        function executeApplyTypewriterModifierCommand() { return applyModifierCommand('typewriter'); }
+        function executeApplyUnderlinedModifierCommand() { return applyModifierCommand('underlined'); }
+
         function executeSendRequestCommand() {
           var pars = parseTextRequest(editor.getValue());
 
-          if (pars && pars.firstLine) {
-            var parsFirst = parseFirstLine(pars.firstLine);
+          if (!pars || !pars.firstLine) return;
+          var parsFirst = parseFirstLine(pars.firstLine);
 
-            if (parsFirst && parsFirst.url) {
-              editor.setOption('readOnly', true);
-              if (!withSplitter) withSplitter = requireSplitter();
+          if (!parsFirst || !parsFirst.url) return;
 
-              var normalizedUrl = parsFirst.url;
-              if (!/^(\/|\.|http|https):/i.test(normalizedUrl)) {
-                // default to HTTPS for all cases except the page is from unsecured HTTP
-                normalizedUrl = (/^http\b/i.test(location.protocol) ? 'http://' : 'https://') + normalizedUrl;
+          editor.setOption('readOnly', true);
+          if (!withSplitter) withSplitter = requireSplitter();
+
+          var normalizedUrl = parsFirst.url;
+          if (!/^(\/|\.|http|https):/i.test(normalizedUrl)) {
+            // default to HTTPS for all cases except the page is from unsecured HTTP
+            normalizedUrl = (/^http\b/i.test(location.protocol) ? 'http://' : 'https://') + normalizedUrl;
+          }
+
+          var headers = [];
+          var bodyNormalized = pars.body;
+          if (bodyNormalized) {
+            while (/^\s/i.test(bodyNormalized)) {
+              var headerValMatch = /^\s+([^\:\s]+)\s*\:\s*(.+)\s*(\n|$)/.exec(bodyNormalized);
+              if (headerValMatch) {
+                var headerName = headerValMatch[1];
+                var headerValue = headerValMatch[2];
+                headers.push([headerName, headerValue]);
+                bodyNormalized = bodyNormalized.slice(headerValMatch[0].length);
+              } else {
+                break;
               }
-
-              var headers = [];
-              var bodyNormalized = pars.body;
-              if (bodyNormalized) {
-                while (/^\s/i.test(bodyNormalized)) {
-                  var headerValMatch = /^\s+([^\:\s]+)\s*\:\s*(.+)\s*(\n|$)/.exec(bodyNormalized);
-                  if (headerValMatch) {
-                    var headerName = headerValMatch[1];
-                    var headerValue = headerValMatch[2];
-                    headers.push([headerName, headerValue]);
-                    bodyNormalized = bodyNormalized.slice(headerValMatch[0].length);
-                  } else {
-                    break;
-                  }
-                }
-              }
-
-              var verbContinuousTense =
-                parsFirst.verb.charAt(0).toUpperCase() + parsFirst.verb.slice(1).toLowerCase();
-              verbContinuousTense +=
-                (
-                  // getTing - duplicate last consonant if precedet by vowel
-                  'eyuioa'.indexOf(verbContinuousTense.charAt(verbContinuousTense.length - 2)) >= 0 &&
-                  'eyuioa'.indexOf(verbContinuousTense.charAt(verbContinuousTense.length - 1)) < 0 ?
-                  verbContinuousTense.charAt(verbContinuousTense.length - 1) :
-                  ''
-                ) + 'ing';
-
-              set(withSplitter.splitterMainPanel, verbContinuousTense + '...');
-
-              var startTime = getTimeNow();
-              var ftc = fetchXHR(normalizedUrl, {
-                method: parsFirst.verb,
-                // @ts-ignore
-                withCredentials: true,
-                credentials: 'include',
-                headers: /** @type {*} */({ entries: headers }),
-                body: parsFirst.verb === 'GET' || !bodyNormalized ? undefined :
-                  bodyNormalized
-              });
-              ftc.then(
-                function (response) {
-                  var replyTime = getTimeNow() - startTime;
-                  var headers = response.headers;
-                  var text = response.body;
-                  editor.setOption('readOnly', false);
-                  set(withSplitter.splitterMainPanel, 'Done: ' + (replyTime / 1000) + 's.');
-
-                  if (!replyEditor) {
-                    replyEditor = createReplyCodeMirror(
-                      withSplitter.bottomHost,
-                      text
-                    );
-                  } else {
-                    replyEditor.setValue(text);
-                  }
-
-                }, function (err) {
-                  var replyTime = getTimeNow() - startTime;
-
-                  editor.setOption('readOnly', false);
-                  set(withSplitter.splitterMainPanel, 'Failed: ' + (replyTime / 1000) + 's.');
-                  if (!replyEditor) {
-                    replyEditor = createReplyCodeMirror(
-                      withSplitter.bottomHost,
-                      err.message || String(err)
-                    );
-                  } else {
-                    replyEditor.setValue(String(err.message || err));
-                  }
-                }
-              )
             }
           }
+
+          var verbContinuousTense =
+            parsFirst.verb.charAt(0).toUpperCase() + parsFirst.verb.slice(1).toLowerCase();
+          verbContinuousTense +=
+            (
+              // getTing - duplicate last consonant if precedet by vowel
+              'eyuioa'.indexOf(verbContinuousTense.charAt(verbContinuousTense.length - 2)) >= 0 &&
+                'eyuioa'.indexOf(verbContinuousTense.charAt(verbContinuousTense.length - 1)) < 0 ?
+                verbContinuousTense.charAt(verbContinuousTense.length - 1) :
+                ''
+            ) + 'ing';
+
+          set(withSplitter.splitterMainPanel, verbContinuousTense + '...');
+
+          var startTime = getTimeNow();
+          var ftc = fetchXHR(normalizedUrl, {
+            method: parsFirst.verb,
+            // @ts-ignore
+            withCredentials: true,
+            credentials: 'include',
+            headers: /** @type {*} */({ entries: headers }),
+            body: parsFirst.verb === 'GET' || !bodyNormalized ? undefined :
+              bodyNormalized
+          });
+          ftc.then(
+            function (response) {
+              var replyTime = getTimeNow() - startTime;
+              var headers = response.headers;
+              var text = response.body;
+              editor.setOption('readOnly', false);
+              set(withSplitter.splitterMainPanel, 'Done: ' + (replyTime / 1000) + 's.');
+
+              if (!replyEditor) {
+                replyEditor = createReplyCodeMirror(
+                  withSplitter.bottomHost,
+                  text
+                );
+              } else {
+                replyEditor.setValue(text);
+              }
+
+            }, function (err) {
+              var replyTime = getTimeNow() - startTime;
+
+              editor.setOption('readOnly', false);
+              set(withSplitter.splitterMainPanel, 'Failed: ' + (replyTime / 1000) + 's.');
+              if (!replyEditor) {
+                replyEditor = createReplyCodeMirror(
+                  withSplitter.bottomHost,
+                  err.message || String(err)
+                );
+              } else {
+                replyEditor.setValue(String(err.message || err));
+              }
+            }
+          );
+
+          return true;
 
           /**
            * @param {HTMLElement} host

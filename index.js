@@ -5522,12 +5522,6 @@ on(div, "touchstart", () => {
         loadingComplete: loadingComplete
       };
 
-      function getSplash() {
-        var isTtyWtfSplash = typeof location !== 'undefined' && location && /tty/i.test(location.hostname || '');
-        var splashText = isTtyWtfSplash ? embeddedTtyWtfSplashMarkdown_get() : embeddedSplashText;
-        return splashText;
-      }
-
       function init() {
         var useText =
           verb === 'splash' ? getSplash() : text;
@@ -6212,6 +6206,16 @@ on(div, "touchstart", () => {
       return typeof CodeMirror === 'function';
     }
 
+    function isTtyWtf() {
+      var detected = typeof location !== 'undefined' && location && /tty/i.test(location.hostname || '');
+      return detected;
+    }
+
+    function getSplash() {
+      var splashText = isTtyWtf() ? embeddedTtyWtfSplashMarkdown_get() : embeddedSplashText;
+      return splashText;
+    }
+
     function bootUrlEncoded() {
       var initialTmod = getTextAndVerbFromUrlEncoded();
       var text = initialTmod.text;
@@ -6231,13 +6235,14 @@ on(div, "touchstart", () => {
       function getTextAndVerbFromUrlEncoded() {
         var enc = detectCurrentUrlEncoded(location);
         if (!enc) {
-          var text = getFunctionCommentContent(function () {/*
+          var text = isTtyWtf() ? '' : getFunctionCommentContent(function () {/*
 post httpbin.org/post
   Content-type: text/html
   Funny: YES!
 
 Send this to test?
         */});
+
           var verb = 'splash';
         } else {
           var skipVerb = enc.encodedUrl.verbPos < 0 && /^http/i.test(enc.encodedUrl.addr || '');

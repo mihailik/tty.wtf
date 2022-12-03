@@ -1714,6 +1714,7 @@ I hope it works — firstly for me, and hopefully helps others.
       }
 
       function patchCodeMirror(libText) {
+        return libText;
         var replacedText = (libText
           .replace(
             getFunctionCommentContent(function () {/*

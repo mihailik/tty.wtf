@@ -1,4 +1,4 @@
-// {build-by-hash:nrw6ztj09v Sat Dec 03 2022 15:26:58 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
+// {build-by-hash:zzng2n77yg Sat Dec 03 2022 16:03:48 GMT+0000 (Greenwich Mean Time) with  darwin/x64}
 // #region codemirror
 // CodeMirror, copyright (c) by Marijn Haverbeke and others
 // Distributed under an MIT license: https://codemirror.net/5/LICENSE
@@ -8025,7 +8025,7 @@
     }
     on(d.scroller, "touchstart", function (e) {
       if (!signalDOMEvent(cm, e) && !isMouseLikeTouchEvent(e) && !clickInGutter(cm, e)) {
-        d.input.ensurePolled(true);
+        d.input.ensurePolled();
         clearTimeout(touchFinished);
         var now = +new Date;
         d.activeTouch = {start: now, moved: false,
@@ -8864,10 +8864,7 @@
       }
     });
 
-    on(div, "touchstart", () => {
-  input.forceCompositionEnd(true)
-  input.lastTap = +new Date()
-})
+    on(div, "touchstart", function () { return input.forceCompositionEnd(); });
 
     on(div, "input", function () {
       if (!this$1.composing) { this$1.readFromDOMSoon(); }
@@ -9153,20 +9150,13 @@
     }
   };
 
-  ContentEditableInput.prototype.ensurePolled = function (cancellable) {
-    this.forceCompositionEnd(cancellable);
+  ContentEditableInput.prototype.ensurePolled = function () {
+    this.forceCompositionEnd();
   };
   ContentEditableInput.prototype.reset = function () {
     this.forceCompositionEnd();
   };
-  ContentEditableInput.prototype.forceCompositionEnd = function (cancellable) {
-    if (cancellable) {
-      if (+new Date() < this.lastTap - 400) return
-      var cm = this.cm;
-      var startPos = cm.indexFromPos(cm.getCursor('from'))
-      var endPos = cm.indexFromPos(cm.getCursor('to'))
-      if (startPos !== endPos) return // do not force composition during selection
-    }
+  ContentEditableInput.prototype.forceCompositionEnd = function () {
     if (!this.composing) { return }
     clearTimeout(this.readDOMTimeout);
     this.composing = null;

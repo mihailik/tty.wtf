@@ -565,7 +565,7 @@ function ttywtf() {
   }
 
   function updateFontSizeToContent() {
-    var fontSize = calculateFontSizeToContent();
+    var fontSize = Math.min(calculateFontSizeToContent(), 2.5);
     var roundedFontSizeStr = !fontSize ? '' :
       (Math.round(fontSize * 2) * 50) + '%';
     if (textarea.style.fontSize !== roundedFontSizeStr) {
@@ -580,7 +580,7 @@ function ttywtf() {
   var invisibleDIVParent;
 
   function calculateFontSizeToContent() {
-    if (!textarea.value) return 4;
+    if (!textarea.value) return 2.5;
 
     if (!invisibleSPAN) {
       invisibleSPAN = document.createElement('span');

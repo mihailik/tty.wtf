@@ -157,26 +157,13 @@ function ttywtf() {
 
     var encoded = mangleForURL(encodeText(text));
 
-    var hasReplaceState = typeof history !== 'undefined' && history && typeof history.replaceState === 'function';
-    var isFileProtocol = /^file:$/i.test(location.protocol || '');
-    var isAboutProtocol = /^about:$/i.test(location.protocol || '');
-
-    var allowReplaceState =
-      !/\//.test(encoded) &&
-      !isFileProtocol &&
-      !isAboutProtocol &&
-      hasReplaceState;
-
     if (bases.source === 'hash') {
       console.log('store in hash ', bases, ' --> ', encoded);
       location.href = '#' + encoded;
       return;
-    } else if (allowReplaceState) {
+    } else {
       console.log('store with replaceState ', bases, ' --> ', encoded, ' as ' + location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + encoded);
       history.replaceState(null, 'unused-string', location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + encoded);
-    } else {
-      console.log('store in hash ', bases, ' --> ', encoded);
-      location.href = '#' + encoded;
     }
   }
 

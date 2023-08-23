@@ -1673,6 +1673,41 @@ function ttywtf() {
 
   // #endregion
 
+  /**
+ * @param modifier {string}
+ * @param remove {boolean=}
+ **/
+  function applyModifierToSelection(modifier, remove) {
+    var selection = getCurrentSelection();
+
+    if (!modifier || !selection.text) return;
+
+    var leadText = selection.text.slice(0, selection.startPos);
+    var modifyText = selection.text.slice(selection.startPos, selection.endPos);
+    var trailText = selection.text.slice(selection.endPos);
+
+    if (!modifyText) return;
+
+    var replacedModifyText = applyModifier(
+      modifyText,
+      modifier,
+      remove);
+
+    var newText = leadText + replacedModifyText + trailText;
+
+    if (selection.text !== newText) {
+      editor.replaceSelection(replacedModifyText, 'around');
+      return true;
+      // editor.setValue(newText);
+      // if (selectionStartPos !== leadText.length) {
+      //   //editor.setSelection().selectionStart = leadText.length;
+      // }
+      // //if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
+
+      // // onchange - already triggers?
+    }
+  }
+
   /** @type {ReturnType<typeof createParser>} */
   var parseRanges = runParseRanges;
 

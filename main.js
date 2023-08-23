@@ -1678,6 +1678,28 @@ function ttywtf() {
    * @param remove {boolean=}
    **/
   function applyModifierToSelection(modifier, remove) {
+    var oldText = textarea.value;
+
+    if (!modifier || !oldText) return;
+
+    var leadText = oldText.slice(0, textarea.selectionStart);
+    var modifyText = oldText.slice(textarea.selectionStart, textarea.selectionEnd);
+    var trailText = oldText.slice(textarea.selectionEnd);
+
+    if (!modifyText) return;
+
+    var newText = leadText + applyModifier(
+      modifyText,
+      modifier,
+      remove) + trailText;
+
+    if (oldText !== newText) {
+      textarea.value = newText;
+      if (textarea.selectionStart !== leadText.length) textarea.selectionStart = leadText.length;
+      if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
+
+      textarea_onchange_debounced();
+    }
   }
 
   /** @type {ReturnType<typeof createParser>} */

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Math">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Emoji">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto Sans Symbols 2">
+
+  <style>
+    html {
+      box-sizing: border-box;
+      font-family: "Arial Unicode", "Note Sans Math", "Note Emoji", "Noto Sans Symbols", "Noto Sans Symbols 2", "Note Sans";
+      background: white;
+      color: black
+    }
+
+    *,
+    *:before,
+    *:after {
+      box-sizing: inherit;
+      font: inherit;
+    }
+  </style>
+
+  <title>TTY</title>
+</head>
+
+<body>
+  <script>
+    (function () {
+      function detectLocationBase(location) {
+        if (!location) location = window.location;
+        if (/http/.test(location.protocol)) {
+          if (/github\.io/i.test(location.host)) {
+            var firstDir = (location.pathname || '').split('/').filter(function (part) { return !!part; })[0];
+            if (!firstDir) return {
+              source: 'path',
+              path: '/',
+              encoded: location.pathname.replace(/^\//, '')
+            };
+            var posFirstDir = location.pathname.indexOf(firstDir);
+            return {
+              source: 'path',
+              base: location.pathname.slice(0, posFirstDir),
+              encoded: location.pathname.slice(posFirstDir)
+            };
+          } else if (/\.vscode/i.test(location.host)) {
+            var matchIndexHtml = /\/(index|404)\.html\b/i.exec(location.pathname || '');
+            if (!matchIndexHtml) return {
+              source: 'hash',
+              path: location.pathname,
+              encoded: location.hash.replace(/^#/, '')
+            };
+            return {
+              source: 'hash',
+              path: location.pathname.slice(0, matchIndexHtml.index + 1),
+              encoded: location.hash.replace(/^#/, '')
+            };
+          } else {
+            return {
+              source: 'path',
+              path: '/',
+              encoded: location.pathname.replace(/^\//, '')
+            };
+          }
+        } else {
+          return {
+            source: 'hash',
+            path: location.pathname,
+            encoded: location.hash.replace(/^#/, '')
+          };
+        }
+      }
+
+      var bases = detectLocationBase(location);
+      if (bases.path !== location.pathname) {
+        document.write('<base href="' + bases.path + '">');
+      }
+    })();
+  </script>
+  <script src="main.js"></script>
+  <script src="pako.js"></script>
+  <script>
+    if (/file/i.test(location.protocol)) {
+      ['main.js', 'pako.js'].map(function (src) {
+        var script = document.createElement('script');
+        script.src = src;
+        document.body.appendChild(script);
+      });
+    }
+  </script>
+</body>
+
+</html>

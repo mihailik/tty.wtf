@@ -2,9 +2,6 @@
 
 function ttywtf() {
 
-  /** @type {string[] | undefined} */
-  var residualModifiers;
-
   function addButtonHandlers() {
     var buttonsArray = document.getElementsByTagName('button');
     for (var i = 0; i < buttonsArray.length; i++) {
@@ -47,6 +44,8 @@ function ttywtf() {
       }
     }
   }
+
+  // #region URL content handling
 
   function getStorageText() {
     return deriveTextFromLocation();
@@ -173,13 +172,6 @@ function ttywtf() {
     if (encoded.length < 1900 && convertFromMarkdown(encoded) === text) return encoded;
     if (text.length < 1900) return 'txt~' + text;
     return 'b~' + convertToCompressed(text);
-  }
-
-  var regex_isASCII = /^[ -~\r\n\t]*$/;
-
-  /** @param str {string} */
-  function isAscii(str) {
-    return typeof str === 'string' && regex_isASCII.test(str);
   }
 
   var regex_markdownDecorChunks = /([\*_]+)([^\*_\n]+)([\*_]+)/g;
@@ -310,6 +302,8 @@ function ttywtf() {
     var base64 = btoa(deflatedStr);
     return base64;
   }
+
+  // #endregion
 
   /** @param evt {ClipboardEvent} */
   function textarea_onpaste(evt) {
@@ -704,68 +698,6 @@ function ttywtf() {
     }
   }
 
-  /**
-   * @param {string} text
-   * @param {number} start
-   * @param {number} end
-   */
-  function getModifiersTextSection(text, start, end) {
-    var modText = text;
-    if (start !== end) {
-      modText = modText.slice(start, end);
-      return { text: modText, start: start, end: end, parsed: parseRanges(modText) };
-    }
-
-    var consequentMatch = /\S+\s*$/.exec(text.slice(0, start));
-    var consequentEntryStart = start - (consequentMatch ? consequentMatch[0].length : 0);
-
-    if (!consequentMatch || !consequentMatch[0]) {
-      // if cannot find consequent BEFORE, try consequent AFTER
-      consequentMatch = /^\s*\S+/.exec(text.slice(start));
-      if (!consequentMatch) return { text: '', start: start, end: start, parsed: parseRanges('') };
-      var parsed = parseRanges(consequentMatch[0]);
-      var consequentEntry = parsed[0];
-    } else {
-      var parsed = parseRanges(consequentMatch[0]);
-      var consequentEntry = parsed[parsed.length - 1];
-    }
-
-    if (!parsed.length) return { text: '', start: start, end: start, parsed };
-
-    // pick previous if this is punctuation or whitespace after formatted word
-    if (typeof consequentEntry === 'string' && parsed && parsed.length > 1) {
-      var prevConsequentEntry = parsed[parsed.length - 2];
-      if (consequentEntry.indexOf('\n') < 0 &&
-        typeof prevConsequentEntry !== 'string' &&
-        consequentEntry == applyModifier(consequentEntry, prevConsequentEntry.fullModifiers)) {
-        consequentEntry = prevConsequentEntry;
-      }
-    }
-
-
-    if (consequentMatch && consequentMatch[0]) {
-      if (consequentEntry) {
-        parsed.length = 1;
-        parsed.modifiers = typeof consequentEntry === 'string' ? [] : consequentEntry.modifiers;
-        parsed.fullModifiers = typeof consequentEntry === 'string' ? '' : consequentEntry.fullModifiers;
-        parsed[0] = consequentEntry;
-      } else {
-        parsed.length = 0;
-        parsed.modifiers = [];
-        parsed.fullModifiers = '';
-      }
-
-      return {
-        text: typeof consequentEntry === 'string' ? consequentEntry : consequentEntry.formatted,
-        start: consequentEntryStart,
-        end: consequentEntryStart + consequentEntry.length,
-        parsed: parsed
-      };
-    }
-
-    return { text: '', start: start, end: start, parsed: parseRanges('') };
-  }
-
   function window_onunload() {
     // save to local storage NOW
     textarea_onchange_debounced();
@@ -914,7 +846,7 @@ function ttywtf() {
     getStorageTextFirstTime();
   }
 
-  function runInLocalNodeScript() {
+  function  runInLocalNodeScript() {
     console.log('Running local DEV server...');
 
     var fs = require('fs');

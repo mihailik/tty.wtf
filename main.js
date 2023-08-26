@@ -96,6 +96,12 @@ function ttywtf() {
           path: location.pathname.slice(0, matchIndexHtml.index + 1),
           encoded: location.hash.replace(/^#/, '')
         };
+      } else if (location.host.toLowerCase() === 'oyin.bo') {
+        return {
+          source: 'path',
+          path: '/tty.wtf/',
+          encoded: location.pathname.replace(/(^\/)|(^\/tty\.wtf\/)/, '')
+        };
       } else {
         return {
           source: 'path',

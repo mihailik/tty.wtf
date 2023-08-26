@@ -100,7 +100,7 @@ function ttywtf() {
         return {
           source: 'path',
           path: '/tty.wtf/',
-          encoded: location.pathname.replace(/(^\/)|(^\/tty\.wtf\/)/, '')
+          encoded: location.pathname.replace(/(^\/tty\.wtf\/)|(^\/)/, '')
         };
       } else {
         return {

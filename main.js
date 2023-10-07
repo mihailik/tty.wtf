@@ -795,6 +795,13 @@ function ttywtf() {
     textarea.onmousemove = textarea_onmousemove;
     textarea.onpaste = textarea_onpaste;
 
+    // firefox mobile fails to autoselect on doubleclick
+    if (navigator.userAgent.indexOf('Firefox') >= 0) {
+      textarea.ondblclick = function (evt) {
+        textarea.selection
+      };
+    }
+
     window.onunload = window_onunload;
 
     addButtonHandlers();
@@ -1622,20 +1629,44 @@ function ttywtf() {
     if (!modifier || !oldText) return;
 
     var leadText = oldText.slice(0, textarea.selectionStart);
-    var modifyText = oldText.slice(textarea.selectionStart, textarea.selectionEnd);
+    var modifyTextStart = oldText.slice(textarea.selectionStart, textarea.selectionEnd);
+    var modifyTextEnd = '';
     var trailText = oldText.slice(textarea.selectionEnd);
 
-    if (!modifyText) return;
+    var expandedToWord = false;
+    if (!modifyTextStart) {
+      var lastWordMatch = /[^\s\r\n]*$/i.exec(leadText);
+      var lastWordIndex = lastWordMatch ? lastWordMatch.index : 0;
+      var leadForWord = leadText.slice(lastWordIndex);
+      if (leadForWord.length && leadForWord.length < 100) {
+        modifyTextStart = leadForWord;
+        leadText = leadText.slice(0, lastWordIndex);
+        expandedToWord = true;
+      }
 
-    var newText = leadText + applyModifier(
-      modifyText,
-      modifier,
-      remove) + trailText;
+      var firstWordMatch = /^[^\s\r\n]*/i.exec(trailText);
+      var trailForWord = firstWordMatch ? firstWordMatch[0] : '';
+      if (trailForWord.length && trailForWord.length < 100) {
+        modifyTextEnd += trailForWord;
+        trailText = trailText.slice(trailForWord.length);
+        expandedToWord = true;
+      }
+    }
+
+    const appliedTextStart = applyModifier(modifyTextStart, modifier, remove);
+    const appliedTextEnd = applyModifier(modifyTextEnd, modifier, remove);
+
+    var newText = leadText + appliedTextStart + appliedTextEnd + trailText;
 
     if (oldText !== newText) {
       textarea.value = newText;
-      if (textarea.selectionStart !== leadText.length) textarea.selectionStart = leadText.length;
-      if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
+      if (expandedToWord) {
+        if (textarea.selectionStart !== leadText.length + appliedTextStart.length) textarea.selectionStart = leadText.length + appliedTextStart.length;
+        if (textarea.selectionEnd !== leadText.length + appliedTextStart.length) textarea.selectionEnd = leadText.length + appliedTextStart.length;
+      } else {
+        if (textarea.selectionStart !== leadText.length) textarea.selectionStart = leadText.length;
+        if (textarea.selectionEnd !== newText.length - trailText.length) textarea.selectionEnd = newText.length - trailText.length;
+      }
 
       textarea_onchange_debounced();
     }

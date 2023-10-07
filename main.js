@@ -537,7 +537,7 @@ function ttywtf() {
               textareaLastValue = newText;
               textarea.value = newText;
               formattingApplied = true;
-              var restoreSelectionPos = unchangedPrefixLength + editedInnerText.length;
+              var restoreSelectionPos = unchangedPrefixLength + innerText.length;
               if (textarea.selectionStart !== restoreSelectionPos || textarea.selectionEnd !== restoreSelectionPos) {
                 textarea.selectionStart = restoreSelectionPos;
                 textarea.selectionEnd = restoreSelectionPos;

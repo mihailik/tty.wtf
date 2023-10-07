@@ -719,7 +719,7 @@ function ttywtf() {
 
   function createLayout() {
     var tableLayoutHTML =
-      '<table style="width: 100%; height: 100%;" cellspacing=0 cellpadding=0><tr><td width="100%">' +
+      '<table style="width: 100%; height: 100%;" cellspacing=0 cellpadding=0><tr><td width="100%" style="position: relative">' +
       '<textarea id="textarea" autofocus>' +
       '</textarea>' +
       '</td><td width="1%" style="width: 1em; padding-right: 0.5em;" id="toolbar" valign=top>' +
@@ -745,7 +745,7 @@ function ttywtf() {
       '#toolbar button#cursive .symbol-formatted { left: 0.1em; } \n' +
       '#toolbar button#box .symbol-formatted { left: 0.05em; top: 0.08em; } \n' +
       '#toolbar button#plate .symbol-formatted { top: 0.14em; } \n' +
-      '#textarea { width: 100%; height: 100%; overflow: auto; border: none; padding: 1em; outline: none; font: inherit; resize: none; }';
+      '#textarea { width: 100%; height: 100%; overflow: auto; border: none; padding: 1em; outline: none; font: inherit; resize: none; position: absolute; left: 0; top: 0; }';
 
     var styleEl = document.createElement('style');
     styleEl.innerHTML = styleCSS;
@@ -1075,6 +1075,7 @@ function ttywtf() {
       var imgSize = { width: 800, height: 418 };
 
       return new Promise(function (resolve, reject) {
+        // @ts-ignore
         var puppeteer = require('puppeteer');
         puppeteer.launch().then(
           function withBrowser(browser) {
@@ -1640,7 +1641,6 @@ function ttywtf() {
     }
   }
 
-  /** @type {ReturnType<typeof createParser>} */
   var parseRanges = runParseRanges;
 
   var save_timeout;

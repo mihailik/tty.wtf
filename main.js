@@ -107,7 +107,9 @@ function ttywtf() {
 
   function getLocationSource(location) {
     var bases = detectLocationBase(location);
-    return unmangleFromURL(bases.encoded);
+    var source = bases.encoded;
+    if (source.charAt(0) === '/') source = source.slice(1);
+    return unmangleFromURL(source);
   }
 
   /**

@@ -71,18 +71,11 @@ function ttywtf() {
   function detectLocationBase(location) {
     if (!location) location = window.location;
     if (/http/.test(location.protocol)) {
-      if (/github\.io/i.test(location.host)) {
-        var firstDir = (location.pathname || '').split('/').filter(function (part) { return !!part; })[0];
-        if (!firstDir) return {
-          source: 'path',
-          path: '/',
-          encoded: location.pathname.replace(/^\//, '')
-        };
-        var posFirstDir = location.pathname.indexOf(firstDir);
+      if (/github\.io/i.test(location.host) || location.host.toLowerCase() === 'oyin.bo') {
         return {
           source: 'path',
-          base: location.pathname.slice(0, posFirstDir),
-          encoded: location.pathname.slice(posFirstDir)
+          path: location.pathname.slice(0, location.pathname.indexOf('/', 1) + 1),
+          encoded: '/' + location.pathname.slice(location.pathname.indexOf('/', 1) + 1)
         };
       } else if (/\.vscode/i.test(location.host)) {
         var matchIndexHtml = /\/(index|404)\.html\b/i.exec(location.pathname || '');
@@ -95,18 +88,6 @@ function ttywtf() {
           source: 'hash',
           path: location.pathname.slice(0, matchIndexHtml.index + 1),
           encoded: location.hash.replace(/^#/, '')
-        };
-      } else if (location.host.toLowerCase() === 'oyin.bo') {
-        return {
-          source: 'path',
-          path: '/tty.wtf/',
-          encoded: location.pathname.replace(/(^\/tty\.wtf\/)|(^\/)/, '')
-        };
-      } else if (location.host.toLowerCase() === 'mihailik.github.io') {
-        return {
-          source: 'path',
-          path: location.pathname.slice(0, location.pathname.indexOf('/', 1) + 1),
-          encoded: '/' + location.pathname.slice(location.pathname.indexOf('/', 1) + 1)
         };
       } else {
         return {

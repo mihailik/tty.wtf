@@ -85,10 +85,10 @@
 })();
 </script>
 <script src="main.js"></script>
-<script src="pako.js"></script>
+<script src="lib.js"></script>
 <script>
 if (/file/i.test(location.protocol)) {
-  ['main.js', 'pako.js'].map(function(src) {
+  ['main.js', 'lib.js'].map(function(src) {
     var script = document.createElement('script');
     script.src = src;
     document.body.appendChild(script);

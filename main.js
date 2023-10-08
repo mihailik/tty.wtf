@@ -798,7 +798,7 @@ function ttywtf() {
     // firefox mobile fails to autoselect on doubleclick
     if (navigator.userAgent.indexOf('Firefox') >= 0) {
       textarea.ondblclick = function (evt) {
-        textarea.selection
+        // textarea.selection
       };
     }
 
@@ -859,7 +859,7 @@ function ttywtf() {
     getStorageTextFirstTime();
   }
 
-  function  runInLocalNodeScript() {
+  function runInLocalNodeScript() {
     console.log('Running local DEV server...');
 
     var fs = require('fs');

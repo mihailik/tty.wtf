@@ -4,10 +4,6 @@
   "private": true,
   "description": "",
   "scripts": {
-    "start": "node main.js",
-    "test": "echo \"No tests yet...\""
-  },
-  "dependencies": {
-    "puppeteer": "^15.4.0"
+    "start": "node main.js"
   }
 }

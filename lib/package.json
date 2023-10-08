@@ -1,0 +1,19 @@
+{
+  "name": "lib",
+  "version": "1.0.0",
+  "description": "",
+  "main": "lib.js",
+
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "scripts": {
+    "build": "rollup lib.js --file ../lib.js --format iife --plugin @rollup/plugin-node-resolve --context this",
+    "start": "node main.js"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.2",
+    "pako": "^2.1.0",
+    "rollup": "^4.0.2"
+  }
+}

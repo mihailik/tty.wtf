@@ -155,7 +155,9 @@ function ttywtf() {
       return;
     } else {
       console.log('store with replaceState ', bases, ' --> ', encoded, ' as ' + location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + encoded);
-      history.replaceState(null, 'unused-string', location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + '/' + encoded);
+      history.replaceState(null, 'unused-string',
+        location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') +
+        bases.path + encoded);
     }
   }
 

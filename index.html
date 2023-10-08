@@ -62,6 +62,12 @@
           path: '/tty.wtf/',
           encoded: location.pathname.replace(/(^\/tty\.wtf\/)|(^\/)/, '')
         };
+      } else if (location.host.toLowerCase() === 'mihailik.github.io') {
+        return {
+          source: 'path',
+          path: location.pathname.slice(0, location.pathname.indexOf('/', 1) + 1),
+          encoded: '/' + location.pathname.slice(location.pathname.indexOf('/', 1) + 1)
+        };
       } else {
         return {
           source: 'path',

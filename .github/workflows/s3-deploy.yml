@@ -23,4 +23,12 @@ jobs:
       #   run: npm install && npm run build
 
       - name: Upload website content to S3
-        run: aws s3 sync dist s3://hosting-tty-wtf/  # Replace with your S3 bucket
+        run: aws s3 sync . s3://hosting-tty-wtf/  \
+            --exclude '.github/*' \
+            --exclude '.vscode/*' \
+            --exclude 'azurefn/*' \
+            --exclude '.gitignore' \
+            --exclude '.CNAME' \
+            --exclude 'package.json' \
+            --exclude 'package-lock.json' \
+        # Replace with your S3 bucket

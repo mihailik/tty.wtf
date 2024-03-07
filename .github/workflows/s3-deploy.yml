@@ -20,7 +20,7 @@ jobs:
 
       - name: Build your website (if necessary)  # Adapt based on your build process
         # Example: Build commands for a static site generator
-        run: npm install && npm run build
+        run: echo OK
 
       - name: Upload website content to S3
         run: aws s3 sync . s3://hosting-tty-wtf/

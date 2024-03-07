@@ -1,0 +1,26 @@
+name: Deploy to S3
+
+on:
+  push:
+    branches: [ main ]  # Change "main" to your branch name if needed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  # You can choose other runner OS
+
+    steps:
+      - uses: actions/checkout@v3  # Checkout code from your repository
+
+      - name: Configure AWS credentials  # Add AWS credentials securely
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # Replace with your AWS region
+
+      # - name: Build your website (if necessary)  # Adapt based on your build process
+      #   # Example: Build commands for a static site generator
+      #   run: npm install && npm run build
+
+      - name: Upload website content to S3
+        run: aws s3 sync dist s3://hosting-tty-wtf/  # Replace with your S3 bucket

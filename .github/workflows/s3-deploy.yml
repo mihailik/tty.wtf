@@ -18,17 +18,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1  # Replace with your AWS region
 
-      # - name: Build your website (if necessary)  # Adapt based on your build process
-      #   # Example: Build commands for a static site generator
-      #   run: npm install && npm run build
+      - name: Build your website (if necessary)  # Adapt based on your build process
+        # Example: Build commands for a static site generator
+        run: npm install && npm run build
 
       - name: Upload website content to S3
-        run: aws s3 sync . s3://hosting-tty-wtf/  \
-            --exclude '.github/*' \
-            --exclude '.vscode/*' \
-            --exclude 'azurefn/*' \
-            --exclude '.gitignore' \
-            --exclude '.CNAME' \
-            --exclude 'package.json' \
-            --exclude 'package-lock.json' \
+        run: aws s3 sync . s3://hosting-tty-wtf/
         # Replace with your S3 bucket
